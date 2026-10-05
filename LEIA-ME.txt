@@ -1,0 +1,40 @@
+APPS FREEDOM PARA ANDROID
+=========================
+
+Este projeto gera DOIS aplicativos separados:
+
+  FreedomComercial.apk    -> app "Freedom Comercial"
+                             Gestor: faturamento do mês da equipe, meta, ideal, falta, positivação e TODOS os vendedores.
+                             Vendedor: a semana dele (meta acumulativa) e o mês.
+  FreedomFaturamento.apk  -> app "Freedom Faturamento"
+                             Faturamento do dia por tipo de pedido, total do mês, Standby e PEND da equipe.
+
+Cada pessoa instala o(s) app(s) que usa e faz o login com o PRÓPRIO e-mail e senha do site
+relatorios.cbfreedom.com.br. O login fica guardado só no celular dela (senha criptografada).
+Os apps não precisam de servidor: o celular busca os números direto no site.
+
+COMO GERAR OS APKs (uma vez, no GitHub)
+1. Crie uma conta em github.com (grátis) e um repositório novo, PRIVADO, chamado apps-freedom.
+2. Na página do repositório: "uploading an existing file" e arraste TODO o conteúdo desta pasta
+   (inclusive a pasta .github). Clique em "Commit changes".
+3. Abra a aba "Actions": o "Gerar APKs" começa sozinho e leva uns 5 a 8 minutos.
+4. Quando ficar verde, abra a aba "Releases" (ou "Code" > Releases à direita) e baixe
+   FreedomComercial.apk e FreedomFaturamento.apk.
+Toda vez que um arquivo for trocado no repositório, ele gera uma versão nova, que instala por cima da antiga.
+
+NO CELULAR
+1. Abra o APK baixado e permita "instalar apps desta fonte" quando o Android pedir.
+2. Abra o app, faça o login.
+3. Segure o dedo na tela inicial > Widgets > Freedom Comercial (ou Freedom Faturamento) > arraste para a tela.
+4. Estique o widget para mostrar mais coisas (no Comercial do gestor, grande mostra os vendedores).
+   - Tocar no horário (canto de cima à direita) = atualiza agora.
+   - Tocar no resto = abre a tela cheia.
+5. Atualiza sozinho a cada 15 minutos. Em Xiaomi/Samsung/Motorola, deixe a bateria do app como
+   "Sem restrições" para ele não ser bloqueado.
+
+PASTAS
+  comum/        código usado pelos dois apps (login, acesso ao site, widget, atualização automática, tela)
+  comercial/    app Freedom Comercial
+  faturamento/  app Freedom Faturamento
+  .github/      instrução para o GitHub montar os APKs
+  freedom.keystore  assinatura dos apps (não apague: sem ela o celular não aceita atualizar por cima)

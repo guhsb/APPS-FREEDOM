@@ -1,0 +1,52 @@
+name: Gerar APKs
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Montar os dois APKs
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Renomear
+        run: |
+          cp comercial/build/outputs/apk/release/comercial-release.apk FreedomComercial.apk
+          cp faturamento/build/outputs/apk/release/faturamento-release.apk FreedomFaturamento.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Apps-Freedom
+          path: |
+            FreedomComercial.apk
+            FreedomFaturamento.apk
+
+      - name: Publicar em Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Apps Freedom ${{ github.run_number }}
+          body: |
+            FreedomComercial.apk = app do Comercial (gestor e vendedor)
+            FreedomFaturamento.apk = app do Faturamento
+          files: |
+            FreedomComercial.apk
+            FreedomFaturamento.apk
+          make_latest: true

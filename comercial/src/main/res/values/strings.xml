@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Freedom Comercial</string>
+    <string name="nome_widget">Freedom · Comercial</string>
+    <string name="desc_widget">Faturamento do mês, meta e vendedores (gestor) ou sua semana e mês (vendedor)</string>
+</resources>

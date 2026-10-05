@@ -1,0 +1,37 @@
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:radial-gradient(520px 360px at 50% 0,rgba(232,75,138,.13),transparent 70%),#0a0c12;background-attachment:fixed;color:#f2f4f8;
+  font:15px system-ui,-apple-system,Roboto,sans-serif;padding:0 16px 40px;min-height:100vh}
+.topo{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:12px 0 10px;background:linear-gradient(#0a0c12 75%,rgba(10,12,18,0))}
+.topo img{height:30px}
+.topo .st{flex:1;text-align:right;font-size:11px;color:#8b93a7;line-height:1.35}
+.topo .st b{color:#c9ced9;font-weight:600}
+.bt{width:40px;height:40px;border-radius:50%;border:1px solid #232838;background:#12151f;color:#f2f4f8;font-size:19px;display:flex;align-items:center;justify-content:center;padding:0}
+.bt.gira span{display:inline-block;animation:gira 1s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+.aviso{background:rgba(240,165,58,.12);border:1px solid rgba(240,165,58,.35);color:#f0c27a;border-radius:12px;padding:10px 12px;font-size:13px;margin:4px 0 12px}
+.card{background:#12151f;border:1px solid #232838;border-radius:16px;padding:16px;margin-bottom:12px}
+.rot{font-size:11px;letter-spacing:.12em;color:#8b93a7;font-weight:700}
+.big{font-size:34px;font-weight:900;letter-spacing:-.5px;margin:6px 0 2px;white-space:nowrap}
+.big small{font-size:.45em;color:#e84b8a;vertical-align:.65em;margin-right:4px;font-weight:900}
+.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;background:#1b2030}
+.trilho{height:10px;background:#1b2030;border-radius:10px;position:relative;margin:12px 0 6px}
+.trilho>div{height:100%;border-radius:10px;min-width:10px}
+.trilho>s{position:absolute;top:-4px;bottom:-4px;width:2px;background:#c9ced9;border-radius:2px}
+.leg{display:flex;justify-content:space-between;font-size:11px;color:#8b93a7}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.tile{background:#0e1119;border:1px solid #1d2231;border-radius:12px;padding:10px 8px}
+.tile span{display:block;font-size:11px;color:#8b93a7}
+.tile b{display:block;font-size:15px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.verde{color:#1fbf8f}.laranja{color:#f0a53a}.rosa{color:#e84b8a}.cinza{color:#8b93a7}
+.carregando{text-align:center;color:#8b93a7;padding:80px 0}
+.carregando i{display:block;width:34px;height:34px;margin:0 auto 14px;border:3px solid #232838;border-top-color:#e84b8a;border-radius:50%;animation:gira 1s linear infinite}
+.fundo-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:20;padding:16px}
+.fundo-modal.on{display:flex}
+.modal{width:100%;max-width:420px;background:#12151f;border:1px solid #232838;border-radius:18px;padding:18px}
+.modal h3{margin:0 0 6px;font-size:17px}.modal p{margin:0 0 16px;color:#8b93a7;font-size:13px}
+.modal button{width:100%;border:0;border-radius:12px;padding:14px;font-size:15px;font-weight:700;margin-top:8px}
+.b1{background:#e84b8a;color:#fff}.b2{background:#1b2030;color:#f2f4f8}
+.rod{text-align:center;color:#5d6578;font-size:11px;margin-top:18px}
+@media (min-width:700px){body{max-width:760px;margin:0 auto}}
+@media (max-width:430px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}

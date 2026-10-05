@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css">
+<style>
+.centro{text-align:center;padding-top:8px}
+.logo{height:70px}
+.lb{margin-top:14px;font-size:12px;letter-spacing:.3em;color:#8b93a7;font-weight:700}
+.val{font-size:46px;font-weight:900;letter-spacing:-1px;margin:4px 0 2px;white-space:nowrap}
+.val small{font-size:.45em;color:#e84b8a;vertical-align:.6em;margin-right:4px}
+.sub{color:#8b93a7;font-size:13px}
+.tps{margin:18px auto 0;max-width:460px;display:flex;flex-direction:column;gap:8px}
+.tp{display:flex;align-items:center;gap:8px;background:#12151f;border:1px solid #232838;border-left:4px solid var(--c);border-radius:10px;padding:11px 12px;text-align:left}
+.tp span{flex:1;color:#aab1c2;font-size:14px}.tp b{font-size:15px;white-space:nowrap}.tp i{font-style:normal;color:#8b93a7;font-size:11px;width:52px;text-align:right}
+.tp .pc{flex:none;width:44px;color:#5d6578;font-size:11px;text-align:right}
+.mes{display:inline-flex;gap:10px;align-items:baseline;max-width:100%;margin:20px 0 0;background:#12151f;border:1px solid #232838;border-radius:999px;padding:11px 20px}
+.mes span{white-space:nowrap;font-size:10px;letter-spacing:.14em;color:#8b93a7;font-weight:700}.mes b{font-size:19px;white-space:nowrap}
+.cards{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:18px auto 0;max-width:460px}
+.cd{background:#12151f;border:1px solid #232838;border-top:3px solid var(--c);border-radius:12px;padding:14px 6px}
+.cd span{display:block;color:#8b93a7;font-size:12px}.cd b{display:block;font-size:19px;margin-top:6px;white-space:nowrap}
+@media (max-width:360px){.val{font-size:38px}.cd b{font-size:16px}}
+</style></head><body>
+<div id="conteudo"></div>
+<script src="base.js"></script>
+<script>
+var CORES = { V: '#1fbf8f', C: '#8b6cf0', '1': '#4f7cff', B: '#f0a53a', P: '#2bb673', O: '#e5484d', D: '#3b82f6',
+              Q: '#f59e0b', M: '#10b981', T: '#f97316', '5': '#a855f7', '7': '#ef4444', '6': '#7c3aed', A: '#60a5fa' };
+Base.iniciar(function (d, e) {
+  var dia = d.dia || {}, mes = d.mes || {}, tipos = dia.tipos || [], tot = F.n(dia.valor);
+  var lista = tipos.map(function (t) {
+    return '<div class="tp" style="--c:' + (CORES[t.codigo] || '#8b93a7') + '"><span>' + F.esc(t.nome) + '</span><b>' + F.brl(t.valor) + '</b>' +
+      '<em class="pc">' + (tot ? F.pct(F.n(t.valor) / tot * 100) : '') + '</em><i>' + F.int(t.pedidos) + ' ped.</i></div>';
+  }).join('');
+  document.getElementById('conteudo').innerHTML =
+    '<div class="centro">' +
+    '<img class="logo" src="logo.png" alt="Freedom">' +
+    '<div class="lb">FATURAMENTO DO DIA</div>' +
+    '<div class="val"><small>R$</small>' + F.num(dia.valor) + '</div>' +
+    '<div class="sub">' + F.dataBR(dia.data) + ' · ' + F.int(dia.pedidos) + (Math.round(F.n(dia.pedidos)) === 1 ? ' pedido' : ' pedidos') + '</div>' +
+    '<div class="tps">' + (lista || '<div class="sub">Nenhum pedido faturado</div>') + '</div>' +
+    '<div class="mes"><span>TOTAL DE ' + F.esc(mes.nome || '') + '</span><b>' + F.brl(mes.valor) + '</b></div>' +
+    '<div class="cards"><div class="cd" style="--c:#f0a53a"><span>Standby</span><b>' + F.brl(d.standby) + '</b></div>' +
+    '<div class="cd" style="--c:#8b6cf0"><span>PEND da equipe (faturável)</span><b>' + F.brl(d.pend) + '</b></div></div>' +
+    '<div class="rod">Atualiza sozinho a cada 15 minutos · toque em ↻ para atualizar agora</div></div>';
+});
+</script>
+</body></html>
