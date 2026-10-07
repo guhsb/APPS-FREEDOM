@@ -1,4 +1,4 @@
-name: Gerar APKs
+name: Gerar APK
 
 on:
   push:
@@ -23,30 +23,23 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Montar os dois APKs
-        run: gradle assembleRelease --no-daemon --stacktrace
+      - name: Montar o APK
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Renomear
-        run: |
-          cp comercial/build/outputs/apk/release/comercial-release.apk FreedomComercial.apk
-          cp faturamento/build/outputs/apk/release/faturamento-release.apk FreedomFaturamento.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Freedom.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Apps-Freedom
-          path: |
-            FreedomComercial.apk
-            FreedomFaturamento.apk
+          name: Freedom
+          path: Freedom.apk
 
       - name: Publicar em Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: Apps Freedom ${{ github.run_number }}
+          name: Freedom ${{ github.run_number }}
           body: |
-            FreedomComercial.apk = app do Comercial (gestor e vendedor)
-            FreedomFaturamento.apk = app do Faturamento
-          files: |
-            FreedomComercial.apk
-            FreedomFaturamento.apk
+            Freedom.apk = app único: Helpdesk, site e painéis/widgets (Comercial, Faturamento) conforme o acesso de cada login
+          files: Freedom.apk
           make_latest: true

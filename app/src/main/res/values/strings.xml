@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Freedom</string>
+    <string name="widget_comercial">Freedom · Comercial</string>
+    <string name="widget_comercial_desc">Faturamento do mês, meta e vendedores (gestor) ou sua semana e mês (vendedor)</string>
+    <string name="widget_faturamento">Freedom · Faturamento</string>
+    <string name="widget_faturamento_desc">Faturamento do dia por tipo de pedido, total do mês, Standby e PEND</string>
+</resources>

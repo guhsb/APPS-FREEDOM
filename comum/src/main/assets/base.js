@@ -19,7 +19,8 @@ var F = {
 
 var Base = {
   render: null,
-  estado: function () { try { return JSON.parse(App.dados()); } catch (e) { return {}; } },
+  // cada página de painel define PAINEL_ID ('comercial', 'faturamento'...) antes de carregar este arquivo
+  estado: function () { try { return JSON.parse(window.PAINEL_ID ? App.dadosPainel(PAINEL_ID) : App.dados()); } catch (e) { return {}; } },
   iniciar: function (render) {
     Base.render = render;
     document.body.insertAdjacentHTML('afterbegin',

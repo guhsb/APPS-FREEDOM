@@ -1,40 +1,59 @@
-APPS FREEDOM PARA ANDROID
-=========================
+APP FREEDOM PARA ANDROID (app único)
+====================================
 
-Este projeto gera DOIS aplicativos separados:
+Um só aplicativo (Freedom.apk) para todo mundo. Cada pessoa entra com o PRÓPRIO e-mail e senha do site
+relatorios.cbfreedom.com.br e o app mostra só o que aquele login tem acesso no site (os "módulos"):
 
-  FreedomComercial.apk    -> app "Freedom Comercial"
-                             Gestor: faturamento do mês da equipe, meta, ideal, falta, positivação e TODOS os vendedores.
-                             Vendedor: a semana dele (meta acumulativa) e o mês.
-  FreedomFaturamento.apk  -> app "Freedom Faturamento"
-                             Faturamento do dia por tipo de pedido, total do mês, Standby e PEND da equipe.
+  Módulo do login     O que aparece no app
+  ---------------     -----------------------------------------------------------------------
+  helpdesk            Aba Helpdesk + avisos no celular (novo chamado, resposta, status, prioridade,
+                      responsável, anexo, SLA) + widget Helpdesk (na fila, comigo, sem responsável,
+                      SLA, meus chamados e lista dos chamados em aberto)
+  commercial          Painel e widget "Comercial": o perfil decide a tela
+                        - vendedor: a semana dele (meta acumulativa) e o mês
+                        - gestor/diretor: faturamento do mês da equipe, meta, positivação e vendedores
+  logistics           Painel e widget "Faturamento": faturamento do dia por tipo de pedido, total do mês,
+                      Standby e PEND da equipe
+  (qualquer login)    Aba Site: o site completo, já logado
 
-Cada pessoa instala o(s) app(s) que usa e faz o login com o PRÓPRIO e-mail e senha do site
-relatorios.cbfreedom.com.br. O login fica guardado só no celular dela (senha criptografada).
-Os apps não precisam de servidor: o celular busca os números direto no site.
+Quem tem acesso a tudo vê tudo. Quem só tem Helpdesk vê Helpdesk + Site. Os widgets que o login não pode
+ver nem aparecem na lista de widgets do celular.
 
-COMO GERAR OS APKs (uma vez, no GitHub)
-1. Crie uma conta em github.com (grátis) e um repositório novo, PRIVADO, chamado apps-freedom.
-2. Na página do repositório: "uploading an existing file" e arraste TODO o conteúdo desta pasta
-   (inclusive a pasta .github). Clique em "Commit changes".
-3. Abra a aba "Actions": o "Gerar APKs" começa sozinho e leva uns 5 a 8 minutos.
-4. Quando ficar verde, abra a aba "Releases" (ou "Code" > Releases à direita) e baixe
-   FreedomComercial.apk e FreedomFaturamento.apk.
-Toda vez que um arquivo for trocado no repositório, ele gera uma versão nova, que instala por cima da antiga.
+ABAS
+  1. Helpdesk (principal): últimas atualizações, chamados em aberto, números da Central de Atendimento,
+     configurações dos avisos. Tocar num aviso abre o chamado na aba Site.
+     - Modo tempo real (padrão): verifica a cada 2 min (1 a 30 min) com um aviso fixo na barra.
+     - Reserva: a cada 15 min, mesmo se o Android fechar o app. O que você mesmo faz não gera aviso.
+  2. Site: tocar de novo em "Site" volta ao início; segurar o dedo recarrega.
+  3. Painel: os números de cada área liberada. Com mais de uma (ex.: Comercial e Faturamento),
+     aparece um seletor em cima.
 
 NO CELULAR
-1. Abra o APK baixado e permita "instalar apps desta fonte" quando o Android pedir.
-2. Abra o app, faça o login.
-3. Segure o dedo na tela inicial > Widgets > Freedom Comercial (ou Freedom Faturamento) > arraste para a tela.
-4. Estique o widget para mostrar mais coisas (no Comercial do gestor, grande mostra os vendedores).
-   - Tocar no horário (canto de cima à direita) = atualiza agora.
-   - Tocar no resto = abre a tela cheia.
-5. Atualiza sozinho a cada 15 minutos. Em Xiaomi/Samsung/Motorola, deixe a bateria do app como
-   "Sem restrições" para ele não ser bloqueado.
+1. Instale o Freedom.apk (permita "instalar apps desta fonte"). Ele instala por cima do antigo
+   "Freedom Comercial" e mantém o login. Quem tinha o antigo "Freedom Faturamento" pode desinstalar ele.
+2. Abra o app e faça o login. Aceite as notificações e libere a bateria quando o app pedir.
+3. Widgets: segure o dedo na tela inicial > Widgets > Freedom > escolha (Helpdesk, Comercial,
+   Faturamento) e arraste. Estique para ver mais (o Helpdesk grande mostra a última novidade e a
+   lista de chamados). Tocar no horário atualiza; tocar no resto abre o app na aba certa.
+   O widget do Helpdesk se atualiza junto com os avisos (a cada 2 min no modo tempo real).
+4. Em Xiaomi/Samsung/Motorola, deixe a bateria do app como "Sem restrições".
+
+COMO ATUALIZAR NO GITHUB
+Copie os arquivos para a pasta do repositório (GitHub Desktop), faça Commit e Push.
+O GitHub monta o app sozinho (aba Actions, uns 5 min) e publica o Freedom.apk em Releases.
+O número da versão sobe a cada envio, então o APK novo instala por cima do antigo.
+
+PARA CRIAR UM PAINEL NOVO NO FUTURO (ex.: Financeiro)
+  1. app/src/main/java/.../financeiro/PainelFinanceiro.kt  (copie PainelFaturamento e troque módulo, busca e desenho)
+  2. app/src/main/assets/painel-financeiro.html             (tela cheia)
+  3. app/src/main/java/br/com/cbfreedom/app/Widgets.kt      (class WidgetFinanceiro : Widget("financeiro"))
+  4. app/src/main/res/xml/widget_financeiro.xml + receiver no app/src/main/AndroidManifest.xml
+  5. registre em app/src/main/java/br/com/cbfreedom/app/AppFreedom.kt
+  O app já mostra/esconde o painel e o widget conforme o módulo do login.
 
 PASTAS
-  comum/        código usado pelos dois apps (login, acesso ao site, widget, atualização automática, tela)
-  comercial/    app Freedom Comercial
-  faturamento/  app Freedom Faturamento
-  .github/      instrução para o GitHub montar os APKs
-  freedom.keystore  assinatura dos apps (não apague: sem ela o celular não aceita atualizar por cima)
+  app/      o aplicativo: painéis (Comercial, Faturamento), widgets, ícone
+  comum/    a base: login, abas, Helpdesk, site, acesso por módulo, widget, atualização automática
+  .github/  instrução para o GitHub montar o APK
+  freedom.keystore  assinatura do app (não apague: sem ela o celular não aceita atualizar por cima)
+  (as pastas antigas "comercial" e "faturamento" não são mais usadas e podem ser apagadas)

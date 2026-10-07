@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- O resto (abas, Helpdesk, site, permissões) vem do módulo comum -->
+    <application
+        android:name="br.com.cbfreedom.app.AppFreedom"
+        android:allowBackup="false"
+        android:icon="@drawable/icone"
+        android:roundIcon="@drawable/icone"
+        android:label="@string/app_name"
+        android:supportsRtl="false">
+
+        <!-- Um widget por painel. O app esconde da lista os que o login não pode ver. -->
+        <receiver
+            android:name="br.com.cbfreedom.app.WidgetComercial"
+            android:exported="false"
+            android:label="@string/widget_comercial">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_comercial" />
+        </receiver>
+
+        <receiver
+            android:name="br.com.cbfreedom.app.WidgetFaturamento"
+            android:exported="false"
+            android:label="@string/widget_faturamento">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_faturamento" />
+        </receiver>
+    </application>
+</manifest>

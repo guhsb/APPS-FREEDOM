@@ -5,6 +5,14 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- para a atualização automática continuar depois de reiniciar o celular -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- avisos do Helpdesk -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- downloads do site em celulares antigos (Android 9 ou menor) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application>
         <activity
@@ -12,7 +20,8 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/TemaFreedom"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode">
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -23,5 +32,41 @@
             android:name="br.com.cbfreedom.comum.Tarefa"
             android:exported="true"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- modo tempo real do Helpdesk (aviso fixo na barra) -->
+        <service
+            android:name="br.com.cbfreedom.comum.HelpdeskServico"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitorar os chamados do Helpdesk da empresa e avisar quando mudam" />
+        </service>
+
+        <!-- widget do Helpdesk (números da Central de Atendimento e chamados em aberto) -->
+        <receiver
+            android:name="br.com.cbfreedom.comum.WidgetHelpdesk"
+            android:exported="false"
+            android:label="@string/widget_helpdesk">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_helpdesk" />
+        </receiver>
+
+        <receiver
+            android:name="br.com.cbfreedom.comum.HelpdeskAlarme"
+            android:exported="false" />
+
+        <receiver
+            android:name="br.com.cbfreedom.comum.Inicio"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

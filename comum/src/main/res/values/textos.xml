@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_helpdesk">Freedom · Helpdesk</string>
+    <string name="widget_helpdesk_desc">Chamados na fila, comigo, sem responsável, SLA e chamados em aberto</string>
+</resources>

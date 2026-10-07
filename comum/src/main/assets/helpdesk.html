@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css">
+<style>
+.topo h1{flex:1;margin:0;font-size:17px;line-height:1.15}
+.topo h1 small{display:block;font-size:11px;color:#8b93a7;font-weight:400;margin-top:2px}
+.estado{display:flex;align-items:center;gap:8px;font-size:12px;color:#aab1c2;margin:2px 0 12px}
+.estado i{width:8px;height:8px;border-radius:50%;background:#1fbf8f;box-shadow:0 0 0 4px rgba(31,191,143,.15);flex:none}
+.estado.off i{background:#5d6578;box-shadow:none}.estado.erro i{background:#f0a53a;box-shadow:0 0 0 4px rgba(240,165,58,.15)}
+.aviso{display:flex;gap:10px;align-items:center}.aviso span{flex:1}
+.aviso button{flex:none;border:0;border-radius:10px;padding:8px 12px;font-weight:700;font-size:12px;background:#f0a53a;color:#1a1206}
+.aviso.rosa{background:rgba(232,75,138,.1);border-color:rgba(232,75,138,.35);color:#f3a6c6}
+.aviso.rosa button{background:#e84b8a;color:#fff}
+.resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.resumo .tile b{font-size:22px}
+.acoes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:6px}
+.acoes button{background:#12151f;border:1px solid #232838;color:#f2f4f8;border-radius:12px;padding:12px 6px;font-size:13px;font-weight:600}
+.acoes button.pri{background:#e84b8a;border-color:#e84b8a;color:#fff}
+h2{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:.12em;color:#8b93a7;margin:20px 0 8px}
+h2 span{letter-spacing:0;font-weight:400}
+.ev{background:#12151f;border:1px solid #232838;border-left:3px solid #4f7cff;border-radius:12px;padding:11px 12px;margin-bottom:8px}
+.ev.novo{border-left-color:#e84b8a}.ev.nao-visto{background:#161a27}
+.ev .t{display:flex;justify-content:space-between;gap:8px;font-size:14px;font-weight:700}
+.ev .t span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev .t em{flex:none;font-style:normal;font-weight:400;font-size:11px;color:#8b93a7}
+.ev p{margin:5px 0 0;font-size:13px;color:#aab1c2;line-height:1.35;word-break:break-word}
+.ch{display:flex;align-items:center;gap:10px;background:#12151f;border:1px solid #232838;border-radius:12px;padding:10px 12px;margin-bottom:6px}
+.ch .pr{width:4px;align-self:stretch;border-radius:4px;flex:none}
+.ch .tx{flex:1;min-width:0}.ch .tx b{display:block;font-size:13px}
+.ch .tx span{display:block;font-size:13px;color:#aab1c2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch .st{flex:none;font-style:normal;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#1b2030;color:#c9ced9}
+.vazio{text-align:center;color:#8b93a7;font-size:13px;padding:18px 8px;background:#12151f;border:1px dashed #232838;border-radius:12px}
+.cfg{background:#12151f;border:1px solid #232838;border-radius:16px;padding:4px 14px;margin-top:8px}
+.op{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #1d2231}
+.op:last-child{border-bottom:0}.op div{flex:1;font-size:14px}.op small{display:block;color:#8b93a7;font-size:12px;margin-top:2px}
+.sw{position:relative;width:46px;height:26px;flex:none}.sw input{opacity:0;width:0;height:0}
+.sw s{position:absolute;inset:0;background:#2a3042;border-radius:26px;transition:.2s}
+.sw s:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+s{background:#e84b8a}.sw input:checked+s:before{transform:translateX(20px)}
+select{background:#0e1119;color:#f2f4f8;border:1px solid #232838;border-radius:10px;padding:8px;font-size:14px}
+.lk{background:none;border:0;color:#e84b8a;font-size:14px;font-weight:600;padding:12px 0;text-align:left;width:100%}
+.lk.cz{color:#8b93a7}
+details summary{list-style:none;cursor:pointer}details[open] summary .seta{transform:rotate(180deg)}.seta{display:inline-block;transition:.2s}details summary::-webkit-details-marker{display:none}
+</style></head><body>
+<div class="topo"><img src="logo.png" alt="Freedom"><h1>Helpdesk<small id="sub"></small></h1>
+  <button class="bt" id="btAt" aria-label="Verificar agora"><span>↻</span></button></div>
+<div id="conteudo"><div class="carregando"><i></i>Carregando…</div></div>
+<script src="base.js"></script>
+<script>
+var STATUS = { OPEN: ['Aberto', '#4f7cff'], IN_PROGRESS: ['Em andamento', '#8b6cf0'], WAITING: ['Aguardando', '#f0a53a'],
+  RESOLVED: ['Resolvido', '#1fbf8f'], CLOSED: ['Fechado', '#5d6578'] };
+var PRIO = { LOW: '#5d6578', MEDIUM: '#4f7cff', NORMAL: '#4f7cff', HIGH: '#f0a53a', URGENT: '#e5484d', CRITICAL: '#e5484d' };
+var PRIO_TXT = { LOW: 'Baixa', MEDIUM: 'Média', NORMAL: 'Normal', HIGH: 'Alta', URGENT: 'Urgente', CRITICAL: 'Crítica' };
+var cfgAberta = false, ultimo = '';
+
+function est() { try { return JSON.parse(App.helpdesk()); } catch (e) { return {}; } }
+function quando(ms) {
+  if (!ms) return '';
+  var d = new Date(ms), h = new Date(), min = Math.round((h - d) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return 'há ' + min + ' min';
+  if (d.toDateString() === h.toDateString()) return F.hhmm(ms);
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + F.hhmm(ms);
+}
+function abrir(c) { try { App.abrirSite(c); } catch (e) {} }
+function attr(t) { return F.esc(t).replace(/"/g, '&quot;'); }
+function cfg(o) { try { App.configurarHelpdesk(JSON.stringify(o)); } catch (e) {} }
+
+function render() {
+  var e = est();
+  var chave = JSON.stringify(e) + Math.floor(Date.now() / 60000);
+  document.getElementById('btAt').classList.toggle('gira', !!e.verificando);
+  if (chave === ultimo) return;
+  ultimo = chave;
+  document.getElementById('sub').textContent = e.email || '';
+  var h = '';
+
+  // situação
+  var ok = e.status === 'ok' || !e.status, cls = !e.ativo ? 'off' : ok ? '' : 'erro';
+  var txt = !e.ativo ? 'Avisos desligados neste app' :
+    e.verificando ? 'Verificando…' :
+    (ok ? 'Avisos ligados · ' + (e.monitorados || 0) + ' chamado(s) acompanhados' : e.status) +
+    (e.ultima ? ' · ' + quando(e.ultima) : '');
+  h += '<div class="estado ' + cls + '"><i></i><span>' + F.esc(txt) + '</span></div>';
+
+  // avisos importantes
+  if (!e.ativo)
+    h += '<div class="aviso rosa"><span>Os avisos do Helpdesk estão desligados.</span><button onclick="cfg({ativo:true})">Ligar</button></div>';
+  if (e.ativo && !e.notifOk)
+    h += '<div class="aviso"><span>As notificações deste app estão bloqueadas no celular.</span><button onclick="App.configurarNotificacoes()">Permitir</button></div>';
+  if (e.ativo && !e.bateriaOk)
+    h += '<div class="aviso"><span>Para os avisos chegarem com a tela bloqueada, libere o uso de bateria.</span><button onclick="App.liberarBateria()">Liberar</button></div>';
+
+  // resumo
+  var r = e.resumo || {}, req = r.requester || {}, ws = r.workspace;
+  h += '<div class="resumo">' + F.tile('Meus ativos', F.int(req.active), '');
+  if (ws) {
+    h += F.tile('Na fila', F.int(ws.open)) + F.tile('Comigo', F.int(ws.assigned_to_me_active)) +
+      F.tile('Sem responsável', F.int(ws.unassigned_active), F.n(ws.unassigned_active) ? 'laranja' : '') +
+      F.tile('SLA em risco', F.int(ws.sla_at_risk), F.n(ws.sla_at_risk) ? 'laranja' : '') +
+      F.tile('SLA estourado', F.int(ws.sla_breached), F.n(ws.sla_breached) ? 'rosa' : '');
+  }
+  h += '</div>';
+
+  // ações
+  h += '<div class="acoes"><button class="pri" onclick="abrir(\'/helpdesk/new\')">＋ Abrir chamado</button>' +
+    '<button onclick="abrir(\'/helpdesk/my-tickets\')">Meus chamados</button>' +
+    '<button onclick="abrir(\'/helpdesk/workspace\')">Atendimento</button></div>';
+
+  // últimas atualizações
+  var feed = e.feed || [];
+  h += '<h2>ÚLTIMAS ATUALIZAÇÕES <span>' + (feed.length ? feed.length + ' recentes' : '') + '</span></h2>';
+  if (!feed.length) h += '<div class="vazio">Nenhuma novidade ainda.<br>Quando um chamado mudar, o aviso aparece aqui e na barra de notificações.</div>';
+  feed.slice(0, 30).forEach(function (x) {
+    var linhas = (x.linhas || []).slice(0, 4).map(F.esc).join('<br>');
+    h += '<div class="ev' + (x.novo ? ' novo' : '') + (x.t > (e.visto || 0) ? ' nao-visto' : '') + '" data-c="' + attr(x.caminho || '/helpdesk') + '">' +
+      '<div class="t"><span>' + F.esc(x.titulo) + '</span><em>' + quando(x.t) + '</em></div><p>' + linhas + '</p></div>';
+  });
+
+  // chamados em aberto
+  var ab = e.abertos || [];
+  h += '<h2>CHAMADOS EM ABERTO <span>' + ab.length + '</span></h2>';
+  if (!ab.length) h += '<div class="vazio">' + (e.ultima ? 'Nenhum chamado em aberto que você acompanha.' : 'Buscando os chamados…') + '</div>';
+  ab.forEach(function (t) {
+    var s = STATUS[t.status] || [t.status, '#5d6578'];
+    h += '<div class="ch" data-c="/helpdesk/tickets/' + attr(t.id) + '"><i class="pr" style="background:' + (PRIO[t.priority] || '#5d6578') + '"></i>' +
+      '<div class="tx"><b>' + F.esc(t.protocol) + (PRIO_TXT[t.priority] ? ' <span style="display:inline;color:#8b93a7;font-weight:400;font-size:11px">· ' + PRIO_TXT[t.priority] + '</span>' : '') + '</b>' +
+      '<span>' + F.esc(t.title || '') + '</span></div><em class="st" style="color:' + s[1] + '">' + F.esc(s[0]) + '</em></div>';
+  });
+
+  // configurações
+  var opts = [1, 2, 5, 10, 15, 30].map(function (m) { return '<option value="' + m + '"' + (m === e.intervalo ? ' selected' : '') + '>' + m + ' min</option>'; }).join('');
+  h += '<h2>CONFIGURAÇÕES</h2><details class="cfg" id="cfg"' + (cfgAberta ? ' open' : '') + '><summary class="op"><div>⚙ Configurar avisos<small>' +
+    (e.ativo ? (e.tempoReal ? 'Tempo real' : 'Econômico') + ' · a cada ' + e.intervalo + ' min' : 'Desligados') + '</small></div><span class="cinza seta">▾</span></summary>' +
+    '<label class="op"><div>Receber avisos do Helpdesk<small>Novos chamados, respostas, status, prioridade, responsável</small></div><span class="sw"><input type="checkbox" id="cAtivo"' + (e.ativo ? ' checked' : '') + '><s></s></span></label>' +
+    '<label class="op"><div>Modo tempo real<small>Mantém um aviso fixo na barra para verificar sempre no horário</small></div><span class="sw"><input type="checkbox" id="cTR"' + (e.tempoReal ? ' checked' : '') + '><s></s></span></label>' +
+    '<div class="op"><div>Verificar a cada<small>Com o celular parado o Android pode espaçar um pouco</small></div><select id="cInt">' + opts + '</select></div>' +
+    '<label class="op"><div>Avisar das minhas ações<small>Também avisa o que você mesmo mudou</small></div><span class="sw"><input type="checkbox" id="cMeu"' + (e.minhasAcoes ? ' checked' : '') + '><s></s></span></label>' +
+    '<div class="op" style="display:block"><button class="lk" onclick="App.configurarNotificacoes()">Som e estilo das notificações</button>' +
+    (e.bateriaOk ? '' : '<button class="lk" onclick="App.liberarBateria()">Liberar uso em segundo plano (bateria)</button>') +
+    '<button class="lk cz" id="sair">Sair / trocar login</button></div></details>';
+  h += '<div class="rod">Toque num aviso ou chamado para abrir no site · ↻ verifica agora</div>';
+
+  document.getElementById('conteudo').innerHTML = h;
+  var d = document.getElementById('cfg');
+  d.addEventListener('toggle', function () { cfgAberta = d.open; });
+  document.getElementById('cAtivo').onchange = function () { cfg({ ativo: this.checked }); };
+  document.getElementById('cTR').onchange = function () { cfg({ tempoReal: this.checked }); };
+  document.getElementById('cMeu').onchange = function () { cfg({ minhasAcoes: this.checked }); };
+  document.getElementById('cInt').onchange = function () { cfg({ intervalo: parseInt(this.value, 10) }); };
+  document.getElementById('sair').onclick = function () {
+    if (this.dataset.ok) { try { App.sair(); } catch (x) {} return; }
+    this.dataset.ok = '1'; this.textContent = 'Toque de novo para confirmar a saída';
+  };
+}
+
+document.getElementById('btAt').onclick = function () { this.classList.add('gira'); try { App.verificarHelpdesk(); } catch (e) {} };
+document.getElementById('conteudo').addEventListener('click', function (ev) {
+  var el = ev.target.closest ? ev.target.closest('[data-c]') : null;
+  if (el) abrir(el.getAttribute('data-c'));
+});
+window.recebidoHelpdesk = function () { ultimo = ''; render(); };
+render();
+setInterval(render, 20000);
+</script>
+</body></html>

@@ -7,12 +7,21 @@ import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
 
-/** Atualização automática a cada 15 minutos (o menor intervalo que o Android permite), com internet. */
+/**
+ * Atualização automática a cada 15 minutos (o menor intervalo que o Android permite), com internet:
+ * números do widget/painel e, de reserva, os avisos do Helpdesk.
+ */
 class Tarefa : JobService() {
 
     override fun onStartJob(params: JobParameters): Boolean {
         Thread {
-            Atualizador.atualizar(applicationContext)
+            val app = applicationContext
+            try { Atualizador.atualizar(app) } catch (_: Exception) { }
+            try {
+                Helpdesk.verificar(app, false)
+                Helpdesk.agendarAlarme(app)
+                if (Helpdesk.ativo(app) && Helpdesk.tempoReal(app)) Helpdesk.iniciarServico(app)
+            } catch (_: Exception) { }
             jobFinished(params, false)
         }.start()
         return true

@@ -12,8 +12,11 @@ import javax.net.ssl.SSLException
 class ErroLogin(msg: String) : IOException(msg)
 class SemAcesso(msg: String) : IOException(msg)
 
-/** Acesso ao site relatorios.cbfreedom.com.br (sessão por cookie, igual ao navegador). */
-class Api(private val email: String, private val senha: String) {
+/**
+ * Acesso ao site relatorios.cbfreedom.com.br (sessão por cookie, igual ao navegador).
+ * cookieInicial: reaproveita uma sessão já aberta (usado pelo monitor do Helpdesk).
+ */
+class Api(private val email: String, private val senha: String, cookieInicial: String = "") {
 
     companion object {
         const val BASE = "https://relatorios.cbfreedom.com.br/api/v1"
@@ -26,7 +29,12 @@ class Api(private val email: String, private val senha: String) {
         }
     }
 
-    private var cookie = ""
+    /** Cookie da sessão ("nome=valor; ...") para reaproveitar depois. */
+    var cookie: String = cookieInicial
+        private set
+
+    /** Cabeçalhos Set-Cookie completos do login (para logar o WebView do site automaticamente). */
+    val setCookies = mutableListOf<String>()
 
     private fun abrir(caminho: String): HttpURLConnection {
         val c = URL(BASE + caminho).openConnection() as HttpURLConnection
@@ -54,7 +62,7 @@ class Api(private val email: String, private val senha: String) {
         val partes = mutableListOf<String>()
         for ((nome, valores) in c.headerFields) {
             if (nome != null && nome.equals("Set-Cookie", ignoreCase = true)) {
-                for (v in valores) partes.add(v.substringBefore(";"))
+                for (v in valores) { setCookies.add(v); partes.add(v.substringBefore(";")) }
             }
         }
         cookie = partes.joinToString("; ")
@@ -70,6 +78,20 @@ class Api(private val email: String, private val senha: String) {
         val txt = c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         c.disconnect()
         return JSONObject(txt)
+    }
+
+    /** GET que não lança erro por código HTTP: devolve (código, corpo). Usado pelo monitor do Helpdesk. */
+    fun bruto(caminho: String): Pair<Int, String> {
+        val c = abrir(caminho)
+        try {
+            c.instanceFollowRedirects = false
+            val cod = c.responseCode
+            val fluxo = if (cod >= 400) c.errorStream else c.inputStream
+            val txt = fluxo?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+            return Pair(cod, txt)
+        } finally {
+            c.disconnect()
+        }
     }
 
     fun sair() {
