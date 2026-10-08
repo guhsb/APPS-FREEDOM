@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- modo tempo real: alarme exato para acordar o celular com a tela desligada -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <!-- atualizar o próprio app pelas versões publicadas no GitHub (o Android pede confirmação) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- downloads do site em celulares antigos (Android 9 ou menor) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
@@ -58,6 +63,16 @@
 
         <receiver
             android:name="br.com.cbfreedom.comum.HelpdeskAlarme"
+            android:exported="false" />
+
+        <!-- botões Responder / Assumir dos avisos de chamado -->
+        <receiver
+            android:name="br.com.cbfreedom.comum.ChamadoAcao"
+            android:exported="false" />
+
+        <!-- resposta do instalador do Android na atualização do app -->
+        <receiver
+            android:name="br.com.cbfreedom.comum.AtualizacaoRecebedor"
             android:exported="false" />
 
         <receiver

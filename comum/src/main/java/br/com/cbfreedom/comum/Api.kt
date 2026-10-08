@@ -94,6 +94,26 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
         }
     }
 
+    /** Requisição GET ou POST com corpo JSON; não lança erro por código HTTP: devolve (código, corpo). */
+    fun enviar(metodo: String, caminho: String, corpo: JSONObject?): Pair<Int, String> {
+        val c = abrir(caminho)
+        try {
+            c.instanceFollowRedirects = false
+            c.requestMethod = metodo           // GET ou POST
+            if (corpo != null) {
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                c.outputStream.use { it.write(corpo.toString().toByteArray(Charsets.UTF_8)) }
+            }
+            val cod = c.responseCode
+            val fluxo = if (cod >= 400) c.errorStream else c.inputStream
+            val txt = fluxo?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+            return Pair(cod, txt)
+        } finally {
+            c.disconnect()
+        }
+    }
+
     fun sair() {
         try {
             val c = abrir("/auth/logout"); c.requestMethod = "POST"; c.responseCode; c.disconnect()

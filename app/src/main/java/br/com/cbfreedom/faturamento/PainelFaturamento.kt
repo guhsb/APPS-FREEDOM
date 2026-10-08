@@ -90,6 +90,14 @@ object PainelFaturamento : Painel {
 
     private class Tipo(val codigo: String, val nome: String, val valor: Double, val pedidos: Double)
 
+    // a tela grande (logo no meio, tipos de pedido, total do mês e cartões) precisa de ~240 dp de altura
+    override fun classe(w: Float, h: Float): Char = when {
+        h < 90f -> 'B'
+        w < 200f -> 'P'
+        h < 240f -> 'M'
+        else -> 'G'
+    }
+
     override fun desenhar(p: Pintor, d: JSONObject, info: Info, classe: Char) {
         val dia = d.optJSONObject("dia") ?: JSONObject()
         val arr = dia.optJSONArray("tipos") ?: JSONArray()
@@ -97,6 +105,7 @@ object PainelFaturamento : Painel {
             .map { Tipo(it.optString("codigo"), it.optString("nome"), n(it, "valor"), n(it, "pedidos")) }
         val mes = d.optJSONObject("mes") ?: JSONObject()
         when (classe) {
+            'B' -> barra(p, dia, mes, info)
             'P' -> pequeno(p, d, dia, mes, info)
             'M' -> medio(p, d, dia, mes, tipos, info)
             else -> grande(p, d, dia, mes, tipos, info)
@@ -104,6 +113,20 @@ object PainelFaturamento : Painel {
     }
 
     private fun pedidos(v: Double) = Fmt.int(v) + if (Math.round(v) == 1L) " pedido" else " pedidos"
+
+    /** Widget de uma linha: faturamento de hoje + total do mês. */
+    private fun barra(p: Pintor, dia: JSONObject, mes: JSONObject, info: Info) {
+        val y = p.barraTopo("HOJE " + Fmt.dataBR(dia.optString("data")).take(5) + " · " + Fmt.int(n(dia, "pedidos")) + " ped.", info)
+        val x = p.barraX()
+        val dir = p.larg - 12f
+        val largo = p.larg >= 260f
+        val wm = if (largo) {
+            val wv = p.texto(Fmt.brlK(n(mes, "valor")), dir, y, 11f, Cor.BRANCO, 'B', 'D')
+            wv + p.texto("Mês ", dir - wv, y, 9f, Cor.ROSA, 'B', 'D')
+        } else 0f
+        val max = dir - x - (if (largo) wm + 10f else 0f)
+        p.valorRS(n(dia, "valor"), x, y, 16f, 'E', max)
+    }
 
     private fun pequeno(p: Pintor, d: JSONObject, dia: JSONObject, mes: JSONObject, info: Info) {
         val W = p.larg; val H = p.alt; val iw = W - 2 * X0
@@ -137,10 +160,11 @@ object PainelFaturamento : Painel {
         val yC = H - 12f - altC
         // valor + data/pedidos, centralizados no espaço entre o cabeçalho e a linha dos tipos
         val livre = yC - 22f - y0
-        val yv = y0 + max(0f, (livre - 30f) / 2f) + 26f
+        val tamV = (30f + max(0f, livre - 60f) * 0.35f).coerceAtMost(44f)
+        val yv = y0 + max(0f, (livre - tamV) / 2f) + tamV * 0.87f
         p.texto(Fmt.dataBR(dia.optString("data")), W - X0, yv - 13f, 10f, Cor.CINZA, 'N', 'D')
         p.texto(pedidos(n(dia, "pedidos")), W - X0, yv, 10f, Cor.CINZA, 'N', 'D')
-        p.valorRS(n(dia, "valor"), X0, yv, 30f, 'E', iw - 74f)
+        p.valorRS(n(dia, "valor"), X0, yv, tamV, 'E', iw - 74f)
         // tipos de pedido numa linha
         val yt = yC - 9f
         var x = X0
@@ -174,7 +198,7 @@ object PainelFaturamento : Painel {
         y += tv + 4f
         p.valorRS(n(dia, "valor"), cx, y, tv, 'C', iw)
         y += 15f
-        p.texto(Fmt.dataBR(dia.optString("data")) + " · " + pedidos(n(dia, "pedidos")), cx, y, 10f, Cor.CINZA, 'N', 'C')
+        val linhaData = y
         y += 10f
 
         // parte de baixo (fixa): total do mês, cartões, rodapé
@@ -192,7 +216,11 @@ object PainelFaturamento : Painel {
         if (cabe < tipos.size && cabe > 0 && espaco - cabe * (altChip + 5f) < 13f) cabe -= 1
         cabe = min(cabe, tipos.size)
         val resto = tipos.drop(cabe)
-        val usado = cabe * (altChip + 5f) + if (resto.isNotEmpty()) 13f else 0f
+        // sem espaço nem para a linha "+ N tipos": o resumo vai junto com a data
+        val restoNaData = resto.isNotEmpty() && espaco - cabe * (altChip + 5f) < 13f
+        p.texto(Fmt.dataBR(dia.optString("data")) + " · " + pedidos(n(dia, "pedidos")) +
+            (if (restoNaData) " · " + resto.size + (if (resto.size > 1) " tipos" else " tipo") else ""), cx, linhaData, 10f, Cor.CINZA, 'N', 'C', iw)
+        val usado = cabe * (altChip + 5f) + if (resto.isNotEmpty() && !restoNaData) 13f else 0f
         var yc = y + max(0f, (espaco - usado) / 2f)
         for (t in tipos.take(cabe)) {
             val x = cx - wChip / 2
@@ -204,7 +232,7 @@ object PainelFaturamento : Painel {
             p.texto(t.nome, x + 10f, base, 10f, Cor.CINZA, 'N', max = wChip - 30f - wp - wv)
             yc += altChip + 5f
         }
-        if (resto.isNotEmpty()) {
+        if (resto.isNotEmpty() && !restoNaData) {
             val s = "+ " + resto.size + (if (resto.size > 1) " tipos: " else " tipo: ") + Fmt.brlK(resto.sumOf { it.valor })
             p.texto(s, cx, yc + 7f, 9f, Cor.CINZA, 'N', 'C')
         }

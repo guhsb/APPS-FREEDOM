@@ -17,22 +17,22 @@ android {
         versionName = "2." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
+    // Assinatura: a chave NÃO fica no repositório. No GitHub ela vem dos Secrets
+    // (FREEDOM_KEYSTORE e FREEDOM_KEYSTORE_PASSWORD, ver LEIA-ME). Sem eles (build no PC), usa a chave de teste do Android.
+    val chave = System.getenv("FREEDOM_KEYSTORE_FILE")?.let { rootProject.file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        create("freedom") {
-            storeFile = rootProject.file("freedom.keystore")
-            storePassword = "freedom123"
-            keyAlias = "freedom"
-            keyPassword = "freedom123"
+        if (chave != null) create("freedom") {
+            storeFile = chave
+            storePassword = System.getenv("FREEDOM_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("FREEDOM_KEY_ALIAS") ?: "freedom"
+            keyPassword = System.getenv("FREEDOM_KEYSTORE_PASSWORD")
         }
     }
 
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("freedom")
-        }
-        getByName("debug") {
-            signingConfig = signingConfigs.getByName("freedom")
+            signingConfig = if (chave != null) signingConfigs.getByName("freedom") else signingConfigs.getByName("debug")
         }
     }
 

@@ -4,3 +4,7 @@ build/
 local.properties
 .idea/
 *.iml
+# chaves de assinatura nunca vão para o GitHub
+*.keystore
+*.jks
+*.b64

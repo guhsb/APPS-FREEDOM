@@ -21,20 +21,38 @@ ver nem aparecem na lista de widgets do celular.
 
 ABAS
   1. Helpdesk (principal): últimas atualizações, chamados em aberto, números da Central de Atendimento,
-     configurações dos avisos. Tocar num aviso abre o chamado na aba Site.
-     - Modo tempo real (padrão): verifica a cada 2 min (1 a 30 min) com um aviso fixo na barra.
-     - Reserva: a cada 15 min, mesmo se o Android fechar o app. O que você mesmo faz não gera aviso.
+     configurações dos avisos. Tocar num aviso abre a TELA DO CHAMADO no app: conversa, quem está
+     atendendo, caixa para responder e botão "Assumir chamado" (para quem atende). Anexos e mudança
+     de status: botão de abrir no site (canto de cima).
+     - Nos avisos do celular tem os botões "Responder" (escreve e envia sem abrir o app) e
+       "Assumir" (aparece para quem atende, em chamado sem responsável).
+     - Modo tempo real (padrão): com a tela ligada confere a cada 15 s (dá para escolher até 30 min);
+       com a tela desligada, a cada 1 min. Mantém um aviso fixo na barra.
+       Para chegar NA HORA mesmo (sem esperar nenhuma verificação), o site teria que mandar o aviso
+       (push); hoje o app consulta o site sozinho.
+     - Respostas: a cada verificação rápida o app também confere o histórico dos chamados ativos
+       (os seus primeiro), então uma resposta nova chega em segundos mesmo que a lista não mude.
+     - Reserva: a cada 15 min, mesmo se o Android fechar o app.
+     - O que você MESMO faz (sua resposta, sua mudança de status) não toca o celular: aparece só na
+       lista "Últimas atualizações" com a marca "Você". Para receber aviso disso também, ligue
+       "Avisar das minhas ações" nas configurações. Para testar, peça para outra pessoa responder.
+     - Som: os avisos usam o som de notificação do celular e aparecem por cima da tela.
+       Em "Configurar avisos" tem "Testar notificação" e "Som e estilo dos avisos".
   2. Site: tocar de novo em "Site" volta ao início; segurar o dedo recarrega.
   3. Painel: os números de cada área liberada. Com mais de uma (ex.: Comercial e Faturamento),
      aparece um seletor em cima.
 
 NO CELULAR
-1. Instale o Freedom.apk (permita "instalar apps desta fonte"). Ele instala por cima do antigo
-   "Freedom Comercial" e mantém o login. Quem tinha o antigo "Freedom Faturamento" pode desinstalar ele.
+1. Instale o Freedom.apk (permita "instalar apps desta fonte").
+   IMPORTANTE (troca da assinatura, out/2026): quem tem uma versão ANTIGA do Freedom (ou o antigo
+   "Freedom Comercial"/"Freedom Faturamento") precisa DESINSTALAR antes, uma única vez. Depois disso o
+   app se atualiza sozinho.
 2. Abra o app e faça o login. Aceite as notificações e libere a bateria quando o app pedir.
 3. Widgets: segure o dedo na tela inicial > Widgets > Freedom > escolha (Helpdesk, Comercial,
-   Faturamento) e arraste. Estique para ver mais (o Helpdesk grande mostra a última novidade e a
-   lista de chamados). Tocar no horário atualiza; tocar no resto abre o app na aba certa.
+   Faturamento) e arraste. Dá para deixar do tamanho de 1 linha (2x1) até a tela inteira:
+   quanto maior, mais coisas aparecem (o Helpdesk grande mostra a última novidade e a lista de
+   chamados; o Comercial do gestor mostra os vendedores). Tocar no horário atualiza; tocar no resto
+   abre o app na aba certa.
    O widget do Helpdesk se atualiza junto com os avisos (a cada 2 min no modo tempo real).
 4. Em Xiaomi/Samsung/Motorola, deixe a bateria do app como "Sem restrições".
 
@@ -42,6 +60,26 @@ COMO ATUALIZAR NO GITHUB
 Copie os arquivos para a pasta do repositório (GitHub Desktop), faça Commit e Push.
 O GitHub monta o app sozinho (aba Actions, uns 5 min) e publica o Freedom.apk em Releases.
 O número da versão sobe a cada envio, então o APK novo instala por cima do antigo.
+
+ATUALIZAÇÃO AUTOMÁTICA NOS CELULARES
+O app confere o GitHub (Releases) ao abrir e a cada 6 h. Com versão nova, aparece o aviso
+"Nova versão do app disponível" (notificação + faixa na aba Helpdesk/Painel). Tocar em "Atualizar"
+baixa e abre o instalador do Android (na primeira vez ele pede para permitir "instalar apps desta
+fonte" para o Freedom). O login e os widgets continuam. Também dá para procurar em
+Helpdesk > Configurações > "Versão do app".
+Obs.: isso usa o GitHub público. Se o repositório virar privado, a atualização automática para
+(aí cada pessoa baixa o APK de outro lugar).
+
+ASSINATURA DO APP (Secrets do GitHub) — fazer UMA vez
+A chave que assina o app NÃO fica mais no repositório (antes ela ficava pública).
+Ela fica guardada nos Secrets do GitHub, que ninguém consegue ler:
+  GitHub > repositório APPS-FREEDOM > Settings > Secrets and variables > Actions > New repository secret
+    FREEDOM_KEYSTORE           = o texto do arquivo FREEDOM_KEYSTORE.txt (enviado à parte, não vai no zip)
+    FREEDOM_KEYSTORE_PASSWORD  = a senha do arquivo SENHA_DA_CHAVE.txt
+Guarde também o arquivo freedom-assinatura.jks num lugar seguro (backup). Sem essa chave não dá
+para publicar atualizações que instalem por cima.
+O GitHub confere a impressão digital da chave antes de publicar; se os Secrets forem trocados por
+engano, ele para com erro em vez de publicar um APK que os celulares recusariam.
 
 PARA CRIAR UM PAINEL NOVO NO FUTURO (ex.: Financeiro)
   1. app/src/main/java/.../financeiro/PainelFinanceiro.kt  (copie PainelFaturamento e troque módulo, busca e desenho)
@@ -54,6 +92,5 @@ PARA CRIAR UM PAINEL NOVO NO FUTURO (ex.: Financeiro)
 PASTAS
   app/      o aplicativo: painéis (Comercial, Faturamento), widgets, ícone
   comum/    a base: login, abas, Helpdesk, site, acesso por módulo, widget, atualização automática
-  .github/  instrução para o GitHub montar o APK
-  freedom.keystore  assinatura do app (não apague: sem ela o celular não aceita atualizar por cima)
+  .github/  instrução para o GitHub montar o APK (a chave vem dos Secrets; nunca coloque *.jks/*.keystore aqui)
   (as pastas antigas "comercial" e "faturamento" não são mais usadas e podem ser apagadas)

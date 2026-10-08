@@ -168,8 +168,16 @@ class Pintor(val larg: Float, val alt: Float, k: Float, val logoImg: Bitmap?) {
     }
 
     /** Canto de cima à direita: horário da última atualização + "toque para atualizar". */
-    fun horario(info: Info, dir: Float, y0: Float) {
+    /** Widget estreito: o horário vira só "↻ 15:35" (não cabe o texto inteiro ao lado do logo). */
+    val estreito: Boolean get() = larg < 235f
+
+    fun horario(info: Info, dir: Float, y0: Float, compacto: Boolean = estreito) {
         val hm = if (info.hora > 0) Fmt.hhmm(info.hora) else "--:--"
+        if (compacto) {
+            val cor = if (info.erro != null && !info.atualizando) Cor.LARANJA else Cor.CINZA
+            texto(if (info.atualizando) "↻ …" else (if (info.erro != null) "! " else "↻ ") + hm, dir, y0 + 10f, 9f, cor, 'B', 'D')
+            return
+        }
         if (info.atualizando) texto("atualizando…", dir, y0 + 8f, 8f, Cor.CINZA, 'B', 'D')
         else texto("↻ atualizado $hm", dir, y0 + 8f, 8f, Cor.CINZA, 'B', 'D')
         if (info.erro != null && !info.atualizando) texto("não atualizou · toque aqui", dir, y0 + 17f, 7f, Cor.LARANJA, 'N', 'D')
@@ -178,20 +186,46 @@ class Pintor(val larg: Float, val alt: Float, k: Float, val logoImg: Bitmap?) {
 
     /** Logo + título + horário. Devolve o y onde o conteúdo começa. */
     fun cabecalho(titulo: String, info: Info, x0: Float, y0: Float, pequeno: Boolean): Float {
-        val lw = logo(x0, y0, 20f)
+        val lw = logo(x0, y0, if (estreito) 17f else 20f)
         horario(info, larg - x0, y0)
         if (pequeno) {
             texto(titulo, x0, y0 + 32f, 9f, Cor.CINZA, 'B', max = larg - 2 * x0)
             return y0 + 36f
         }
         val tx = x0 + lw + 7f
-        texto(titulo, tx, y0 + 13.5f, 10f, Cor.CINZA, 'B', max = larg - x0 - tx - 104f)
+        texto(titulo, tx, y0 + 13.5f, 10f, Cor.CINZA, 'B', max = larg - x0 - tx - (if (estreito) 44f else 104f))
         return y0 + 26f
     }
+
+    /**
+     * Widget de uma linha só (bem baixo): rótulo + horário em cima, valor grande embaixo e, opcional,
+     * um texto à direita. Devolve o y da linha de base do valor.
+     */
+    fun barraTopo(rotulo: String, info: Info): Float {
+        val x0 = 12f
+        val comLogo = larg >= 230f
+        val lw = if (comLogo) logo(x0, (alt - 22f) / 2f, 22f) + 10f else 0f
+        horario(info, larg - x0, 6f, true)
+        texto(rotulo, x0 + lw, alt / 2f - 4f, 8.5f, Cor.CINZA, 'B', max = larg - 2 * x0 - lw - 50f)
+        return alt / 2f + 13f
+    }
+
+    fun barraX(): Float = if (larg >= 230f) 12f + (logoImg?.let { 22f * it.width / it.height } ?: 0f) + 10f else 12f
+
+    /** Valor em reais que cabe na largura: completo (R$ 1.234,56) ou resumido (R$ 1,2 mil). */
+    fun reaisQueCabe(v: Double, tam: Float, max: Float, peso: Char = 'H'): String =
+        if (medir(Fmt.brl(v), tam, peso) <= max) Fmt.brl(v) else Fmt.brlK(v)
 
     /** Tela de aviso (sem login, sem dados, erro). */
     fun mensagem(titulo: String, msg: String, info: Info?) {
         val x0 = 14f
+        if (alt < 90f) {
+            // widget de uma linha: só o título e a mensagem
+            if (info != null) horario(info, larg - 12f, 6f, true)
+            texto(titulo, 12f, alt / 2f - 4f, 8.5f, Cor.CINZA, 'B', max = larg - 70f)
+            texto(msg, 12f, alt / 2f + 12f, 9.5f, if (info?.erro != null) Cor.LARANJA else Cor.BRANCO, 'N', max = larg - 24f)
+            return
+        }
         logo(x0, 12f, 20f)
         if (info != null) horario(info, larg - x0, 12f)
         var y = 12f + 20f + 20f

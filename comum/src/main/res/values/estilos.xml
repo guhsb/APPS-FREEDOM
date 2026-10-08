@@ -3,8 +3,8 @@
     <style name="TemaFreedom" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/fundo_freedom</item>
         <item name="android:statusBarColor">@color/fundo_freedom</item>
-        <item name="android:navigationBarColor">@color/fundo_freedom</item>
+        <item name="android:navigationBarColor">#10131b</item>
         <item name="android:colorAccent">#e84b8a</item>
     </style>
-    <color name="fundo_freedom">#0a0c12</color>
+    <color name="fundo_freedom">#0b0d12</color>
 </resources>

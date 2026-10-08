@@ -16,7 +16,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -53,6 +52,8 @@ class Tela : Activity() {
     companion object {
         const val EXTRA_ABA = "aba"
         const val EXTRA_PAINEL = "painel"
+        const val EXTRA_ATUALIZAR = "atualizar"
+        private val RE_CHAMADO = Regex("^(?:https://relatorios\\.cbfreedom\\.com\\.br)?/helpdesk/tickets/(\\d+)/?$")
         const val ABA_HELPDESK = "helpdesk"
         const val ABA_SITE = "site"
         const val ABA_PAINEL = "painel"
@@ -60,8 +61,11 @@ class Tela : Activity() {
         private const val REQ_ARQUIVO = 31
         private const val REQ_PERMISSAO = 32
         private const val HOST = "relatorios.cbfreedom.com.br"
-        private val FUNDO = Color.parseColor("#0a0c12")
-        private val FUNDO_BARRA = Color.parseColor("#0e1119")
+        private val FUNDO = Color.parseColor("#0b0d12")
+        private val FUNDO_BARRA = Color.parseColor("#10131b")
+        private val COR_INATIVA = Color.parseColor("#8b93a7")
+        private val COR_LINHA = Color.parseColor("#1d2230")
+        private val ROSA_SUAVE = Color.parseColor("#2e1a26")      // rosa a ~16% sobre a barra
 
         /** Faz os downloads gerados por JavaScript no site (blob:/data:) virem para o app salvar. */
         private const val GANCHO_DOWNLOAD = "(function(){" +
@@ -78,6 +82,35 @@ class Tela : Activity() {
             "document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a'):null;" +
             "if(!a)return;var h=a.href||'';if(h.indexOf('blob:')===0||h.indexOf('data:')===0){e.preventDefault();e.stopPropagation();" +
             "window.__fdSave(h,a.getAttribute('download'));}},true);" +
+            "})();"
+
+        /**
+         * Ajustes do site para a tela do celular: o resumo "Chamados" do cabeçalho saía cortado para fora da tela.
+         * Aqui ele vira um quadro fixo dentro da tela, ganha um botão de fechar e as linhas de Atendimento
+         * passam a abrir a Central de Atendimento.
+         */
+        private const val GANCHO_SITE = "(function(){" +
+            "if(window.__fdSite)return;window.__fdSite=true;" +
+            "var P='[aria-label=\"Resumo de chamados\"]';" +
+            "var st=document.createElement('style');st.textContent=" +
+            "'@media (max-width:900px){'+P+'{position:fixed!important;left:12px!important;right:12px!important;top:72px!important;" +
+            "width:auto!important;max-width:none!important;max-height:calc(100vh - 96px);overflow:auto;" +
+            "box-shadow:0 14px 40px rgba(0,0,0,.35)!important;z-index:2147483000!important;padding-top:34px!important}}'+" +
+            "P+'>div,'+P+'>a{min-height:40px;align-items:center;cursor:pointer}'+" +
+            "'.__fdX{position:absolute;top:4px;right:6px;border:0;background:transparent;font-size:22px;line-height:1;padding:6px 10px;color:#6b7084;z-index:2}';" +
+            "document.head.appendChild(st);" +
+            "function pn(){return document.querySelector(P);}" +
+            "function bt(){var l=document.querySelectorAll('[aria-haspopup=\"dialog\"]');for(var i=0;i<l.length;i++){if(/Chamados/.test(l[i].getAttribute('aria-label')||l[i].textContent))return l[i];}return null;}" +
+            "function fechar(){var b=bt();if(b&&b.getAttribute('aria-expanded')==='true')b.click();}" +
+            "function ir(c){var a=document.querySelector('a[href=\"'+c+'\"]');if(a)a.click();else location.href=c;}" +
+            "new MutationObserver(function(){var p=pn();if(p&&!p.querySelector('.__fdX')){if(getComputedStyle(p).position==='static')p.style.position='relative';" +
+            "var x=document.createElement('button');x.type='button';x.className='__fdX';x.textContent='\u2715';x.setAttribute('aria-label','Fechar');p.appendChild(x);}})" +
+            ".observe(document.body,{childList:true,subtree:true});" +
+            "document.addEventListener('click',function(e){var p=pn();if(!p||!p.contains(e.target))return;" +
+            "if(e.target.closest('.__fdX')){e.preventDefault();e.stopPropagation();fechar();return;}" +
+            "var d=e.target.closest('div');if(d&&d.parentElement===p){e.preventDefault();fechar();ir('/helpdesk/workspace');}" +
+            "var a=e.target.closest('a');if(a&&p.contains(a)){setTimeout(fechar,50);}" +
+            "},true);" +
             "})();"
     }
 
@@ -121,10 +154,10 @@ class Tela : Activity() {
         conteudo = FrameLayout(this)
         raiz.addView(conteudo, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         linhaAbas = View(this)
-        linhaAbas.setBackgroundColor(Color.parseColor("#232838"))
+        linhaAbas.setBackgroundColor(COR_LINHA)
         raiz.addView(linhaAbas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
         barraAbas = criarAbas()
-        raiz.addView(barraAbas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60)))
+        raiz.addView(barraAbas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(68)))
         setContentView(raiz)
 
         webApp = novaWebLocal()
@@ -137,51 +170,62 @@ class Tela : Activity() {
     private fun dp(v: Int): Int = Math.round(v * resources.displayMetrics.density)
     private fun cheio() = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
 
+    /** Barra de abas no estilo Material 3: ícone dentro de uma "pílula" que acende na aba ativa. */
     private fun criarAbas(): LinearLayout {
         val barra = LinearLayout(this)
         barra.orientation = LinearLayout.HORIZONTAL
         barra.setBackgroundColor(FUNDO_BARRA)
+        barra.setPadding(dp(8), dp(8), dp(8), dp(6))
         val itens = listOf(
             Triple(ABA_HELPDESK, "Helpdesk", R.drawable.ic_aba_helpdesk),
             Triple(ABA_SITE, "Site", R.drawable.ic_aba_site),
             Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel)
         )
-        val tv = TypedValue()
-        theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
         for ((id, rotulo, icone) in itens) {
             val item = LinearLayout(this)
             item.orientation = LinearLayout.VERTICAL
-            item.gravity = Gravity.CENTER
-            if (tv.resourceId != 0) item.setBackgroundResource(tv.resourceId)
+            item.gravity = Gravity.CENTER_HORIZONTAL
             item.isClickable = true
             item.contentDescription = rotulo
 
-            val caixa = FrameLayout(this)
+            val pilula = FrameLayout(this)
             val img = ImageView(this)
             img.setImageResource(icone)
-            caixa.addView(img, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            pilula.addView(img, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
             if (id == ABA_HELPDESK) {
                 selo = TextView(this)
                 selo.setTextColor(Color.WHITE)
-                selo.textSize = 9f
+                selo.textSize = 9.5f
+                selo.typeface = android.graphics.Typeface.DEFAULT_BOLD
                 selo.gravity = Gravity.CENTER
+                selo.minWidth = dp(17)
                 selo.setPadding(dp(4), 0, dp(4), 0)
                 val fundo = GradientDrawable()
-                fundo.cornerRadius = dp(8).toFloat()
+                fundo.cornerRadius = dp(9).toFloat()
                 fundo.setColor(Cor.ROSA)
+                fundo.setStroke(dp(2), FUNDO_BARRA)
                 selo.background = fundo
                 selo.visibility = View.GONE
-                caixa.addView(selo, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(15), Gravity.TOP or Gravity.END))
+                val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(17), Gravity.TOP or Gravity.END)
+                lp.topMargin = dp(1); lp.marginEnd = dp(10)
+                pilula.addView(selo, lp)
             }
-            item.addView(caixa, LinearLayout.LayoutParams(dp(40), dp(28)))
+            item.addView(pilula, LinearLayout.LayoutParams(dp(60), dp(32)))
             val txt = TextView(this)
             txt.text = rotulo
-            txt.textSize = 11f
+            txt.textSize = 12f
             txt.gravity = Gravity.CENTER
-            item.addView(txt, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            txt.letterSpacing = 0.01f
+            val lpT = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            lpT.topMargin = dp(4)
+            item.addView(txt, lpT)
             item.setOnClickListener {
                 // tocar de novo no Site volta para o início do site
-                if (aba == id && id == ABA_SITE) webSite?.let { abrirUrlSite(Helpdesk.SITE + "/") } else selecionar(id)
+                when {
+                    aba == id && id == ABA_SITE -> webSite?.let { abrirUrlSite(Helpdesk.SITE + "/") }
+                    aba == id && id == ABA_HELPDESK && paginaApp == "chamado" -> voltarHelpdesk()
+                    else -> selecionar(id)
+                }
             }
             item.setOnLongClickListener {
                 if (id == ABA_SITE) { selecionar(ABA_SITE); webSite?.reload(); toast("Recarregando o site…"); true } else false
@@ -195,9 +239,18 @@ class Tela : Activity() {
 
     private fun pintarAbas() {
         for ((id, par) in abas) {
-            val cor = if (id == aba) Cor.ROSA else Color.parseColor("#8b93a7")
+            val ativa = id == aba
+            val cor = if (ativa) Cor.ROSA else COR_INATIVA
             par.first.setColorFilter(cor)
-            par.second.setTextColor(cor)
+            par.second.setTextColor(if (ativa) Color.WHITE else COR_INATIVA)
+            par.second.typeface = if (ativa) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+            val pilula = par.first.parent as? View ?: continue
+            if (ativa) {
+                val f = GradientDrawable()
+                f.cornerRadius = dp(16).toFloat()
+                f.setColor(ROSA_SUAVE)
+                pilula.background = f
+            } else pilula.background = null
         }
     }
 
@@ -240,8 +293,10 @@ class Tela : Activity() {
         }
         linhaAbas.visibility = View.VISIBLE
         barraAbas.visibility = View.VISIBLE
-        if (paginaApp != "helpdesk") { webApp.loadUrl(ASSET + "helpdesk.html"); paginaApp = "helpdesk" }
+        if (paginaApp != "helpdesk" && paginaApp != "chamado") { webApp.loadUrl(ASSET + "helpdesk.html"); paginaApp = "helpdesk" }
         val caminho = i?.getStringExtra(Helpdesk.EXTRA_CAMINHO)
+        val atualizar = i?.getBooleanExtra(EXTRA_ATUALIZAR, false) ?: false
+        i?.removeExtra(EXTRA_ATUALIZAR)
         val pedida = i?.getStringExtra(EXTRA_ABA)
         i?.getStringExtra(EXTRA_PAINEL)?.let { if (Freedom.porId(it) != null) painelAtual = it }
         i?.removeExtra(Helpdesk.EXTRA_CAMINHO)
@@ -249,10 +304,11 @@ class Tela : Activity() {
         i?.removeExtra(EXTRA_PAINEL)
         for ((id, v) in itensAba) v.visibility = if (abaDisponivel(id)) View.VISIBLE else View.GONE
         when {
-            caminho != null -> abrirNoSite(caminho)
+            caminho != null -> abrirCaminho(caminho)
             pedida != null && abaDisponivel(pedida) -> selecionar(pedida)
             else -> selecionar(aba)
         }
+        if (atualizar) { if (paginaApp == "chamado") voltarHelpdesk(); selecionar(ABA_HELPDESK); iniciarAtualizacao() }
         ajustarAbas()
         pedirPermissoes()
     }
@@ -271,6 +327,65 @@ class Tela : Activity() {
         }
         if (nova == ABA_PAINEL && Atualizador.velho(this, 2)) atualizarPainel()
         atualizarSelo()
+    }
+
+    /** Chamado (/helpdesk/tickets/ID) abre na tela do app; o resto abre na aba Site. */
+    private fun abrirCaminho(caminho: String) {
+        val m = RE_CHAMADO.find(caminho.trim())
+        val id = m?.groupValues?.get(1)?.toIntOrNull()
+        if (id != null && Acesso.helpdesk(this)) abrirChamado(id) else abrirNoSite(caminho)
+    }
+
+    private fun abrirChamado(id: Int) {
+        Helpdesk.nm(this).cancel(Helpdesk.idNotificacao(id))
+        webApp.loadUrl(ASSET + "chamado.html#" + id)
+        paginaApp = "chamado"
+        selecionar(ABA_HELPDESK)
+    }
+
+    private fun voltarHelpdesk() {
+        webApp.loadUrl(ASSET + "helpdesk.html")
+        paginaApp = "helpdesk"
+    }
+
+    // ---- atualização do app ----
+    // o Android reinicia o app quando a pessoa libera "instalar apps desconhecidos": guarda o pedido no aparelho
+    private var esperandoPermissaoInstalar: Boolean
+        get() = System.currentTimeMillis() - getSharedPreferences("atualizacao", MODE_PRIVATE).getLong("pediu_permissao", 0L) < 10 * 60_000L
+        set(v) { getSharedPreferences("atualizacao", MODE_PRIVATE).edit().putLong("pediu_permissao", if (v) System.currentTimeMillis() else 0L).apply() }
+
+    private fun iniciarAtualizacao() {
+        if (isFinishing || isDestroyed) return
+        if (Atualizacao.nova(this) == null) {
+            Thread {
+                val r = Atualizacao.conferir(applicationContext, true)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    when (r) {
+                        Atualizacao.Conferencia.NOVA -> iniciarAtualizacao()
+                        Atualizacao.Conferencia.EM_DIA -> toast("O app já está na versão mais nova")
+                        Atualizacao.Conferencia.FALHOU -> toast("Não consegui verificar agora. Confira a internet e tente de novo.")
+                    }
+                    avisarHelpdesk()
+                }
+            }.start()
+            return
+        }
+        if (!Atualizacao.podeInstalar(this)) {
+            AlertDialog.Builder(this)
+                .setTitle("Permitir atualizar o app")
+                .setMessage("Na próxima tela, ative \"Permitir desta fonte\" para o Freedom e volte. A atualização continua sozinha.")
+                .setPositiveButton("Continuar") { _, _ ->
+                    esperandoPermissaoInstalar = true
+                    try {
+                        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                    } catch (_: Exception) { esperandoPermissaoInstalar = false; Atualizacao.abrirNoNavegador(this) }
+                }
+                .setNegativeButton("Agora não", null)
+                .show()
+            return
+        }
+        Thread { Atualizacao.baixarEInstalar(this) { avisarHelpdesk(); avisarPainel() } }.start()
     }
 
     private fun abrirNoSite(caminho: String) {
@@ -292,6 +407,7 @@ class Tela : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val s = webSite
+        if (aba == ABA_HELPDESK && paginaApp == "chamado") { voltarHelpdesk(); return }
         if (aba == ABA_SITE && s != null && avisoSite?.visibility == View.VISIBLE) {
             avisoSite?.visibility = View.GONE
             if (s.canGoBack()) { s.goBack(); return }
@@ -312,22 +428,29 @@ class Tela : Activity() {
     override fun onResume() {
         super.onResume()
         webApp.onResume(); webSite?.onResume(); websPainel.values.forEach { it.onResume() }
+        Atualizacao.telaAberta = true
+        if (esperandoPermissaoInstalar) {
+            esperandoPermissaoInstalar = false
+            if (Atualizacao.podeInstalar(this)) iniciarAtualizacao()
+        }
         Helpdesk.ouvinte = { runOnUiThread { avisarHelpdesk(); atualizarSelo(); if (Store.logado(this)) ajustarAbas() } }
         if (Store.logado(this)) {
             Helpdesk.aplicar(this)
             val p = Helpdesk.prefs(this)
-            if (Helpdesk.ativo(this) && System.currentTimeMillis() - p.getLong("ultima", 0L) > Helpdesk.intervalo(this) * 60_000L)
+            if (Helpdesk.ativo(this) && System.currentTimeMillis() - p.getLong("ultima", 0L) > Helpdesk.intervaloCompletoMs(this))
                 Helpdesk.emSegundoPlano(this, false)
             if (aba == ABA_PAINEL && Atualizador.velho(this, 2)) atualizarPainel()
             if (aba == ABA_HELPDESK) Helpdesk.marcarVisto(this)
             avisarHelpdesk()
             atualizarSelo()
             ajustarAbas()
+            Atualizacao.conferirEmSegundoPlano(this, false) { avisarHelpdesk(); avisarPainel() }
         }
     }
 
     override fun onPause() {
         Helpdesk.ouvinte = null
+        Atualizacao.telaAberta = false
         webApp.onPause(); webSite?.onPause(); websPainel.values.forEach { it.onPause() }
         try { CookieManager.getInstance().flush() } catch (_: Exception) { }
         super.onPause()
@@ -338,7 +461,7 @@ class Tela : Activity() {
         runOnUiThread { w.evaluateJavascript(codigo, null) }
     }
 
-    private fun avisarHelpdesk() { if (paginaApp == "helpdesk") js(webApp, "window.recebidoHelpdesk && recebidoHelpdesk()") }
+    private fun avisarHelpdesk() { if (paginaApp == "helpdesk" || paginaApp == "chamado") js(webApp, "window.recebidoHelpdesk && recebidoHelpdesk()") }
     private fun avisarPainel() = runOnUiThread { for (w in websPainel.values) w.evaluateJavascript("window.recebido && recebido()", null) }
 
     private fun atualizarPainel() {
@@ -381,13 +504,22 @@ class Tela : Activity() {
             val caixa = LinearLayout(this)
             caixa.orientation = LinearLayout.VERTICAL
             caixa.setBackgroundColor(FUNDO)
+            // seletor de painel (controle segmentado)
             val chips = LinearLayout(this)
             chips.orientation = LinearLayout.HORIZONTAL
-            chips.setPadding(dp(12), dp(10), dp(12), dp(4))
+            chips.setPadding(dp(3), dp(3), dp(3), dp(3))
+            val trilho = GradientDrawable()
+            trilho.cornerRadius = dp(12).toFloat()
+            trilho.setColor(Color.parseColor("#12151d"))
+            trilho.setStroke(dp(1), COR_LINHA)
+            chips.background = trilho
             val rolagem = android.widget.HorizontalScrollView(this)
             rolagem.isHorizontalScrollBarEnabled = false
-            rolagem.addView(chips)
-            caixa.addView(rolagem, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            rolagem.isFillViewport = true
+            rolagem.addView(chips, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            val lpR = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            lpR.setMargins(dp(16), dp(12), dp(16), dp(2))
+            caixa.addView(rolagem, lpR)
             val frame = FrameLayout(this)
             caixa.addView(frame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
             conteudo.addView(caixa, cheio())
@@ -406,19 +538,21 @@ class Tela : Activity() {
         for (p in lista) {
             val t = TextView(this)
             t.text = p.nomeModulo
-            t.textSize = 13f
-            t.setPadding(dp(14), dp(7), dp(14), dp(7))
-            val fundo = GradientDrawable()
-            fundo.cornerRadius = dp(18).toFloat()
+            t.textSize = 13.5f
+            t.gravity = Gravity.CENTER
+            t.minWidth = dp(88)
+            t.setPadding(dp(14), dp(8), dp(14), dp(8))
             val sel = p.id == painelAtual
-            fundo.setColor(if (sel) Cor.ROSA else Color.parseColor("#12151f"))
-            if (!sel) fundo.setStroke(dp(1), Color.parseColor("#232838"))
-            t.background = fundo
-            t.setTextColor(if (sel) Color.WHITE else Color.parseColor("#aab1c2"))
+            if (sel) {
+                val fundo = GradientDrawable()
+                fundo.cornerRadius = dp(9).toFloat()
+                fundo.setColor(Color.parseColor("#232a3a"))
+                t.background = fundo
+            }
+            t.typeface = if (sel) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+            t.setTextColor(if (sel) Color.WHITE else Color.parseColor("#a3abbd"))
             t.setOnClickListener { painelAtual = p.id; montarChips() }
-            val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            lp.marginEnd = dp(8)
-            chips.addView(t, lp)
+            chips.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         mostrarPainel(painelAtual!!)
     }
@@ -482,6 +616,7 @@ class Tela : Activity() {
                 progresso?.visibility = View.GONE
                 try { CookieManager.getInstance().flush() } catch (_: Exception) { }
                 v.evaluateJavascript(GANCHO_DOWNLOAD, null)
+                v.evaluateJavascript(GANCHO_SITE, null)
             }
 
             override fun doUpdateVisitedHistory(v: WebView, url: String?, isReload: Boolean) {
@@ -774,6 +909,7 @@ class Tela : Activity() {
                 o.put("titulo", p.nomeModulo)
             }
             o.put("atualizando", Atualizador.atualizando)
+            o.put("app", Atualizacao.resumo(this@Tela))
             o.put("email", Store.email(this@Tela) ?: "")
             o.put("nome", nomeApp())
             return o.toString()
@@ -866,8 +1002,54 @@ class Tela : Activity() {
             }
         }
 
+        /** Endereço do site: chamado abre na tela do app, o resto na aba Site. */
         @JavascriptInterface
-        fun abrirSite(caminho: String) = runOnUiThread { abrirNoSite(caminho) }
+        fun abrirSite(caminho: String) = runOnUiThread { abrirCaminho(caminho) }
+
+        /** Sempre na aba Site (botão "Abrir no site" da tela do chamado). */
+        @JavascriptInterface
+        fun siteDireto(caminho: String) = runOnUiThread { abrirNoSite(caminho) }
+
+        // ---- tela do chamado ----
+
+        @JavascriptInterface
+        fun carregarChamado(id: Int) {
+            val app = applicationContext
+            Thread {
+                val r = Chamado.historico(app, id)
+                js(webApp, "window.chamadoCarregado && chamadoCarregado(" + id + "," + r.ok + "," +
+                    JSONObject.quote(r.mensagem) + "," + (r.dados?.toString() ?: "null") + ")")
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun responderChamado(id: Int, texto: String) {
+            val app = applicationContext
+            Thread {
+                val r = Chamado.responder(app, id, texto)
+                js(webApp, "window.chamadoAcao && chamadoAcao(" + id + ",'responder'," + r.ok + "," + JSONObject.quote(r.mensagem) + ")")
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun assumirChamado(id: Int) {
+            val app = applicationContext
+            Thread {
+                val r = Chamado.assumir(app, id)
+                js(webApp, "window.chamadoAcao && chamadoAcao(" + id + ",'assumir'," + r.ok + "," + JSONObject.quote(r.mensagem) + ")")
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun voltar() = runOnUiThread { voltarHelpdesk() }
+
+        // ---- atualização do app ----
+
+        @JavascriptInterface
+        fun atualizarApp() = runOnUiThread { iniciarAtualizacao() }
+
+        @JavascriptInterface
+        fun atualizarPeloNavegador() = runOnUiThread { Atualizacao.abrirNoNavegador(this@Tela) }
 
         @JavascriptInterface
         fun aba(nome: String) = runOnUiThread { selecionar(nome) }
@@ -877,5 +1059,21 @@ class Tela : Activity() {
 
         @JavascriptInterface
         fun configurarNotificacoes() = runOnUiThread { abrirConfigNotificacoes() }
+
+        @JavascriptInterface
+        fun testarNotificacao() {
+            Helpdesk.testar(applicationContext)
+            if (!Helpdesk.notificacoesPermitidas(applicationContext)) runOnUiThread { abrirConfigNotificacoes() }
+        }
+
+        /** Abre direto as configurações do canal dos avisos (som, aparecer na tela, tela de bloqueio). */
+        @JavascriptInterface
+        fun configurarSom() = runOnUiThread {
+            try {
+                startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, Helpdesk.CANAL_AVISOS))
+            } catch (_: Exception) { abrirConfigNotificacoes() }
+        }
     }
 }

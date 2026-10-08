@@ -17,6 +17,7 @@ class Tarefa : JobService() {
         Thread {
             val app = applicationContext
             try { Atualizador.atualizar(app) } catch (_: Exception) { }
+            try { Atualizacao.conferir(app, false) } catch (_: Exception) { }   // versão nova do app (no máximo a cada 6 h)
             try {
                 Helpdesk.verificar(app, false)
                 Helpdesk.agendarAlarme(app)

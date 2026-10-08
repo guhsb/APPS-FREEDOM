@@ -24,6 +24,8 @@ interface Painel {
     val fundoRosado: Boolean get() = false
     val naAbaPainel: Boolean get() = true          // aparece na aba Painel do app (o Helpdesk tem aba própria)
     val aba: String get() = "painel"               // aba do app que o widget abre
+    /** Tipo de desenho para o tamanho: 'B' barra (1 linha), 'P' pequeno, 'M' médio, 'G' grande. */
+    fun classe(w: Float, h: Float): Char = Freedom.classe(w, h)
     fun buscar(api: Api): JSONObject
     /** classe: 'P' = pequeno, 'M' = médio, 'G' = grande */
     fun desenhar(p: Pintor, d: JSONObject, info: Info, classe: Char)
@@ -53,13 +55,15 @@ object Freedom {
 
     /** Tamanho do widget em dp -> tipo de desenho e "zoom" para preencher bem o espaço. */
     fun classe(w: Float, h: Float): Char = when {
+        h < 90f -> 'B'
         w < 200f -> 'P'
-        h < 230f -> 'M'
+        h < 170f -> 'M'
         else -> 'G'
     }
 
     fun zoom(w: Float, h: Float, classe: Char): Float {
         val z = when (classe) {
+            'B' -> minOf(w / 250f, h / 56f)
             'P' -> minOf(w / 155f, h / 155f)
             'M' -> minOf(w / 330f, h / 150f)
             else -> w / 330f
@@ -69,7 +73,7 @@ object Freedom {
 
     /** Desenha a imagem do widget (w x h em dp, k = pixels por dp). Não depende do Android "vivo": dá para testar no PC. */
     fun render(painel: Painel, w: Float, h: Float, k: Float, logo: Bitmap?, dadosTxt: String?, info: Info, semAcesso: Boolean = false): Bitmap {
-        val classe = classe(w, h)
+        val classe = painel.classe(w, h)
         val z = zoom(w, h, classe)
         val p = Pintor(w / z, h / z, k * z, logo)
         p.fundo(painel.fundoRosado)

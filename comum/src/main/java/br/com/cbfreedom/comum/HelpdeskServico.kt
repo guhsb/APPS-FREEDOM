@@ -8,7 +8,10 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 
-/** Modo tempo real: fica em primeiro plano (aviso fixo) e verifica o Helpdesk no intervalo escolhido. */
+/**
+ * Modo tempo real: fica em primeiro plano (aviso fixo) e verifica o Helpdesk no intervalo escolhido.
+ * Com a tela ligada roda a cada poucos segundos; com a tela desligada quem acorda o celular é o alarme.
+ */
 class HelpdeskServico : Service() {
 
     private val h = Handler(Looper.getMainLooper())
@@ -18,8 +21,8 @@ class HelpdeskServico : Service() {
     private val tick = object : Runnable {
         override fun run() {
             if (!deveRodar()) { parar(); return }
-            Helpdesk.emSegundoPlano(applicationContext, false)
-            h.postDelayed(this, Helpdesk.intervalo(this@HelpdeskServico) * 60_000L)
+            Helpdesk.cicloEmSegundoPlano(applicationContext)
+            h.postDelayed(this, Helpdesk.intervaloSeg(this@HelpdeskServico) * 1000L)
         }
     }
 

@@ -62,8 +62,10 @@ object PainelHelpdesk : Painel {
             val r = Helpdesk.resumoTela(c)
             val novidades = JSONArray()
             val feed = r.optJSONArray("feed") ?: JSONArray()
-            for (i in 0 until min(5, feed.length())) {
+            for (i in 0 until feed.length()) {
+                if (novidades.length() >= 5) break
                 val f = feed.optJSONObject(i) ?: continue
+                if (f.optBoolean("meu", false)) continue          // ações minhas não são "novidade"
                 novidades.put(JSONObject().put("t", f.optLong("t")).put("titulo", f.optString("titulo")).put("texto", f.optString("texto")))
             }
             val d = JSONObject().put("resumo", r.optJSONObject("resumo") ?: JSONObject())
@@ -100,6 +102,16 @@ object PainelHelpdesk : Painel {
         return l
     }
 
+    private fun curto(r: String): String = when (r) {
+        "Na fila" -> "na fila"
+        "Comigo" -> "comigo"
+        "Sem responsável" -> "sem resp."
+        "Meus chamados" -> "meus"
+        "SLA em risco" -> "SLA risco"
+        "SLA estourado" -> "SLA estour."
+        else -> r.lowercase()
+    }
+
     private fun corStatus(s: String): Int = when (s) {
         "OPEN" -> Cor.AZUL
         "IN_PROGRESS" -> Cor.VIOLETA
@@ -133,6 +145,23 @@ object PainelHelpdesk : Painel {
     override fun desenhar(p: Pintor, d: JSONObject, info: Info, classe: Char) {
         val W = p.larg; val H = p.alt; val iw = W - 2 * X0
         val nums = numeros(d)
+        if (classe == 'B') {
+            // uma linha: "3 na fila  2 comigo  1 sem resp. ..."
+            val y = p.barraTopo("HELPDESK", info)
+            var x = p.barraX()
+            val dir = p.larg - 12f
+            for (n in nums) {
+                val v = n.valor.toString()
+                val r = " " + curto(n.rotulo)
+                val wv = p.medir(v, 15f, 'H'); val wr = p.medir(r, 9f)
+                if (x + wv + wr > dir) break
+                val destaque = n.valor > 0 && (n.cor == Cor.LARANJA || n.cor == Cor.ROSA)
+                p.texto(v, x, y, 15f, if (destaque) n.cor else Cor.BRANCO, 'H')
+                p.texto(r, x + wv, y, 9f, Cor.CINZA)
+                x += wv + wr + 10f
+            }
+            return
+        }
         val y0 = p.cabecalho("HELPDESK", info, X0, 12f, classe == 'P')
 
         if (classe == 'P') {

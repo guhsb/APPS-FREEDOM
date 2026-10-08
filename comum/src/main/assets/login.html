@@ -1,52 +1,86 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css">
 <style>
-*{box-sizing:border-box}html,body{margin:0;height:100%}
-body{background:radial-gradient(420px 320px at 50% 12%,rgba(232,75,138,.16),transparent 70%),#0a0c12;color:#f2f4f8;
-font:16px system-ui,-apple-system,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
-.box{width:100%;max-width:380px;text-align:center}
-img{height:64px;margin-bottom:10px}
-h1{font-size:20px;margin:0 0 4px}
-p.s{color:#8b93a7;font-size:13px;margin:0 0 24px;line-height:1.4}
-label{display:block;text-align:left;color:#8b93a7;font-size:12px;margin:14px 0 6px;letter-spacing:.04em}
-input{width:100%;background:#12151f;border:1px solid #232838;border-radius:12px;color:#f2f4f8;font-size:16px;padding:14px;outline:none}
-input:focus{border-color:#e84b8a}
-.senha{position:relative}.senha button{position:absolute;right:6px;top:6px;bottom:6px;background:none;border:0;color:#8b93a7;font-size:13px;padding:0 10px}
-button.entrar{width:100%;margin-top:22px;background:#e84b8a;color:#fff;border:0;border-radius:12px;font-size:16px;font-weight:700;padding:15px}
-button.entrar:disabled{opacity:.6}
-.erro{color:#f0a53a;font-size:14px;margin-top:14px;min-height:20px}
-.rod{color:#5d6578;font-size:12px;margin-top:22px;line-height:1.5}
+html,body{height:100%}
+body{padding:0;display:flex;flex-direction:column;
+  background:radial-gradient(520px 380px at 50% -40px,rgba(232,75,138,.20),transparent 70%),var(--bg)}
+.wrap{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:400px;margin:0 auto;padding:28px 20px 20px}
+.marca{text-align:center;margin-bottom:26px}
+.marca .logo{padding:16px 22px;border-radius:22px;background:var(--sf);border:1px solid var(--ln);display:inline-flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 30px rgba(232,75,138,.15)}
+.marca .logo img{height:40px;display:block}
+.marca h1{font-size:24px;font-weight:800;letter-spacing:-.4px;margin:16px 0 4px}
+.marca p{margin:0;color:var(--tx3);font-size:13.5px}
+.campos{background:var(--sf);border:1px solid var(--ln);border-radius:18px;padding:18px 16px 16px}
+label{display:block;color:var(--tx2);font-size:12.5px;font-weight:600;margin:0 2px 7px}
+label+.campo{margin-bottom:14px}
+.campo{position:relative;display:flex;align-items:center;background:var(--sf2);border:1px solid var(--ln2);border-radius:12px;transition:border-color .15s,box-shadow .15s}
+.campo:focus-within{border-color:var(--rosa);box-shadow:0 0 0 3px var(--rosa-s)}
+.campo>svg.ic{margin-left:13px;width:18px;height:18px;color:var(--tx3)}
+.campo:focus-within>svg.ic{color:var(--rosa)}
+.campo input{flex:1;min-width:0;background:transparent;border:0;color:var(--tx);font:inherit;font-size:16px;padding:14px 12px;outline:none}
+.campo input::placeholder{color:var(--tx3)}
+.olho{border:0;background:transparent;color:var(--tx3);padding:0 13px;height:46px;display:flex;align-items:center}
+.olho.on{color:var(--rosa)}
+.entrar{width:100%;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--rosa);color:#fff;border:0;border-radius:12px;
+  font:inherit;font-size:16px;font-weight:700;padding:15px;box-shadow:0 8px 22px rgba(232,75,138,.28)}
+.entrar:active{filter:brightness(.92)}
+.entrar:disabled{opacity:.75}
+.entrar i{display:none;width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:gira .8s linear infinite}
+.entrar:disabled i{display:block}
+#erro:empty{display:none}
+#erro{margin:12px 0 0}
+.recursos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+.recursos div{text-align:center;color:var(--tx3);font-size:11.5px;line-height:1.3}
+.recursos svg.ic{display:block;margin:0 auto 6px;width:20px;height:20px;color:var(--tx2)}
+.seguro{display:flex;gap:8px;align-items:flex-start;justify-content:center;color:var(--tx3);font-size:12px;line-height:1.45;text-align:left;margin:22px 4px 0}
+.seguro svg.ic{width:15px;height:15px;margin-top:1px}
 </style></head><body>
-<div class="box">
-  <img src="logo.png" alt="Freedom">
-  <h1 id="nome">Freedom</h1>
-  <p class="s">Entre com o mesmo e-mail e senha do site<br>relatorios.cbfreedom.com.br</p>
-  <form id="f" autocomplete="on">
-    <label for="email">E-MAIL</label>
-    <input id="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-    <label for="senha">SENHA</label>
-    <div class="senha"><input id="senha" type="password" autocomplete="current-password" required>
-      <button type="button" id="ver">mostrar</button></div>
-    <button class="entrar" id="btn" type="submit">Entrar</button>
+<div class="wrap">
+  <div class="marca">
+    <div class="logo"><img src="logo.png" alt="Freedom"></div>
+    <h1 id="nome">Freedom</h1>
+    <p>Entre com o mesmo e-mail e senha do site</p>
+  </div>
+  <form id="f" class="campos" autocomplete="on">
+    <label for="email">E-mail</label>
+    <div class="campo"><span id="icE"></span><input id="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="voce@cbfreedom.com.br" required></div>
+    <label for="senha">Senha</label>
+    <div class="campo"><span id="icS"></span><input id="senha" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+      <button type="button" class="olho" id="ver" aria-label="Mostrar senha"></button></div>
+    <button class="entrar" id="btn" type="submit"><i></i><span id="btnT">Entrar</span></button>
+    <div id="erro"></div>
   </form>
-  <div class="erro" id="erro"></div>
-  <div class="rod">O login fica guardado só neste celular, com a senha criptografada.<br>Cada pessoa usa o próprio acesso.</div>
+  <div class="recursos">
+    <div><span id="ic1"></span>Avisos do Helpdesk</div>
+    <div><span id="ic2"></span>Site completo</div>
+    <div><span id="ic3"></span>Painéis e widgets</div>
+  </div>
+  <div class="seguro"><span id="ic4"></span><span>O login fica guardado só neste celular, com a senha criptografada. Cada pessoa usa o próprio acesso.</span></div>
 </div>
+<script src="base.js"></script>
 <script>
-try { document.getElementById('nome').textContent = App.nome(); } catch (e) {}
-var btn = document.getElementById('btn'), erro = document.getElementById('erro');
-document.getElementById('ver').onclick = function () {
-  var s = document.getElementById('senha'); var mostrar = s.type === 'password';
-  s.type = mostrar ? 'text' : 'password'; this.textContent = mostrar ? 'esconder' : 'mostrar';
+function troca(id, html) { var el = document.getElementById(id); el.outerHTML = html; }
+troca('icE', F.ic('email')); troca('icS', F.ic('cadeado'));
+troca('ic1', F.ic('sino')); troca('ic2', F.ic('lista')); troca('ic3', F.ic('grafico')); troca('ic4', F.ic('cadeado'));
+try { var n = App.nome(); if (n) document.getElementById('nome').textContent = n; } catch (e) {}
+var btn = document.getElementById('btn'), btnT = document.getElementById('btnT'), erro = document.getElementById('erro'), ver = document.getElementById('ver');
+ver.innerHTML = F.ic('olho');
+ver.onclick = function () {
+  var s = document.getElementById('senha'), mostrar = s.type === 'password';
+  s.type = mostrar ? 'text' : 'password'; ver.classList.toggle('on', mostrar);
+  ver.setAttribute('aria-label', mostrar ? 'Esconder senha' : 'Mostrar senha');
 };
 document.getElementById('f').onsubmit = function (ev) {
   ev.preventDefault();
   var e = document.getElementById('email').value.trim(), s = document.getElementById('senha').value;
-  if (!e || !s) { erro.textContent = 'Preencha o e-mail e a senha.'; return; }
-  erro.textContent = ''; btn.disabled = true; btn.textContent = 'Entrando…';
+  if (!e || !s) { mostrarErro('Preencha o e-mail e a senha.'); return; }
+  erro.innerHTML = ''; btn.disabled = true; btnT.textContent = 'Entrando…';
   try { App.entrar(e, s); } catch (x) { erroLogin('não consegui falar com o app'); }
 };
-function erroLogin(msg) { btn.disabled = false; btn.textContent = 'Entrar'; erro.textContent = 'Não entrou: ' + msg; }
+function mostrarErro(t) { erro.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(t) + '</span></div>'; }
+function erroLogin(msg) { btn.disabled = false; btnT.textContent = 'Entrar'; mostrarErro('Não entrou: ' + msg); }
 </script>
 </body></html>

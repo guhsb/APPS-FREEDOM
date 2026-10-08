@@ -26,7 +26,25 @@ object PainelComercial : Painel {
     override fun buscar(api: Api): JSONObject = Dados.comercial(api)
 
     override fun desenhar(p: Pintor, d: JSONObject, info: Info, classe: Char) {
-        if (d.optString("tipo") == "vendedor") vendedor(p, d, info, classe) else gestor(p, d, info, classe)
+        val vend = d.optString("tipo") == "vendedor"
+        when {
+            classe == 'B' -> barra(p, d, info, vend)
+            // a tela grande do vendedor (semana + mês) precisa de mais altura
+            vend -> vendedor(p, d, info, if (classe == 'G' && p.alt < 240f) 'M' else classe)
+            else -> gestor(p, d, info, classe)
+        }
+    }
+
+    /** Widget de uma linha: valor + % + barrinha. */
+    private fun barra(p: Pintor, d: JSONObject, info: Info, vend: Boolean) {
+        val o = if (vend) d.optJSONObject("semana") ?: JSONObject() else d
+        val y = p.barraTopo(if (vend) o.optString("titulo", "SEMANA") else "FATURAMENTO DO MÊS", info)
+        val x = p.barraX()
+        val dir = p.larg - 12f
+        val wp = p.texto(Fmt.pct(o.v("p") * 100), dir, y, 11f, Cor.BRANCO, 'B', 'D')
+        val max = dir - wp - 8f - x
+        p.texto(p.reaisQueCabe(o.v("valor"), 16f, max), x, y, 16f, Cor.BRANCO, 'H', max = max)
+        p.barra(x, y + 5f, dir - x, 3.5f, o.v("p"), o.v("idealP"), if (o.v("valor") >= o.v("ideal")) Cor.AZUL else Cor.ROSA)
     }
 
     private fun JSONObject.v(k: String): Double = optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
@@ -39,7 +57,7 @@ object PainelComercial : Painel {
     private fun bloco(p: Pintor, o: JSONObject, y: Float, tamV: Float, tamP: Float, altBarra: Float, corOk: Int, corRuim: Int): Float {
         val iw = p.larg - 2 * X0
         val wp = p.texto(Fmt.pct(o.v("p") * 100), p.larg - X0, y, tamP, Cor.BRANCO, 'B', 'D')
-        p.texto(Fmt.brl(o.v("valor")), X0, y, tamV, Cor.BRANCO, 'H', max = iw - wp - 8f)
+        p.texto(p.reaisQueCabe(o.v("valor"), tamV * 0.8f, iw - wp - 8f), X0, y, tamV, Cor.BRANCO, 'H', max = iw - wp - 8f)
         val yb = y + 7f
         p.barra(X0, yb, iw, altBarra, o.v("p"), o.v("idealP"), if (o.v("valor") >= o.v("ideal")) corOk else corRuim)
         return yb + altBarra
@@ -160,8 +178,11 @@ object PainelComercial : Painel {
             if (nota != null) p.texto(nota, X0, baseInfo1 + 28f, 9f, Cor.CINZA, 'N', max = iw)
         }
         if (cl == 'M') {
-            val fim = if (nota != null) 28f else 15f
-            semana(H - 12f - fim, y0)
+            // semana centralizada no espaço livre (sem buraco entre a barra e os números)
+            val altGrupo = if (nota != null) 86f else 73f
+            val topo = y0 + max(0f, (H - 12f - y0 - altGrupo) / 2f)
+            if (topo + altGrupo > H - 6f) semana(H - 12f - (if (nota != null) 28f else 15f), y0)
+            else semana(topo + 55f, topo)
             return
         }
         // grande: semana em cima, mês embaixo (o espaço que sobra fica dividido entre os dois)

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css">
+<style>
+body{padding-bottom:96px}
+.topo .bt.voltar{border:0;background:transparent;width:34px;margin-left:-8px}
+.topo .bt.voltar svg.ic{transform:rotate(180deg);width:24px;height:24px}
+.info{padding:14px 16px}
+.info .linha1{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.info h2{margin:10px 0 12px;font-size:17px;line-height:1.3;font-weight:700}
+.campos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 14px}
+.campos div span{display:block;font-size:11.5px;color:var(--tx3)}
+.campos div b{display:block;font-size:13.5px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prio{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--tx2)}
+.prio i{width:8px;height:8px;border-radius:50%}
+.assumir{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:12px;padding:13px;margin:0 0 12px;
+  background:var(--rosa);color:#fff;font:inherit;font-weight:700;font-size:15px}
+.assumir:disabled{opacity:.6}
+.tl{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.msg{max-width:86%;align-self:flex-start;background:var(--sf);border:1px solid var(--ln);border-radius:16px 16px 16px 6px;padding:10px 12px}
+.msg.eu{align-self:flex-end;background:rgba(232,75,138,.13);border-color:rgba(232,75,138,.3);border-radius:16px 16px 6px 16px}
+.msg .q{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
+.msg .q b{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg.eu .q b{color:#f6b3cf}
+.msg .q em{font-style:normal;font-size:11px;color:var(--tx3);flex:none}
+.msg .q .tag{font-size:10px;font-weight:700;color:var(--tx3);background:var(--sf3);border-radius:999px;padding:1px 6px;flex:none}
+.msg p{margin:0;font-size:14.5px;line-height:1.42;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.ev{align-self:center;display:flex;align-items:center;gap:6px;max-width:94%;font-size:12px;color:var(--tx3);text-align:center;padding:2px 4px}
+.ev svg.ic{width:14px;height:14px;flex:none}
+.ev b{color:var(--tx2);font-weight:600}
+.dia{align-self:center;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--tx3);text-transform:uppercase;margin:6px 0 0}
+.caixa{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(11,13,18,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-top:1px solid var(--ln);padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
+.caixa textarea{flex:1;min-width:0;resize:none;max-height:140px;min-height:44px;background:var(--sf2);border:1px solid var(--ln2);border-radius:14px;color:var(--tx);
+  font:inherit;font-size:15px;line-height:1.35;padding:11px 12px;outline:none}
+.caixa textarea:focus{border-color:var(--rosa)}
+.caixa button{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:var(--rosa);color:#fff;display:flex;align-items:center;justify-content:center}
+.caixa button:disabled{background:var(--sf3);color:var(--tx3)}
+.caixa .fechado{flex:1;text-align:center;color:var(--tx3);font-size:13px;padding:10px}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--sf3);color:var(--tx);border:1px solid var(--ln2);border-radius:12px;
+  padding:10px 14px;font-size:13px;z-index:30;max-width:90%;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
+</style></head><body>
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1 id="tit">Chamado</h1><div class="st" id="sub">Carregando…</div></div>
+  <button class="bt" id="btAt" aria-label="Atualizar"></button>
+  <button class="bt" id="btSite" aria-label="Abrir no site"></button>
+</div>
+<div id="aviso"></div>
+<div id="conteudo"><div class="carregando"><i></i>Abrindo o chamado…</div></div>
+<div class="caixa" id="caixa" style="display:none">
+  <textarea id="texto" rows="1" maxlength="10000" placeholder="Escreva uma resposta…"></textarea>
+  <button id="btEnviar" aria-label="Enviar" disabled></button>
+</div>
+<div class="toast" id="toast"></div>
+<script src="base.js"></script>
+<script>
+F.IC.enviar = '<path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/>';
+F.IC.externo = '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>';
+var STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
+  WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'],
+  CLOSED: ['Fechado', '#8b93a7', '#1d2230'], CANCELED: ['Cancelado', '#8b93a7', '#1d2230'], CANCELLED: ['Cancelado', '#8b93a7', '#1d2230'] };
+var PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], NORMAL: ['Normal', '#4f7cff'], HIGH: ['Alta', '#f0a53a'], URGENT: ['Urgente', '#ef4444'], CRITICAL: ['Crítica', '#ef4444'] };
+var ID = parseInt((location.hash || '').replace('#', ''), 10) || 0;
+var dados = null, ultimaChave = '', enviando = false, assumindo = false, carregando = false, deNovo = false;
+// abriu outro chamado com esta tela aberta: recarrega para trocar de chamado
+window.addEventListener('hashchange', function () { location.reload(); });
+
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btAt').innerHTML = F.ic('atualizar');
+document.getElementById('btSite').innerHTML = F.ic('externo');
+document.getElementById('btEnviar').innerHTML = F.ic('enviar');
+
+function stLabel(s) { return (STATUS[s] || [s || '—'])[0]; }
+function prLabel(s) { return (PRIO[s] || [s || '—'])[0]; }
+function data(s) {
+  if (!s) return null;
+  s = String(s).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1');
+  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s += 'Z';
+  var d = new Date(s); return isNaN(d) ? null : d;
+}
+function hora(s) { var d = data(s); return d ? F.hhmm(d.getTime()) : ''; }
+function diaTxt(d) {
+  var h = new Date(), on = new Date(h.getTime() - 86400000);
+  if (d.toDateString() === h.toDateString()) return 'Hoje';
+  if (d.toDateString() === on.toDateString()) return 'Ontem';
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+}
+function dataHora(s) { var d = data(s); return d ? diaTxt(d) + ' ' + F.hhmm(d.getTime()) : '—'; }
+function rot(it, p) { var l = it[p + '_label']; if (l == null || l === '') l = it[p + '_value']; return l == null ? '' : String(l); }
+function textoEvento(it) {
+  var et = it.event_type || '', o = rot(it, 'old'), n = rot(it, 'new'), meta = it.metadata || {};
+  if (et === 'STATUS_CHANGED') return ['troca', 'alterou o status: ' + stLabel(o) + ' → ' + stLabel(n)];
+  if (et === 'PRIORITY_CHANGED') return ['alerta', 'alterou a prioridade: ' + prLabel(o) + ' → ' + prLabel(n)];
+  if (et === 'ASSIGNEE_CHANGED') return ['pessoa', n ? 'definiu o responsável: ' + n : 'removeu o responsável'];
+  if (et.indexOf('QUEUE') === 0 || et.indexOf('TRANSFER') >= 0) return ['troca', 'transferiu o chamado' + (n ? ' para ' + n : '')];
+  if (et === 'ATTACHMENT_ADDED') return ['clipe', 'anexou um arquivo' + (meta.filename ? ': ' + meta.filename : '')];
+  if (et.indexOf('SOLUTION') >= 0) return ['ok', et.toLowerCase().replace(/_/g, ' ')];
+  var s = (et || 'atualização').toLowerCase().replace(/_/g, ' ');
+  if (o || n) s += ': ' + (o ? o + ' → ' : '') + n;
+  return ['relogio', s];
+}
+function mostrarToast(t) {
+  var el = document.getElementById('toast'); el.textContent = t; el.style.display = 'block';
+  clearTimeout(mostrarToast.t); mostrarToast.t = setTimeout(function () { el.style.display = 'none'; }, 3200);
+}
+function perto() { return window.innerHeight + window.scrollY >= document.body.scrollHeight - 160; }
+
+function render(d) {
+  var t = d.ticket || {}, cap = d.capabilities || {}, itens = d.items || [];
+  var s = STATUS[t.status] || [t.status || '—', '#8b93a7', '#1d2230'], pr = PRIO[t.priority];
+  document.getElementById('tit').textContent = t.protocol || ('Chamado #' + ID);
+  document.getElementById('sub').textContent = t.title || '';
+  var h = '<div class="card info"><div class="linha1"><span class="badge" style="color:' + s[1] + ';background:' + s[2] + '">' + F.esc(s[0]) + '</span>' +
+    (pr ? '<span class="prio"><i style="background:' + pr[1] + '"></i>' + pr[0] + '</span>' : '') + '</div>' +
+    '<h2>' + F.esc(t.title || '') + '</h2><div class="campos">' +
+    '<div><span>Solicitante</span><b>' + F.esc(d.requester_name || '—') + '</b></div>' +
+    '<div><span>Responsável</span><b>' + F.esc(d.assignee_name || 'Sem responsável') + '</b></div>' +
+    '<div><span>Fila</span><b>' + F.esc(d.queue_name || '—') + '</b></div>' +
+    '<div><span>Aberto</span><b>' + dataHora(t.created_at) + '</b></div></div></div>';
+  if (cap.can_take) h += '<button class="assumir" id="btAssumir"' + (assumindo ? ' disabled' : '') + '>' + F.ic('pessoa') + (assumindo ? 'Assumindo…' : 'Assumir chamado') + '</button>';
+
+  h += '<div class="sec"><h2>Conversa</h2><span>' + itens.length + '</span></div><div class="tl">';
+  var ultimoDia = '';
+  itens.forEach(function (it) {
+    var dt = data(it.created_at), dd = dt ? diaTxt(dt) : '';
+    if (dd && dd !== ultimoDia) { h += '<div class="dia">' + dd + '</div>'; ultimoDia = dd; }
+    var a = it.actor || {}, quem = a.name || 'Sistema', eu = !!a.is_current_user;
+    if (it.type === 'EVENT') {
+      var ev = textoEvento(it);
+      h += '<div class="ev">' + F.ic(ev[0]) + '<span><b>' + F.esc(eu ? 'Você' : quem) + '</b> ' + F.esc(ev[1]) + ' · ' + hora(it.created_at) + '</span></div>';
+      return;
+    }
+    var corpo = String(it.body || '').trim();
+    var tag = it.type === 'OPENING' ? 'abriu o chamado' : (a.context === 'REQUESTER' ? 'solicitante' : '');
+    h += '<div class="msg' + (eu ? ' eu' : '') + '"><div class="q"><b>' + F.esc(eu ? 'Você' : quem) + '</b>' +
+      (tag ? '<span class="tag">' + tag + '</span>' : '') + '<em>' + hora(it.created_at) + '</em></div>' +
+      '<p>' + (corpo ? F.esc(corpo) : '<i style="color:var(--tx3)">(sem texto)</i>') + '</p></div>';
+  });
+  if (!itens.length) h += '<div class="vazio">Nenhuma mensagem ainda.</div>';
+  h += '</div><div class="rod">Anexos e alterações de status ficam no site · toque em ' + F.ic('externo').replace('class="ic ', 'class="ic " style="width:12px;height:12px;vertical-align:-2px"') + '</div>';
+  document.getElementById('conteudo').innerHTML = h;
+  var ba = document.getElementById('btAssumir');
+  if (ba) ba.onclick = function () {
+    if (assumindo) return; assumindo = true; ba.disabled = true; ba.lastChild.textContent = 'Assumindo…';
+    try { App.assumirChamado(ID); } catch (e) { assumindo = false; }
+  };
+
+  // caixa de resposta
+  var caixa = document.getElementById('caixa'), aberto = ['RESOLVED', 'CLOSED', 'CANCELED', 'CANCELLED'].indexOf(t.status) < 0;
+  caixa.style.display = 'flex';
+  var fechado = caixa.querySelector('.fechado');
+  document.getElementById('texto').style.display = aberto ? '' : 'none';
+  document.getElementById('btEnviar').style.display = aberto ? '' : 'none';
+  if (!aberto && !fechado) caixa.insertAdjacentHTML('afterbegin', '<div class="fechado">Chamado ' + F.esc(stLabel(t.status).toLowerCase()) + ' · não aceita novas mensagens</div>');
+  if (aberto && fechado) fechado.remove();
+}
+
+function carregar(silencioso) {
+  if (!ID) return;
+  if (carregando) { deNovo = true; return; }
+  carregando = true;
+  if (!silencioso) document.getElementById('btAt').classList.add('gira');
+  try { App.carregarChamado(ID); } catch (e) { carregando = false; }
+}
+window.chamadoCarregado = function (id, ok, msg, d) {
+  if (id !== ID) return;                 // resposta atrasada de outro chamado
+  carregando = false;
+  if (deNovo) { deNovo = false; setTimeout(function () { carregar(true); }, 0); }
+  document.getElementById('btAt').classList.remove('gira');
+  var av = document.getElementById('aviso');
+  if (!ok) {
+    av.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar()">Tentar</button></div>';
+    if (!dados) document.getElementById('conteudo').innerHTML = '';
+    return;
+  }
+  av.innerHTML = '';
+  var chave = JSON.stringify(d);
+  if (chave === ultimaChave) return;
+  var primeira = !dados, desce = primeira || perto();
+  ultimaChave = chave; dados = d;
+  render(d);
+  if (desce) window.scrollTo(0, document.body.scrollHeight);
+};
+window.chamadoAcao = function (id, tipo, ok, msg) {
+  if (id !== ID) return;
+  if (tipo === 'responder') {
+    enviando = false;
+    var tx = document.getElementById('texto');
+    tx.disabled = false;
+    if (ok) { tx.value = ''; ajustar(); mostrarToast('Resposta enviada'); }
+    else mostrarToast(msg);
+    atualizarBotao();
+  } else {
+    assumindo = false;
+    mostrarToast(ok ? 'Você assumiu o chamado' : msg);
+    if (dados) render(dados);              // destrava o botão
+  }
+  carregar(true);
+};
+window.recebidoHelpdesk = function () { carregar(true); };
+
+var tx = document.getElementById('texto'), be = document.getElementById('btEnviar');
+function ajustar() { tx.style.height = 'auto'; tx.style.height = Math.min(140, tx.scrollHeight + 2) + 'px'; }
+function atualizarBotao() { be.disabled = enviando || !tx.value.trim(); }
+tx.addEventListener('input', function () { ajustar(); atualizarBotao(); });
+be.onclick = function () {
+  var v = tx.value.trim(); if (!v || enviando) return;
+  enviando = true; tx.disabled = true; atualizarBotao();
+  try { App.responderChamado(ID, v); } catch (e) { enviando = false; tx.disabled = false; atualizarBotao(); }
+};
+document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
+document.getElementById('btAt').onclick = function () { carregar(); };
+document.getElementById('btSite').onclick = function () { try { App.siteDireto('/helpdesk/tickets/' + ID); } catch (e) {} };
+F.topoSombra();
+carregar();
+setInterval(function () { if (!document.hidden) carregar(true); }, 20000);
+</script>
+</body></html>

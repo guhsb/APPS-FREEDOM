@@ -4,21 +4,22 @@
 <link rel="stylesheet" href="base.css">
 <style>
 .busca{display:flex;gap:8px;margin:4px 0 10px}
-.busca input{flex:1;background:#12151f;border:1px solid #232838;border-radius:12px;color:#f2f4f8;font-size:15px;padding:11px 12px;outline:none}
+.busca input:focus{border-color:var(--rosa)}
+.busca input{flex:1;background:var(--sf);border:1px solid var(--ln);border-radius:12px;color:var(--tx);font-size:15px;padding:11px 12px;outline:none}
 .filtros{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
-.filtros button{flex:none;background:#12151f;border:1px solid #232838;color:#aab1c2;border-radius:999px;padding:7px 12px;font-size:12px}
-.filtros button.on{background:#e84b8a;border-color:#e84b8a;color:#fff;font-weight:700}
-.vs h2{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;letter-spacing:.1em;color:#8b93a7;margin:20px 0 8px}
+.filtros button{flex:none;background:var(--sf);border:1px solid var(--ln);color:var(--tx2);border-radius:999px;padding:7px 12px;font-size:12px}
+.filtros button.on{background:var(--rosa);border-color:var(--rosa);color:#fff;font-weight:700}
+.vs h2{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--tx2);margin:22px 2px 10px}
 .vs h2 span{letter-spacing:0;font-weight:400;font-size:12px}
-.v{background:#12151f;border:1px solid #232838;border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.v{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;margin-bottom:8px}
 .v .l{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .v .l span{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.v .l span em{font-style:normal;color:#5d6578;font-size:12px;margin-right:6px}
-.v .l b{white-space:nowrap}.v .l b i{font-style:normal;color:#8b93a7;font-size:12px;margin-left:6px}
+.v .l span em{font-style:normal;color:var(--tx3);font-size:12px;margin-right:6px}
+.v .l b{white-space:nowrap}.v .l b i{font-style:normal;color:var(--tx3);font-size:12px;margin-left:6px}
 .v .trilho{height:6px;margin:9px 0 6px}.v .trilho>s{top:-3px;bottom:-3px}
-.v .d{display:flex;justify-content:space-between;font-size:12px;color:#8b93a7;gap:8px}
-.nota{font-size:12px;color:#8b93a7;margin-top:10px}
-.vazio{text-align:center;color:#8b93a7;padding:30px 0}
+.v .d{display:flex;justify-content:space-between;font-size:12px;color:var(--tx3);gap:8px}
+.nota{font-size:12px;color:var(--tx3);margin-top:10px}
+.vazio{text-align:center;color:var(--tx3);padding:30px 0}
 </style></head><body>
 <div id="conteudo"></div>
 <script>var PAINEL_ID = 'comercial';</script>

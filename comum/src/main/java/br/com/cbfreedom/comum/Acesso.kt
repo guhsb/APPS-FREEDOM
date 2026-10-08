@@ -51,6 +51,8 @@ object Acesso {
 
     fun perfil(c: Context): String = p(c).getString("perfil", "") ?: ""
 
+    fun nome(c: Context): String = p(c).getString("nome", "") ?: ""
+
     fun limpar(c: Context) {
         p(c).edit().clear().commit()
         Widget.ajustarDisponiveis(c)

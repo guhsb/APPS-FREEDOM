@@ -23,8 +23,35 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Preparar a assinatura (chave guardada nos Secrets)
+        env:
+          CHAVE: ${{ secrets.FREEDOM_KEYSTORE }}
+          SENHA: ${{ secrets.FREEDOM_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$CHAVE" ] || [ -z "$SENHA" ]; then
+            echo "::error::Faltam os Secrets FREEDOM_KEYSTORE e FREEDOM_KEYSTORE_PASSWORD (Settings > Secrets and variables > Actions). Veja o LEIA-ME."
+            exit 1
+          fi
+          echo "$CHAVE" | base64 -d > "$RUNNER_TEMP/freedom.jks"
+          echo "FREEDOM_KEYSTORE_FILE=$RUNNER_TEMP/freedom.jks" >> "$GITHUB_ENV"
+
       - name: Montar o APK
+        env:
+          FREEDOM_KEYSTORE_PASSWORD: ${{ secrets.FREEDOM_KEYSTORE_PASSWORD }}
         run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Conferir a assinatura
+        run: |
+          rm -f "$RUNNER_TEMP/freedom.jks"
+          # impressão digital da chave oficial do Freedom: se mudar, os celulares não aceitam a atualização
+          ESPERADA="4ee15aa7978637266150d9de168c64a6896502ff900a8f83d0c565c8fd1f3e19"
+          AS=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          if [ -z "$AS" ]; then echo "::warning::apksigner não encontrado; assinatura não conferida"; exit 0; fi
+          "$AS" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee certificado.txt | grep -E "DN|SHA-256"
+          if ! grep -qi "SHA-256 digest: $ESPERADA" certificado.txt; then
+            echo "::error::O APK foi assinado com outra chave (Secrets trocados?). Não publiquei para não quebrar a atualização dos celulares."
+            exit 1
+          fi
 
       - name: Renomear
         run: cp app/build/outputs/apk/release/app-release.apk Freedom.apk

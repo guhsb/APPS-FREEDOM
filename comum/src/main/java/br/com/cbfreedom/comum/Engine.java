@@ -6,6 +6,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -45,6 +46,8 @@ public final class Engine {
         public final List<String> lines = new ArrayList<String>();
         public String path;
         public boolean isNew;
+        /** Ação feita por mim mesmo: entra só no histórico do app, sem notificação. */
+        public boolean silent;
     }
 
     public static final class Outcome {
@@ -73,6 +76,15 @@ public final class Engine {
     }
 
     public static Outcome run(Fetcher f, String stateJson, boolean notifyOwn, long deadline) {
+        return run(f, stateJson, notifyOwn, deadline, null);
+    }
+
+    /**
+     * force = chamados em que a sondagem rápida viu item novo no histórico: o histórico deles é consultado
+     * mesmo que a lista não mostre alteração (algumas respostas não mudam o updated_at do chamado).
+     */
+    public static Outcome run(Fetcher f, String stateJson, boolean notifyOwn, long deadline, Set<Integer> force) {
+        if (force == null) force = Collections.emptySet();
         Outcome out = new Outcome();
         JSONObject state;
         try {
@@ -89,9 +101,11 @@ public final class Engine {
 
         // 1) Listas de chamados ------------------------------------------------------------
         Map<Integer, JSONObject> current = new LinkedHashMap<Integer, JSONObject>();
+        Set<Integer> mine = new HashSet<Integer>();   // que eu abri (solicitante) ou que estão comigo
         int okLists = 0;
         String lastErr = null;
-        for (String path : LISTS) {
+        for (int li = 0; li < LISTS.length; li++) {
+            String path = LISTS[li];
             if (System.currentTimeMillis() > deadline) {
                 if (okLists == 0) lastErr = "o site demorou para responder";
                 break;
@@ -117,7 +131,10 @@ public final class Engine {
                 if (items != null) {
                     for (int i = 0; i < items.length(); i++) {
                         JSONObject t = items.optJSONObject(i);
-                        if (t != null && t.has("id")) current.put(t.optInt("id"), t);
+                        if (t != null && t.has("id")) {
+                            current.put(t.optInt("id"), t);
+                            if (li == 1 || li == 3) mine.add(t.optInt("id"));
+                        }
                     }
                 }
                 okLists++;
@@ -192,15 +209,17 @@ public final class Engine {
             }
             touched = touched || isNew || unknownTouched;
 
-            boolean wantTimeline = touched || rotate.contains(id) || (firstRun && isActive(status));
+            boolean forced = force.contains(id);
+            boolean wantTimeline = touched || forced || rotate.contains(id) || (firstRun && isActive(status));
 
             List<String> lines = new ArrayList<String>();
+            Set<String> ownSeen = new LinkedHashSet<String>();
             boolean timelineOk = false, anyOwn = false, anyOther = false;
             String requesterName = "", queueName = "";
             String sinceTs = old != null ? old.optString("updated", "") : updated;
 
-            if (wantTimeline && timelinesLeft > 0 && System.currentTimeMillis() < deadline) {
-                timelinesLeft--;
+            if (wantTimeline && (timelinesLeft > 0 || forced) && System.currentTimeMillis() < deadline) {
+                if (!forced) timelinesLeft--;
                 try {
                     Resp r = f.get(API + "/tickets/" + id + "/timeline");
                     if (r.status == 401) {
@@ -233,9 +252,16 @@ public final class Engine {
                                 boolean own = actor != null && actor.optBoolean("is_current_user", false);
                                 if (own) anyOwn = true;
                                 else anyOther = true;
-                                if (own && !notifyOwn) continue;
-
                                 String type = it.optString("type", "");
+                                if (own && !notifyOwn) {
+                                    // não notifica, mas guarda para o histórico do app
+                                    if (!(isNew && "EVENT".equals(type))) {
+                                        String ol = describe(it, isNew);
+                                        if (ol != null && ol.length() > 0) ownSeen.add(ol);
+                                    }
+                                    continue;
+                                }
+
                                 if ("OPENING".equals(type)) openingBody = clean(it.optString("body", ""));
                                 if (isNew && "EVENT".equals(type)) continue; // eventos automáticos da abertura
                                 if (isNew && "MESSAGE".equals(type) && openingBody != null
@@ -291,6 +317,23 @@ public final class Engine {
                     note.text = lines.get(lines.size() - 1);
                 }
             }
+            if (note == null && !notifyOwn && timelineOk && anyOwn && !anyOther) {
+                // só ações minhas: vai para o histórico do app sem tocar o celular
+                if (isNew) {
+                    note = new Note();
+                    note.isNew = true;
+                    note.title = "Você abriu o chamado " + protocol;
+                    note.text = title;
+                    lines = new ArrayList<String>();
+                    lines.add(title);
+                } else if (!ownSeen.isEmpty()) {
+                    note = new Note();
+                    note.title = protocol + (title.length() > 0 ? " · " + title : "");
+                    lines = new ArrayList<String>(ownSeen);
+                    note.text = lines.get(lines.size() - 1);
+                }
+                if (note != null) note.silent = true;
+            }
             if (note != null) {
                 note.ticketId = id;
                 note.path = "/helpdesk/tickets/" + id;
@@ -317,6 +360,7 @@ public final class Engine {
                 rec.put("updated", updated);
                 rec.put("version", version);
                 rec.put("last_item", lastItem);
+                if (mine.contains(id) || (old != null && old.optBoolean("mine", false))) rec.put("mine", true);
                 newKnown.put(String.valueOf(id), rec);
             } catch (JSONException ignored) {
             }
@@ -378,6 +422,60 @@ public final class Engine {
     }
 
     // ---------------------------------------------------------------------------------------
+    // Sondagem rápida (usada pelo app entre as verificações completas)
+
+    /** Chamados ativos do estado salvo, na ordem de prioridade da sondagem: os meus primeiro, mais recentes antes. */
+    public static List<Integer> probeOrder(String stateJson) {
+        List<Integer> out = new ArrayList<Integer>();
+        try {
+            JSONObject known = new JSONObject(stateJson).optJSONObject("tickets");
+            if (known == null) return out;
+            final Map<Integer, JSONObject> recs = new HashMap<Integer, JSONObject>();
+            Iterator<String> it = known.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                JSONObject r = known.optJSONObject(k);
+                if (r == null || !isActive(r.optString("status"))) continue;
+                try { recs.put(Integer.parseInt(k), r); } catch (NumberFormatException ignored) { }
+            }
+            out.addAll(recs.keySet());
+            Collections.sort(out, new java.util.Comparator<Integer>() {
+                public int compare(Integer a, Integer b) {
+                    JSONObject ra = recs.get(a), rb = recs.get(b);
+                    boolean ma = ra.optBoolean("mine", false), mb = rb.optBoolean("mine", false);
+                    if (ma != mb) return ma ? -1 : 1;
+                    int c = rb.optString("updated").compareTo(ra.optString("updated"));
+                    return c != 0 ? c : b.compareTo(a);
+                }
+            });
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    /** Último item conhecido do histórico de um chamado (-1 = ainda não consultado). */
+    public static long knownLastItem(String stateJson, int id) {
+        try {
+            JSONObject r = new JSONObject(stateJson).optJSONObject("tickets").optJSONObject(String.valueOf(id));
+            return r == null ? -1 : r.optLong("last_item", -1);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /** Maior id de item numa resposta de /tickets/{id}/timeline (-1 se não deu para ler). */
+    public static long maxItemId(String timelineBody) {
+        long max = -1;
+        try {
+            JSONArray items = new JSONObject(timelineBody).optJSONArray("items");
+            if (items != null) for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it != null) max = Math.max(max, it.optLong("id", -1));
+            }
+        } catch (Exception ignored) {
+        }
+        return max;
+    }
 
     public static boolean isActive(String status) {
         return !("RESOLVED".equals(status) || "CLOSED".equals(status) || "CANCELED".equals(status)
