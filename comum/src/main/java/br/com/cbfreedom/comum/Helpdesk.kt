@@ -208,20 +208,33 @@ object Helpdesk {
             if (logou) ed.putString("cookie", api.cookie)
             val avisar = ativo(c)
             when {
-                o.sessionExpired -> ed.putString("status", "Este login não tem acesso ao Helpdesk")
-                !o.ok -> ed.putString("status", "Não verificou: " + (o.error ?: "erro"))
+                o.sessionExpired -> { ed.putString("status", "Este login não tem acesso ao Helpdesk"); diag(c, "Sem acesso ao Helpdesk (sessão recusada)") }
+                !o.ok -> { ed.putString("status", "Não verificou: " + (o.error ?: "erro")); diag(c, "Erro: " + (o.error ?: "erro")) }
                 else -> {
                     ed.putString("estado", o.newState).putString("status", "ok").putInt("monitorados", o.monitored)
                         .putBoolean("login_avisado", false)
                         .remove("sonda")      // a próxima sondagem rápida parte do estado atual
                     nm(c).cancel(NOTIF_LOGIN)
                     forcar.removeAll(forca)
+                    val avisos = o.notes.filter { !it.silent }
                     if (o.notes.isNotEmpty()) {
                         guardarFeed(p, ed, o.notes, agora)
                         // ações minhas (silent) ficam só no histórico do app
-                        val avisos = o.notes.filter { !it.silent }
                         if (avisar && avisos.isNotEmpty()) notificar(c, avisos, o.newState)
                     }
+                    val minhas = o.notes.size - avisos.size
+                    val porQue = when {
+                        avisos.isEmpty() -> ""
+                        !avisar -> " · NÃO avisou: avisos desligados"
+                        !notificacoesPermitidas(c) -> " · NÃO avisou: notificações bloqueadas no Android"
+                        else -> " · avisou no celular"
+                    }
+                    if (o.firstRun) diag(c, "Primeira verificação: linha de base de ${o.monitored} chamados")
+                    else if (o.notes.isNotEmpty() || forca.isNotEmpty() || manual)
+                        diag(c, "Verificação: ${o.monitored} chamados, ${avisos.size} novidade(s)" +
+                            (if (minhas > 0) " + $minhas sua(s)" else "") + porQue +
+                            (if (forca.isNotEmpty()) " · conferiu " + forca.joinToString(", ") { "#$it" } else "") +
+                            avisos.take(3).joinToString("") { "\n  " + it.title + ": " + it.text })
                     if (o.firstRun && avisar) info(
                         c, "Avisos do Helpdesk ativados",
                         "Você vai ser avisado de novos chamados, respostas e mudanças de status, prioridade e responsável."
@@ -238,6 +251,7 @@ object Helpdesk {
             null
         } catch (e: Exception) {
             ed.putString("status", "Não verificou: " + Api.mensagem(e))
+            diag(c, "Erro: " + Api.mensagem(e))
             null
         } finally {
             // se a pessoa saiu (ou trocou de login) durante a verificação, descarta o resultado
@@ -290,6 +304,7 @@ object Helpdesk {
         val antes = p.getString("sonda", null)
         p.edit().putString("sonda", marca).apply()
         val mudouLista = antes != null && antes != marca
+        if (mudouLista) diag(c, "Sondagem: as listas de chamados mudaram")
 
         // respostas: compara o último item do histórico com o que a última verificação viu
         var resposta = false
@@ -305,11 +320,17 @@ object Helpdesk {
             }
             for (id in escolha) {
                 val conhecido = Engine.knownLastItem(estado, id)
-                if (conhecido < 0) continue                // histórico ainda não lido: o rodízio da verificação completa lê
+                if (conhecido < 0) {
+                    // histórico ainda não lido: a verificação completa lê agora (só linha de base, sem aviso)
+                    forcar.add(id); resposta = true; continue
+                }
                 val r = try { api.bruto("/helpdesk/tickets/$id/timeline") } catch (_: Exception) { break }
                 if (r.first == 401) return true
                 if (r.first != 200) continue
-                if (Engine.maxItemId(r.second) > conhecido) { forcar.add(id); resposta = true }
+                if (Engine.maxItemId(r.second) > conhecido) {
+                    forcar.add(id); resposta = true
+                    diag(c, "Sondagem: item novo no histórico do chamado #$id")
+                }
             }
         }
         return mudouLista || resposta
@@ -403,6 +424,7 @@ object Helpdesk {
             .put("notifOk", notificacoesPermitidas(c)).put("bateriaOk", bateriaLivre(c))
             .put("visto", p.getLong("visto", 0L))
         o.put("app", Atualizacao.resumo(c))
+        o.put("diag", try { JSONArray(p.getString("diag", "[]")) } catch (_: Exception) { JSONArray() })
         o.put("feed", try { JSONArray(p.getString("feed", "[]")) } catch (_: Exception) { JSONArray() })
         val estado = try { JSONObject(p.getString("estado", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         estado.optJSONObject("summary")?.let { o.put("resumo", it) }
@@ -420,6 +442,39 @@ object Helpdesk {
         for (t in abertos.take(40)) arr.put(t)
         o.put("abertos", arr)
         return o
+    }
+
+    // ---------------- diagnóstico ----------------
+
+    /** Guarda um registro do que o monitor fez (últimos 50), para entender "por que não chegou o aviso". */
+    @Synchronized
+    fun diag(c: Context, texto: String) {
+        val p = prefs(c)
+        val arr = try { JSONArray(p.getString("diag", "[]")) } catch (_: Exception) { JSONArray() }
+        val novo = JSONArray().put(JSONObject().put("t", System.currentTimeMillis()).put("x", texto.take(600)))
+        for (i in 0 until minOf(arr.length(), 49)) novo.put(arr.get(i))
+        p.edit().putString("diag", novo.toString()).apply()
+    }
+
+    fun textoDiagnostico(c: Context): String {
+        val p = prefs(c)
+        val sb = StringBuilder()
+        sb.append("Freedom ").append(Atualizacao.nomeVersao(c)).append(" · Android ").append(Build.VERSION.RELEASE)
+            .append(" · ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n')
+        sb.append("Avisos: ").append(if (ativo(c)) "ligados" else "DESLIGADOS")
+            .append(" · tempo real: ").append(if (tempoReal(c)) "sim" else "não")
+            .append(" · a cada ").append(textoIntervalo(intervaloSeg(c)))
+            .append(" · notificações: ").append(if (notificacoesPermitidas(c)) "permitidas" else "BLOQUEADAS")
+            .append(" · som: ").append(if (canalOk(c)) "ok" else "SEM SOM")
+            .append(" · bateria: ").append(if (bateriaLivre(c)) "liberada" else "RESTRITA")
+            .append(" · minhas ações: ").append(if (minhasAcoes(c)) "avisa" else "não avisa").append('\n')
+        val arr = try { JSONArray(p.getString("diag", "[]")) } catch (_: Exception) { JSONArray() }
+        val f = java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale("pt", "BR"))
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            sb.append(f.format(java.util.Date(o.optLong("t")))).append("  ").append(o.optString("x")).append('\n')
+        }
+        return sb.toString()
     }
 
     fun marcarVisto(c: Context) {

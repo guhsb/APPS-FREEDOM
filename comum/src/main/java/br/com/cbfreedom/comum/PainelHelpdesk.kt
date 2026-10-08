@@ -115,7 +115,9 @@ object PainelHelpdesk : Painel {
     private fun corStatus(s: String): Int = when (s) {
         "OPEN" -> Cor.AZUL
         "IN_PROGRESS" -> Cor.VIOLETA
-        "WAITING" -> Cor.LARANJA
+        "WAITING", "WAITING_SUPPLIER" -> Cor.LARANJA
+        "PENDING_APPROVAL" -> Cor.VERDE
+        "REOPENED" -> Cor.AZUL
         else -> Cor.CINZA
     }
 

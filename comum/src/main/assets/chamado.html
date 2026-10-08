@@ -14,22 +14,46 @@ body{padding-bottom:96px}
 .campos div b{display:block;font-size:13.5px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prio{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--tx2)}
 .prio i{width:8px;height:8px;border-radius:50%}
-.assumir{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:12px;padding:13px;margin:0 0 12px;
-  background:var(--rosa);color:#fff;font:inherit;font-weight:700;font-size:15px}
-.assumir:disabled{opacity:.6}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:700;font-size:15px;
+  background:var(--sf3);color:var(--tx)}
+.btn.rosa{background:var(--rosa);color:#fff}.btn.verde{background:var(--verde);color:#062a1f}.btn.linha{background:transparent;border:1px solid var(--ln2);color:var(--tx2)}
+.btn:disabled{opacity:.55}
+.btn svg.ic{width:18px;height:18px}
+.op{padding:6px 16px 14px}
+.op h3{margin:10px 0 2px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2)}
+.linhaOp{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-top:1px solid var(--ln)}
+.linhaOp:first-of-type{border-top:0}
+.linhaOp label{font-size:12px;color:var(--tx3);font-weight:600}
+.linhaOp .lado{display:flex;gap:8px}
+.linhaOp select{flex:1;min-width:0;background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:11px 10px;font:inherit;font-size:14.5px}
+.linhaOp .lado button{flex:none;border:0;border-radius:10px;padding:0 16px;font:inherit;font-weight:700;font-size:14px;background:var(--rosa);color:#fff}
+.linhaOp .lado button:disabled{background:var(--sf3);color:var(--tx3)}
+.area{width:100%;min-height:90px;resize:vertical;background:var(--sf2);border:1px solid var(--ln2);border-radius:12px;color:var(--tx);font:inherit;font-size:14.5px;
+  line-height:1.4;padding:10px 12px;outline:none}
+.area:focus{border-color:var(--rosa)}
+.aprov{border-color:rgba(31,191,143,.35);background:linear-gradient(180deg,rgba(31,191,143,.08),transparent 70%),var(--sf)}
+.aprov h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:15px;color:var(--verde)}
+.aprov h3 svg.ic{width:18px;height:18px}
+.aprov .sol{background:var(--sf2);border:1px solid var(--ln);border-radius:12px;padding:10px 12px;font-size:14.5px;line-height:1.42;white-space:pre-wrap;margin:8px 0 12px;overflow-wrap:anywhere}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nota{font-size:12.5px;color:var(--tx3);margin:6px 0 0}
 .tl{display:flex;flex-direction:column;gap:10px;margin-top:4px}
 .msg{max-width:86%;align-self:flex-start;background:var(--sf);border:1px solid var(--ln);border-radius:16px 16px 16px 6px;padding:10px 12px}
 .msg.eu{align-self:flex-end;background:rgba(232,75,138,.13);border-color:rgba(232,75,138,.3);border-radius:16px 16px 6px 16px}
+.msg.solucao{border-color:rgba(31,191,143,.45)}
 .msg .q{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
 .msg .q b{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg.eu .q b{color:#f6b3cf}
 .msg .q em{font-style:normal;font-size:11px;color:var(--tx3);flex:none}
 .msg .q .tag{font-size:10px;font-weight:700;color:var(--tx3);background:var(--sf3);border-radius:999px;padding:1px 6px;flex:none}
+.msg .q .tag.ok{color:var(--verde);background:var(--verde-s)}
 .msg p{margin:0;font-size:14.5px;line-height:1.42;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
 .ev{align-self:center;display:flex;align-items:center;gap:6px;max-width:94%;font-size:12px;color:var(--tx3);text-align:center;padding:2px 4px}
 .ev svg.ic{width:14px;height:14px;flex:none}
 .ev b{color:var(--tx2);font-weight:600}
 .dia{align-self:center;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--tx3);text-transform:uppercase;margin:6px 0 0}
+.anx .item{align-items:center}
+.anx .ico{background:var(--sf3);color:var(--tx2)}
 .caixa{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(11,13,18,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   border-top:1px solid var(--ln);padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
 .caixa textarea{flex:1;min-width:0;resize:none;max-height:140px;min-height:44px;background:var(--sf2);border:1px solid var(--ln2);border-radius:14px;color:var(--tx);
@@ -58,12 +82,22 @@ body{padding-bottom:96px}
 <script>
 F.IC.enviar = '<path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/>';
 F.IC.externo = '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>';
+F.IC.baixar = '<path d="M12 4v11"/><path d="M7 10.5l5 5 5-5"/><path d="M5 20h14"/>';
+F.IC.arquivo = '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>';
+F.IC.x = '<path d="M6 6l12 12M18 6L6 18"/>';
 var STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
-  WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'],
-  CLOSED: ['Fechado', '#8b93a7', '#1d2230'], CANCELED: ['Cancelado', '#8b93a7', '#1d2230'], CANCELLED: ['Cancelado', '#8b93a7', '#1d2230'] };
-var PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], NORMAL: ['Normal', '#4f7cff'], HIGH: ['Alta', '#f0a53a'], URGENT: ['Urgente', '#ef4444'], CRITICAL: ['Crítica', '#ef4444'] };
+  REOPENED: ['Reaberto', '#6f93ff', 'rgba(79,124,255,.15)'], WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'],
+  WAITING_SUPPLIER: ['Aguardando fornecedor', '#f0a53a', 'rgba(240,165,58,.15)'], PENDING_APPROVAL: ['Aguardando aprovação', '#1fbf8f', 'rgba(31,191,143,.15)'],
+  RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'],
+  CANCELED: ['Cancelado', '#8b93a7', '#1d2230'], CANCELLED: ['Cancelado', '#8b93a7', '#1d2230'] };
+var PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], HIGH: ['Alta', '#f0a53a'], URGENT: ['Urgente', '#ef4444'] };
+var SLA = { NOT_CONFIGURED: 'Sem SLA', ON_TRACK: 'No prazo', AT_RISK: 'Atenção', BREACHED: 'Vencido', MET: 'Cumprido' };
+var FECHADOS = ['RESOLVED', 'CLOSED', 'CANCELED', 'CANCELLED'];
 var ID = parseInt((location.hash || '').replace('#', ''), 10) || 0;
-var dados = null, ultimaChave = '', enviando = false, assumindo = false, carregando = false, deNovo = false;
+var dados = null, ultimaChave = '', enviando = false, carregando = false, deNovo = false;
+var ocupado = '';                  // operação em andamento (trava os botões)
+var abertoSol = false, abertoRej = false, confirmaAceite = false;
+var anexos = null, enviandoAnexo = '';
 // abriu outro chamado com esta tela aberta: recarrega para trocar de chamado
 window.addEventListener('hashchange', function () { location.reload(); });
 
@@ -88,39 +122,121 @@ function diaTxt(d) {
   return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
 }
 function dataHora(s) { var d = data(s); return d ? diaTxt(d) + ' ' + F.hhmm(d.getTime()) : '—'; }
+function tamanho(b) { b = Number(b) || 0; return b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
 function rot(it, p) { var l = it[p + '_label']; if (l == null || l === '') l = it[p + '_value']; return l == null ? '' : String(l); }
 function textoEvento(it) {
   var et = it.event_type || '', o = rot(it, 'old'), n = rot(it, 'new'), meta = it.metadata || {};
   if (et === 'STATUS_CHANGED') return ['troca', 'alterou o status: ' + stLabel(o) + ' → ' + stLabel(n)];
   if (et === 'PRIORITY_CHANGED') return ['alerta', 'alterou a prioridade: ' + prLabel(o) + ' → ' + prLabel(n)];
-  if (et === 'ASSIGNEE_CHANGED') return ['pessoa', n ? 'definiu o responsável: ' + n : 'removeu o responsável'];
-  if (et.indexOf('QUEUE') === 0 || et.indexOf('TRANSFER') >= 0) return ['troca', 'transferiu o chamado' + (n ? ' para ' + n : '')];
-  if (et === 'ATTACHMENT_ADDED') return ['clipe', 'anexou um arquivo' + (meta.filename ? ': ' + meta.filename : '')];
-  if (et.indexOf('SOLUTION') >= 0) return ['ok', et.toLowerCase().replace(/_/g, ' ')];
-  var s = (et || 'atualização').toLowerCase().replace(/_/g, ' ');
-  if (o || n) s += ': ' + (o ? o + ' → ' : '') + n;
-  return ['relogio', s];
+  if (et === 'ASSIGNEE_CHANGED') return ['pessoa', n ? 'definiu o responsável: ' + n : 'deixou o chamado sem responsável'];
+  if (et === 'ATTACHMENT_ADDED') return ['clipe', 'anexou ' + (meta.filename ? meta.filename : 'um arquivo')];
+  if (et === 'SOLUTION_PROPOSED') return ['ok', 'enviou a solução e pediu a conclusão'];
+  if (et === 'SOLUTION_ACCEPTED') return ['ok', 'aceitou a solução · chamado concluído'];
+  if (et === 'SOLUTION_REJECTED') return ['alerta', 'rejeitou a solução' + (meta.reason ? ': ' + meta.reason : '')];
+  if (n) return ['troca', 'encaminhou o chamado ' + (o ? 'de ' + o + ' ' : '') + 'para ' + n];
+  return ['relogio', (et || 'atualização').toLowerCase().replace(/_/g, ' ')];
 }
 function mostrarToast(t) {
+  if (!t) return;
   var el = document.getElementById('toast'); el.textContent = t; el.style.display = 'block';
-  clearTimeout(mostrarToast.t); mostrarToast.t = setTimeout(function () { el.style.display = 'none'; }, 3200);
+  clearTimeout(mostrarToast.t); mostrarToast.t = setTimeout(function () { el.style.display = 'none'; }, 3500);
 }
 function perto() { return window.innerHeight + window.scrollY >= document.body.scrollHeight - 160; }
+// texto da solução proposta (igual ao site: a mensagem ligada ao último pedido de conclusão)
+function solucaoProposta(d) {
+  var it = d.items || [], ev = null;
+  for (var i = it.length - 1; i >= 0; i--) if (it[i].type === 'EVENT' && it[i].event_type === 'SOLUTION_PROPOSED') { ev = it[i]; break; }
+  var mid = ev && ev.metadata ? ev.metadata.message_id : null;
+  for (var j = 0; j < it.length; j++) if (mid != null && it[j].type === 'MESSAGE' && it[j].id === mid) return { msg: it[j], ev: ev };
+  return { msg: null, ev: ev };
+}
+function opcoes(lista, atual, vazio) {
+  return (vazio ? '<option value="">' + vazio + '</option>' : '') + lista.map(function (o) {
+    return '<option value="' + F.esc(String(o[0])) + '"' + (String(o[0]) === String(atual) ? ' selected' : '') + '>' + F.esc(o[1]) + '</option>';
+  }).join('');
+}
+function bt(id, txt, cls, icone) {
+  return '<button class="btn ' + (cls || '') + '" id="' + id + '"' + (ocupado ? ' disabled' : '') + '>' + (icone ? F.ic(icone) : '') +
+    (ocupado === id ? 'Aguarde…' : txt) + '</button>';
+}
 
 function render(d) {
+  // guarda o que a pessoa estava escolhendo/escrevendo (a tela se atualiza sozinha)
+  var guard = {};
+  ['selStatus', 'selPrio', 'selResp', 'selSetor', 'txSolucao', 'txMotivo'].forEach(function (k) { var el = document.getElementById(k); if (el) guard[k] = el.value; });
+
   var t = d.ticket || {}, cap = d.capabilities || {}, itens = d.items || [];
   var s = STATUS[t.status] || [t.status || '—', '#8b93a7', '#1d2230'], pr = PRIO[t.priority];
+  var fechado = FECHADOS.indexOf(t.status) >= 0;
+  var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
   document.getElementById('tit').textContent = t.protocol || ('Chamado #' + ID);
   document.getElementById('sub').textContent = t.title || '';
   var h = '<div class="card info"><div class="linha1"><span class="badge" style="color:' + s[1] + ';background:' + s[2] + '">' + F.esc(s[0]) + '</span>' +
-    (pr ? '<span class="prio"><i style="background:' + pr[1] + '"></i>' + pr[0] + '</span>' : '') + '</div>' +
+    (pr ? '<span class="prio"><i style="background:' + pr[1] + '"></i>' + pr[0] + '</span>' : '') +
+    (sla && SLA[sla] ? '<span class="pill">SLA: ' + SLA[sla] + '</span>' : '') + '</div>' +
     '<h2>' + F.esc(t.title || '') + '</h2><div class="campos">' +
     '<div><span>Solicitante</span><b>' + F.esc(d.requester_name || '—') + '</b></div>' +
     '<div><span>Responsável</span><b>' + F.esc(d.assignee_name || 'Sem responsável') + '</b></div>' +
-    '<div><span>Fila</span><b>' + F.esc(d.queue_name || '—') + '</b></div>' +
+    '<div><span>Setor</span><b>' + F.esc(d.queue_name || '—') + '</b></div>' +
     '<div><span>Aberto</span><b>' + dataHora(t.created_at) + '</b></div></div></div>';
-  if (cap.can_take) h += '<button class="assumir" id="btAssumir"' + (assumindo ? ' disabled' : '') + '>' + F.ic('pessoa') + (assumindo ? 'Assumindo…' : 'Assumir chamado') + '</button>';
 
+  // aprovação da solução (quem abriu o chamado confirma ou rejeita a conclusão)
+  if (t.status === 'PENDING_APPROVAL') {
+    var sp = solucaoProposta(d);
+    if (cap.can_review_solution) {
+      h += '<div class="card aprov"><h3>' + F.ic('ok') + 'Pedido de conclusão</h3>' +
+        '<div class="nota">' + F.esc(sp.ev && sp.ev.actor ? sp.ev.actor.name : 'O atendente') + ' enviou a solução. Confira e confirme se o chamado pode ser concluído.</div>' +
+        (sp.msg ? '<div class="sol">' + F.esc(String(sp.msg.body || '').trim()) + '</div>' : '<div style="height:10px"></div>');
+      if (!abertoRej) {
+        h += '<div class="duas">' + bt('btAceitar', confirmaAceite ? 'Toque p/ confirmar' : 'Aceitar solução', 'verde', 'ok') +
+          bt('btRejAbrir', 'Rejeitar', 'linha', 'x') + '</div>';
+      } else {
+        h += '<label class="nota" for="txMotivo">Motivo da rejeição</label><textarea class="area" id="txMotivo" maxlength="2000" placeholder="Explique o que ainda falta…"></textarea>' +
+          '<div class="duas" style="margin-top:8px">' + bt('btRejeitar', 'Enviar rejeição', 'rosa') + bt('btRejCancelar', 'Cancelar', 'linha') + '</div>';
+      }
+      h += '</div>';
+    } else {
+      h += '<div class="aviso" style="background:var(--verde-s);border-color:rgba(31,191,143,.3);color:#9fe3cb">' + F.ic('relogio') +
+        '<span>Solução enviada. Aguardando o solicitante confirmar a conclusão.</span></div>';
+    }
+  }
+
+  // atendimento (só o que este login pode fazer, igual ao site)
+  var linhas = '';
+  if (cap.can_take) linhas += '<div class="linhaOp">' + bt('btAssumir', 'Assumir chamado', 'rosa', 'pessoa') + '</div>';
+  if (cap.can_change_status && (cap.valid_statuses || []).length) {
+    linhas += '<div class="linhaOp"><label for="selStatus">Status · atual: ' + F.esc(stLabel(t.status)) + '</label><div class="lado"><select id="selStatus">' +
+      opcoes(cap.valid_statuses.map(function (v) { return [v, stLabel(v)]; }), '', 'Alterar para…') +
+      '</select><button id="btStatus"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btStatus' ? '…' : 'Alterar') + '</button></div></div>';
+  }
+  if (cap.can_change_priority) {
+    linhas += '<div class="linhaOp"><label for="selPrio">Prioridade</label><div class="lado"><select id="selPrio">' +
+      opcoes(Object.keys(PRIO).map(function (k) { return [k, PRIO[k][0]]; }), t.priority) +
+      '</select><button id="btPrio"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btPrio' ? '…' : 'Salvar') + '</button></div></div>';
+  }
+  if (cap.can_change_assignee) {
+    linhas += '<div class="linhaOp"><label for="selResp">Responsável (transferir para outra pessoa)</label><div class="lado"><select id="selResp">' +
+      opcoes((d.assignee_options || []).map(function (o) { return [o.id, o.name]; }), t.assignee_user_id == null ? '' : t.assignee_user_id, 'Não atribuído') +
+      '</select><button id="btResp"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btResp' ? '…' : 'Salvar') + '</button></div></div>';
+  }
+  if (cap.can_transfer && (d.transfer_options || []).length) {
+    linhas += '<div class="linhaOp"><label for="selSetor">Transferir para outro setor</label><div class="lado"><select id="selSetor">' +
+      opcoes(d.transfer_options.map(function (o) { return [o.id, o.name]; }), '', 'Escolha o setor…') +
+      '</select><button id="btSetor"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btSetor' ? '…' : 'Transferir') + '</button></div></div>';
+  }
+  if (cap.can_propose_solution && !fechado) {
+    linhas += '<div class="linhaOp">';
+    if (!abertoSol) linhas += bt('btSolAbrir', 'Solicitar conclusão', 'verde', 'ok') +
+      '<div class="nota">Envia a solução para o solicitante confirmar e concluir o chamado.</div>';
+    else linhas += '<label for="txSolucao">Solução (o solicitante vai ler e confirmar)</label>' +
+      '<textarea class="area" id="txSolucao" maxlength="10000" placeholder="Descreva o que foi feito para resolver…"></textarea>' +
+      '<div class="duas">' + bt('btSolEnviar', 'Enviar solução', 'verde') + bt('btSolCancelar', 'Cancelar', 'linha') + '</div>';
+    linhas += '</div>';
+  }
+  if (linhas) h += '<div class="card op"><h3>Atendimento</h3>' + linhas + '</div>';
+
+  // conversa
+  var sp2 = solucaoProposta(d), idSol = sp2.msg ? sp2.msg.id : null;
   h += '<div class="sec"><h2>Conversa</h2><span>' + itens.length + '</span></div><div class="tl">';
   var ultimoDia = '';
   itens.forEach(function (it) {
@@ -132,29 +248,81 @@ function render(d) {
       h += '<div class="ev">' + F.ic(ev[0]) + '<span><b>' + F.esc(eu ? 'Você' : quem) + '</b> ' + F.esc(ev[1]) + ' · ' + hora(it.created_at) + '</span></div>';
       return;
     }
-    var corpo = String(it.body || '').trim();
-    var tag = it.type === 'OPENING' ? 'abriu o chamado' : (a.context === 'REQUESTER' ? 'solicitante' : '');
-    h += '<div class="msg' + (eu ? ' eu' : '') + '"><div class="q"><b>' + F.esc(eu ? 'Você' : quem) + '</b>' +
-      (tag ? '<span class="tag">' + tag + '</span>' : '') + '<em>' + hora(it.created_at) + '</em></div>' +
-      '<p>' + (corpo ? F.esc(corpo) : '<i style="color:var(--tx3)">(sem texto)</i>') + '</p></div>';
+    var corpo = String(it.body || '').trim(), ehSol = idSol != null && it.id === idSol;
+    var tag = ehSol ? '<span class="tag ok">solução</span>' : it.type === 'OPENING' ? '<span class="tag">abriu o chamado</span>' :
+      (!eu && a.context === 'REQUESTER' ? '<span class="tag">solicitante</span>' : '');
+    h += '<div class="msg' + (eu ? ' eu' : '') + (ehSol ? ' solucao' : '') + '"><div class="q"><b>' + F.esc(eu ? 'Você' : quem) + '</b>' + tag +
+      '<em>' + hora(it.created_at) + '</em></div><p>' + (corpo ? F.esc(corpo) : '<i style="color:var(--tx3)">(sem texto)</i>') + '</p></div>';
   });
   if (!itens.length) h += '<div class="vazio">Nenhuma mensagem ainda.</div>';
-  h += '</div><div class="rod">Anexos e alterações de status ficam no site · toque em ' + F.ic('externo').replace('class="ic ', 'class="ic " style="width:12px;height:12px;vertical-align:-2px"') + '</div>';
+  h += '</div>';
+
+  // anexos
+  h += '<div class="sec"><h2>Anexos</h2><span id="nAnexos"></span></div><div id="anexosBox"></div>';
+  if (!fechado) h += '<div style="margin-top:8px">' + bt('btAnexar', enviandoAnexo ? 'Enviando ' + enviandoAnexo + '…' : 'Anexar arquivo', 'linha', 'clipe') + '</div>' +
+    '<div class="nota">PDF, imagem, texto, Excel ou Word · até 10 MB</div>';
+  h += '<div class="rod">Tudo aqui é o mesmo chamado do site · ' + F.ic('externo').replace('class="ic ', 'class="ic " style="width:12px;height:12px;vertical-align:-2px"') + ' abre no site</div>';
   document.getElementById('conteudo').innerHTML = h;
-  var ba = document.getElementById('btAssumir');
-  if (ba) ba.onclick = function () {
-    if (assumindo) return; assumindo = true; ba.disabled = true; ba.lastChild.textContent = 'Assumindo…';
-    try { App.assumirChamado(ID); } catch (e) { assumindo = false; }
-  };
+  Object.keys(guard).forEach(function (k) { var el = document.getElementById(k); if (el) el.value = guard[k]; });
+  desenharAnexos();
+  ligar(d);
 
   // caixa de resposta
-  var caixa = document.getElementById('caixa'), aberto = ['RESOLVED', 'CLOSED', 'CANCELED', 'CANCELLED'].indexOf(t.status) < 0;
+  var caixa = document.getElementById('caixa');
   caixa.style.display = 'flex';
-  var fechado = caixa.querySelector('.fechado');
-  document.getElementById('texto').style.display = aberto ? '' : 'none';
-  document.getElementById('btEnviar').style.display = aberto ? '' : 'none';
-  if (!aberto && !fechado) caixa.insertAdjacentHTML('afterbegin', '<div class="fechado">Chamado ' + F.esc(stLabel(t.status).toLowerCase()) + ' · não aceita novas mensagens</div>');
-  if (aberto && fechado) fechado.remove();
+  var aviso = caixa.querySelector('.fechado');
+  document.getElementById('texto').style.display = fechado ? 'none' : '';
+  document.getElementById('btEnviar').style.display = fechado ? 'none' : '';
+  if (fechado && !aviso) caixa.insertAdjacentHTML('afterbegin', '<div class="fechado">Chamado ' + F.esc(stLabel(t.status).toLowerCase()) + ' · não aceita novas mensagens</div>');
+  if (!fechado && aviso) aviso.remove();
+}
+
+function desenharAnexos() {
+  var box = document.getElementById('anexosBox'); if (!box) return;
+  var n = document.getElementById('nAnexos');
+  if (anexos == null) { box.innerHTML = '<div class="vazio">Carregando anexos…</div>'; return; }
+  if (n) n.textContent = anexos.length || '';
+  if (!anexos.length) { box.innerHTML = '<div class="vazio">Nenhum anexo neste chamado.</div>'; return; }
+  box.innerHTML = '<div class="lista anx">' + anexos.map(function (a, i) {
+    var nome = a.original_filename || a.filename || ('Anexo ' + (i + 1));
+    return '<div class="item" data-anexo="' + i + '"><div class="ico">' + F.ic('arquivo') + '</div><div class="tx"><div class="t1"><b>' + F.esc(nome) + '</b></div>' +
+      '<p>' + tamanho(a.size_bytes) + (a.uploaded_by_name ? ' · ' + F.esc(a.uploaded_by_name) : '') + (a.created_at ? ' · ' + dataHora(a.created_at) : '') + '</p></div>' +
+      '<span class="seta">' + F.ic('baixar') + '</span></div>';
+  }).join('') + '</div>';
+}
+
+function operar(botao, tipo, valor) {
+  if (ocupado) return;
+  ocupado = botao;
+  if (dados) render(dados);
+  try { App.operarChamado(ID, tipo, valor == null ? '' : String(valor)); } catch (e) { ocupado = ''; if (dados) render(dados); }
+}
+function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+function ligar(d) {
+  var t = d.ticket || {};
+  function on(id, f) { var el = document.getElementById(id); if (el) el.onclick = f; }
+  on('btAssumir', function () { operar('btAssumir', 'assumir'); });
+  on('btStatus', function () { var v = val('selStatus'); if (!v) { mostrarToast('Escolha o novo status'); return; } if (v === t.status) { mostrarToast('O chamado já está ' + stLabel(v).toLowerCase()); return; } operar('btStatus', 'status', v); });
+  on('btPrio', function () { var v = val('selPrio'); if (v === t.priority) { mostrarToast('A prioridade já é ' + prLabel(v)); return; } operar('btPrio', 'prioridade', v); });
+  on('btResp', function () { var v = val('selResp'), at = t.assignee_user_id == null ? '' : String(t.assignee_user_id); if (v === at) { mostrarToast('Esse já é o responsável'); return; } operar('btResp', 'responsavel', v); });
+  on('btSetor', function () { var v = val('selSetor'); if (!v) { mostrarToast('Escolha o setor de destino'); return; } operar('btSetor', 'setor', v); });
+  on('btSolAbrir', function () { abertoSol = true; render(dados); var el = document.getElementById('txSolucao'); if (el) el.focus(); });
+  on('btSolCancelar', function () { abertoSol = false; render(dados); });
+  on('btSolEnviar', function () { var v = val('txSolucao').trim(); if (!v) { mostrarToast('Escreva a solução'); return; } operar('btSolEnviar', 'solucao', v); });
+  on('btAceitar', function () {
+    if (!confirmaAceite) { confirmaAceite = true; render(dados); setTimeout(function () { if (confirmaAceite && !ocupado) { confirmaAceite = false; render(dados); } }, 5000); return; }
+    confirmaAceite = false; operar('btAceitar', 'aceitar');
+  });
+  on('btRejAbrir', function () { abertoRej = true; render(dados); var el = document.getElementById('txMotivo'); if (el) el.focus(); });
+  on('btRejCancelar', function () { abertoRej = false; render(dados); });
+  on('btRejeitar', function () { var v = val('txMotivo').trim(); if (!v) { mostrarToast('Escreva o motivo da rejeição'); return; } operar('btRejeitar', 'rejeitar', v); });
+  on('btAnexar', function () { if (enviandoAnexo) return; try { App.anexarChamado(ID); } catch (e) {} });
+  var box = document.getElementById('anexosBox');
+  if (box) box.onclick = function (ev) {
+    var el = ev.target.closest ? ev.target.closest('[data-anexo]') : null; if (!el || !anexos) return;
+    var a = anexos[parseInt(el.getAttribute('data-anexo'), 10)]; if (!a) return;
+    try { App.baixarAnexo(ID, a.id, a.original_filename || a.filename || 'anexo'); } catch (e) {}
+  };
 }
 
 function carregar(silencioso) {
@@ -164,6 +332,7 @@ function carregar(silencioso) {
   if (!silencioso) document.getElementById('btAt').classList.add('gira');
   try { App.carregarChamado(ID); } catch (e) { carregando = false; }
 }
+function carregarAnexos() { try { App.anexosChamado(ID); } catch (e) {} }
 window.chamadoCarregado = function (id, ok, msg, d) {
   if (id !== ID) return;                 // resposta atrasada de outro chamado
   carregando = false;
@@ -180,8 +349,19 @@ window.chamadoCarregado = function (id, ok, msg, d) {
   if (chave === ultimaChave) return;
   var primeira = !dados, desce = primeira || perto();
   ultimaChave = chave; dados = d;
+  if (d.ticket && d.ticket.status !== 'PENDING_APPROVAL') { abertoRej = false; confirmaAceite = false; }
   render(d);
-  if (desce) window.scrollTo(0, document.body.scrollHeight);
+  if (desce && !primeira) window.scrollTo(0, document.body.scrollHeight);
+};
+window.chamadoAnexos = function (id, ok, msg, lista) {
+  if (id !== ID) return;
+  anexos = ok ? (lista || []) : [];
+  if (!ok) mostrarToast(msg);
+  desenharAnexos();
+};
+window.chamadoEnviandoAnexo = function (id, nome) {
+  if (id !== ID) return;
+  enviandoAnexo = nome; if (dados) render(dados);
 };
 window.chamadoAcao = function (id, tipo, ok, msg) {
   if (id !== ID) return;
@@ -192,10 +372,16 @@ window.chamadoAcao = function (id, tipo, ok, msg) {
     if (ok) { tx.value = ''; ajustar(); mostrarToast('Resposta enviada'); }
     else mostrarToast(msg);
     atualizarBotao();
+  } else if (tipo === 'anexo') {
+    enviandoAnexo = '';
+    mostrarToast(msg);
+    if (ok) carregarAnexos();
+    if (dados) render(dados);
   } else {
-    assumindo = false;
-    mostrarToast(ok ? 'Você assumiu o chamado' : msg);
-    if (dados) render(dados);              // destrava o botão
+    ocupado = '';
+    if (ok) { abertoSol = false; abertoRej = false; confirmaAceite = false; }
+    mostrarToast(msg || (ok ? 'Feito' : 'Não deu certo'));
+    if (dados) render(dados);              // destrava os botões
   }
   carregar(true);
 };
@@ -211,10 +397,11 @@ be.onclick = function () {
   try { App.responderChamado(ID, v); } catch (e) { enviando = false; tx.disabled = false; atualizarBotao(); }
 };
 document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
-document.getElementById('btAt').onclick = function () { carregar(); };
+document.getElementById('btAt').onclick = function () { carregar(); carregarAnexos(); };
 document.getElementById('btSite').onclick = function () { try { App.siteDireto('/helpdesk/tickets/' + ID); } catch (e) {} };
 F.topoSombra();
 carregar();
-setInterval(function () { if (!document.hidden) carregar(true); }, 20000);
+carregarAnexos();
+setInterval(function () { if (!document.hidden && !ocupado) carregar(true); }, 20000);
 </script>
 </body></html>

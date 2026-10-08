@@ -62,6 +62,7 @@ public final class Engine {
 
     static final String API = "/helpdesk"; // relativo a Api.BASE (/api/v1)
     static final int MAX_TIMELINES = 30;   // máximo de históricos consultados por verificação
+    static final int MAX_TIMELINES_FIRST = 60; // na primeira verificação (linha de base)
     static final int ROTATE_ACTIVE = 10;   // chamados ativos re-checados por rodízio a cada verificação
     static final int MAX_LINES = 6;
 
@@ -170,10 +171,15 @@ public final class Engine {
         // 4) Comparação chamado a chamado ---------------------------------------------------
         JSONObject newKnown = new JSONObject();
         String maxCreated = wmCreated, maxUpdated = wmUpdated;
-        int timelinesLeft = MAX_TIMELINES;
+        int timelinesLeft = firstRun ? MAX_TIMELINES_FIRST : MAX_TIMELINES;
         int newTicketsNotified = 0;
 
-        for (JSONObject t : current.values()) {
+        // os chamados "meus" (que abri ou estão comigo) primeiro: são os que mais importam no limite de consultas
+        List<JSONObject> order = new ArrayList<JSONObject>();
+        for (JSONObject t : current.values()) if (mine.contains(t.optInt("id"))) order.add(t);
+        for (JSONObject t : current.values()) if (!mine.contains(t.optInt("id"))) order.add(t);
+
+        for (JSONObject t : order) {
             int id = t.optInt("id");
             String protocol = t.optString("protocol", "#" + id);
             String title = t.optString("title", "");
@@ -245,7 +251,9 @@ public final class Engine {
                                 if (firstRun || (old == null && !isNew && !unknownTouched)) fresh = false;
                                 else if (isNew) fresh = true;
                                 else if (lastItem >= 0) fresh = iid > lastItem;
-                                else fresh = ts(it.optString("created_at", "")).compareTo(sinceTs) > 0;
+                                // histórico nunca lido: só conta como novo o que veio depois da última mudança
+                                // conhecida do chamado; sem mudança, é só a linha de base (não avisa o que é antigo)
+                                else fresh = touched && ts(it.optString("created_at", "")).compareTo(sinceTs) > 0;
                                 if (!fresh) continue;
 
                                 JSONObject actor = it.optJSONObject("actor");
@@ -533,9 +541,15 @@ public final class Engine {
             String fn = meta != null ? meta.optString("filename", "") : "";
             return "anexou um arquivo" + (fn.length() > 0 ? ": " + fn : "");
         }
-        String s = humanize(et);
-        if (oldV.length() > 0 || newV.length() > 0) s += ": " + (oldV.length() > 0 ? oldV + " → " : "") + newV;
-        return s;
+        if ("SOLUTION_PROPOSED".equals(et)) return "enviou a solução e pediu a conclusão do chamado";
+        if ("SOLUTION_ACCEPTED".equals(et)) return "aceitou a solução (chamado concluído)";
+        if ("SOLUTION_REJECTED".equals(et)) {
+            String motivo = meta != null ? meta.optString("reason", "") : "";
+            return "rejeitou a solução" + (motivo.length() > 0 ? ": " + clip(motivo, 200) : "");
+        }
+        // outros eventos com origem/destino são transferências de setor (igual ao site)
+        if (newV.length() > 0) return "encaminhou o chamado " + (oldV.length() > 0 ? "de " + oldV + " " : "") + "para " + newV;
+        return humanize(et);
     }
 
     static String labelOf(JSONObject it, String prefix) {
@@ -556,6 +570,9 @@ public final class Engine {
             case "OPEN": return "Aberto";
             case "IN_PROGRESS": return "Em andamento";
             case "WAITING": return "Aguardando";
+            case "REOPENED": return "Reaberto";
+            case "WAITING_SUPPLIER": return "Aguardando fornecedor";
+            case "PENDING_APPROVAL": return "Aguardando aprovação";
             case "RESOLVED": return "Resolvido";
             case "CLOSED": return "Fechado";
             case "CANCELED":

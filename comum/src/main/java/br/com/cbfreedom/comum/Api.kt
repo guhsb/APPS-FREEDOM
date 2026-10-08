@@ -94,17 +94,52 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
         }
     }
 
-    /** Requisição GET ou POST com corpo JSON; não lança erro por código HTTP: devolve (código, corpo). */
+    /** Define o método HTTP; PATCH não é aceito por todo HttpURLConnection, então força pelo campo interno. */
+    private fun metodo(c: HttpURLConnection, m: String) {
+        try {
+            c.requestMethod = m
+        } catch (e: java.net.ProtocolException) {
+            val f = HttpURLConnection::class.java.getDeclaredField("method")
+            f.isAccessible = true
+            f.set(c, m)
+        }
+    }
+
+    /** Requisição GET, POST ou PATCH com corpo JSON; não lança erro por código HTTP: devolve (código, corpo). */
     fun enviar(metodo: String, caminho: String, corpo: JSONObject?): Pair<Int, String> {
         val c = abrir(caminho)
         try {
             c.instanceFollowRedirects = false
-            c.requestMethod = metodo           // GET ou POST
+            metodo(c, metodo)
             if (corpo != null) {
                 c.doOutput = true
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 c.outputStream.use { it.write(corpo.toString().toByteArray(Charsets.UTF_8)) }
             }
+            val cod = c.responseCode
+            val fluxo = if (cod >= 400) c.errorStream else c.inputStream
+            val txt = fluxo?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+            return Pair(cod, txt)
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /** Envia um arquivo (multipart/form-data, campo "file"), como o site faz nos anexos. */
+    fun enviarArquivo(caminho: String, nome: String, tipo: String, dados: ByteArray): Pair<Int, String> {
+        val c = abrir(caminho)
+        try {
+            c.instanceFollowRedirects = false
+            c.requestMethod = "POST"
+            c.doOutput = true
+            val limite = "----freedom" + System.currentTimeMillis()
+            c.setRequestProperty("Content-Type", "multipart/form-data; boundary=$limite")
+            val nomeSeguro = nome.replace("\"", "'").replace("\r", "").replace("\n", "")
+            val cab = ("--$limite\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$nomeSeguro\"\r\n" +
+                "Content-Type: $tipo\r\n\r\n").toByteArray(Charsets.UTF_8)
+            val fim = "\r\n--$limite--\r\n".toByteArray(Charsets.UTF_8)
+            c.setFixedLengthStreamingMode(cab.size + dados.size + fim.size)
+            c.outputStream.use { it.write(cab); it.write(dados); it.write(fim) }
             val cod = c.responseCode
             val fluxo = if (cod >= 400) c.errorStream else c.inputStream
             val txt = fluxo?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""

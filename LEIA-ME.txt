@@ -21,9 +21,13 @@ ver nem aparecem na lista de widgets do celular.
 
 ABAS
   1. Helpdesk (principal): últimas atualizações, chamados em aberto, números da Central de Atendimento,
-     configurações dos avisos. Tocar num aviso abre a TELA DO CHAMADO no app: conversa, quem está
-     atendendo, caixa para responder e botão "Assumir chamado" (para quem atende). Anexos e mudança
-     de status: botão de abrir no site (canto de cima).
+     configurações dos avisos. Tocar num aviso abre a TELA DO CHAMADO no app, com tudo o que o site
+     tem (cada pessoa vê só o que o acesso dela permite, igual ao site):
+       - conversa e caixa para responder; anexos (ver, baixar e anexar arquivo de até 10 MB)
+       - Atendimento: assumir, alterar status (andamento, aguardando…), prioridade, responsável
+         (passar para outra pessoa) e transferir de setor
+       - "Solicitar conclusão": o atendente envia a solução; o solicitante recebe o aviso e, na mesma
+         tela, toca em "Aceitar solução" (conclui) ou "Rejeitar" (com motivo)
      - Nos avisos do celular tem os botões "Responder" (escreve e envia sem abrir o app) e
        "Assumir" (aparece para quem atende, em chamado sem responsável).
      - Modo tempo real (padrão): com a tela ligada confere a cada 15 s (dá para escolher até 30 min);
@@ -36,6 +40,11 @@ ABAS
      - O que você MESMO faz (sua resposta, sua mudança de status) não toca o celular: aparece só na
        lista "Últimas atualizações" com a marca "Você". Para receber aviso disso também, ligue
        "Avisar das minhas ações" nas configurações. Para testar, peça para outra pessoa responder.
+     - Diagnóstico (Configurações > "Diagnóstico dos avisos"): mostra cada verificação, o que mudou e
+       se avisou ou por que não (avisos desligados, notificação bloqueada, ação sua…). O botão
+       "Copiar diagnóstico" copia tudo para colar numa conversa de suporte.
+     - Logo depois de instalar/entrar, a primeira verificação só "anota" como está tudo (não avisa o
+       que já existia); os avisos começam a partir dali.
      - Som: os avisos usam o som de notificação do celular e aparecem por cima da tela.
        Em "Configurar avisos" tem "Testar notificação" e "Som e estilo dos avisos".
   2. Site: tocar de novo em "Site" volta ao início; segurar o dedo recarrega.

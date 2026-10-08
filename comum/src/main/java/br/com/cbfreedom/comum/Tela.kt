@@ -59,6 +59,7 @@ class Tela : Activity() {
         const val ABA_PAINEL = "painel"
         private const val ASSET = "file:///android_asset/"
         private const val REQ_ARQUIVO = 31
+        private const val REQ_ANEXO = 33
         private const val REQ_PERMISSAO = 32
         private const val HOST = "relatorios.cbfreedom.com.br"
         private val FUNDO = Color.parseColor("#0b0d12")
@@ -135,6 +136,7 @@ class Tela : Activity() {
     private var aba = ABA_HELPDESK
     private var paginaApp = ""
     private var arquivoCallback: ValueCallback<Array<Uri>>? = null
+    private var anexoPendente = 0          // chamado que vai receber o arquivo escolhido
     private var logandoSite = false
     private var ultimoLoginSite = 0L
     private var destinoSite: String? = null
@@ -386,6 +388,77 @@ class Tela : Activity() {
             return
         }
         Thread { Atualizacao.baixarEInstalar(this) { avisarHelpdesk(); avisarPainel() } }.start()
+    }
+
+    // ---- anexos da tela do chamado ----
+
+    private fun escolherAnexo(id: Int) {
+        anexoPendente = id
+        val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "image/png", "image/jpeg", "text/plain",
+                "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent.createChooser(i, "Escolher arquivo para anexar"), REQ_ANEXO)
+        } catch (_: ActivityNotFoundException) {
+            anexoPendente = 0; toast("Nenhum app de arquivos encontrado")
+        }
+    }
+
+    private fun enviarAnexo(id: Int, uri: Uri) {
+        val app = applicationContext
+        Thread {
+            val r = try {
+                var nome = "arquivo"
+                var tamanho = -1L
+                contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { cur ->
+                    if (cur.moveToFirst()) {
+                        cur.getString(0)?.let { nome = it }
+                        if (!cur.isNull(1)) tamanho = cur.getLong(1)
+                    }
+                }
+                if (tamanho > 10L * 1024 * 1024) Chamado.Resultado(false, "O arquivo passa de 10 MB.")
+                else {
+                    val dados = contentResolver.openInputStream(uri)?.use { ent ->
+                        val out = java.io.ByteArrayOutputStream()
+                        val buf = ByteArray(64 * 1024); var total = 0
+                        while (true) {
+                            val k = ent.read(buf); if (k < 0) break
+                            total += k
+                            if (total > 10 * 1024 * 1024 + 1) break
+                            out.write(buf, 0, k)
+                        }
+                        out.toByteArray()
+                    } ?: ByteArray(0)
+                    val tipo = contentResolver.getType(uri) ?: "application/octet-stream"
+                    js(webApp, "window.chamadoEnviandoAnexo && chamadoEnviandoAnexo($id," + JSONObject.quote(nome) + ")")
+                    Chamado.anexar(app, id, nome, tipo, dados)
+                }
+            } catch (e: Exception) { Chamado.Resultado(false, "Não consegui ler o arquivo: " + Api.mensagem(e)) }
+            js(webApp, "window.chamadoAcao && chamadoAcao($id,'anexo'," + r.ok + "," + JSONObject.quote(r.mensagem) + ")")
+        }.start()
+    }
+
+    private fun baixarAnexo(id: Int, anexo: Int, nome: String) {
+        val app = applicationContext
+        toast("Baixando $nome…")
+        Thread {
+            val prep = Chamado.preparoDownload(app, id, anexo)
+            runOnUiThread {
+                if (prep == null) { toast("Não consegui baixar o anexo"); return@runOnUiThread }
+                try {
+                    val seguro = nome.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "anexo" }
+                    val r = DownloadManager.Request(Uri.parse(prep.first))
+                    if (prep.second.isNotEmpty()) r.addRequestHeader("Cookie", prep.second)
+                    r.setTitle(seguro)
+                    r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    if (Build.VERSION.SDK_INT >= 29) r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, seguro)
+                    else r.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, seguro)
+                    (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(r)
+                } catch (_: Exception) { toast("Não consegui baixar o anexo") }
+            }
+        }.start()
     }
 
     private fun abrirNoSite(caminho: String) {
@@ -799,6 +872,13 @@ class Tela : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_ANEXO) {
+            val id = anexoPendente; anexoPendente = 0
+            val uri = if (resultCode == RESULT_OK) data?.data else null
+            if (id > 0 && uri != null) enviarAnexo(id, uri)
+            else if (id > 0) js(webApp, "window.chamadoAcao && chamadoAcao($id,'anexo',false,'')")
+            return
+        }
         if (requestCode == REQ_ARQUIVO) {
             var res: Array<Uri>? = null
             if (resultCode == RESULT_OK && data != null) {
@@ -1032,12 +1112,41 @@ class Tela : Activity() {
         }
 
         @JavascriptInterface
-        fun assumirChamado(id: Int) {
+        fun assumirChamado(id: Int) = operarChamado(id, "assumir", "")
+
+        /** status · prioridade · responsavel · setor · solucao · aceitar · rejeitar · assumir */
+        @JavascriptInterface
+        fun operarChamado(id: Int, tipo: String, valor: String) {
             val app = applicationContext
             Thread {
-                val r = Chamado.assumir(app, id)
-                js(webApp, "window.chamadoAcao && chamadoAcao(" + id + ",'assumir'," + r.ok + "," + JSONObject.quote(r.mensagem) + ")")
+                val r = Chamado.operar(app, id, tipo, valor)
+                js(webApp, "window.chamadoAcao && chamadoAcao(" + id + "," + JSONObject.quote(tipo) + "," + r.ok + "," + JSONObject.quote(r.mensagem) + ")")
             }.start()
+        }
+
+        @JavascriptInterface
+        fun anexosChamado(id: Int) {
+            val app = applicationContext
+            Thread {
+                val r = Chamado.anexos(app, id)
+                js(webApp, "window.chamadoAnexos && chamadoAnexos(" + id + "," + r.ok + "," + JSONObject.quote(r.mensagem) + "," +
+                    (r.dados?.optJSONArray("items")?.toString() ?: "[]") + ")")
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun anexarChamado(id: Int) = runOnUiThread { escolherAnexo(id) }
+
+        @JavascriptInterface
+        fun baixarAnexo(id: Int, anexo: Int, nome: String) = runOnUiThread { this@Tela.baixarAnexo(id, anexo, nome) }
+
+        @JavascriptInterface
+        fun copiarDiagnostico() = runOnUiThread {
+            try {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico Freedom", Helpdesk.textoDiagnostico(this@Tela)))
+                toast("Diagnóstico copiado. Cole na conversa com o suporte.")
+            } catch (_: Exception) { toast("Não consegui copiar") }
         }
 
         @JavascriptInterface

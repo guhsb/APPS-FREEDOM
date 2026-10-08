@@ -8,9 +8,9 @@ import android.content.Intent
 import org.json.JSONObject
 
 /**
- * Ações num chamado feitas pelo app (sem abrir o site): ler o histórico, responder e assumir.
- * Usa os mesmos endereços do site: GET /helpdesk/tickets/{id}/timeline,
- * POST /helpdesk/tickets/{id}/messages {body} e POST /helpdesk/tickets/{id}/take {version}.
+ * Ações num chamado feitas pelo app (sem abrir o site), com os mesmos endereços que o site usa:
+ * histórico (GET /timeline), responder (POST /messages), assumir (POST /take), status/prioridade/
+ * responsável/setor (PATCH), pedir/aceitar/rejeitar conclusão (POST /solution...) e anexos.
  */
 object Chamado {
 
@@ -22,7 +22,9 @@ object Chamado {
         "stale_ticket_version" to "O chamado foi alterado por outro usuário. Tente de novo.",
         "helpdesk_forbidden" to "Seu acesso de atendimento não está disponível.",
         "resolved_helpdesk_ticket" to "Este chamado já foi resolvido.",
-        "invalid_ticket_transition" to "Esta alteração não está mais disponível."
+        "invalid_ticket_transition" to "Esta alteração de status não está mais disponível.",
+        "invalid_helpdesk_assignee" to "O responsável escolhido não pode atender este chamado.",
+        "inactive_helpdesk_queue" to "O setor de destino não está disponível."
     )
 
     /** Chama o site com a sessão guardada; se ela venceu, entra de novo com o login do app e repete. */
@@ -69,26 +71,120 @@ object Chamado {
         } catch (e: Exception) { Resultado(false, "Não consegui enviar: " + Api.mensagem(e)) }
     }
 
-    fun assumir(c: Context, id: Int): Resultado {
+    fun assumir(c: Context, id: Int): Resultado = operar(c, id, "assumir", null)
+
+    /**
+     * Operações de atendimento, iguais às do site (cada uma manda a "versão" do chamado para não
+     * sobrescrever mudança de outra pessoa; se ficou velha, busca de novo e tenta uma vez mais):
+     *  assumir · status · prioridade · responsavel · setor · solucao (pedir conclusão) ·
+     *  aceitar (confirmar conclusão) · rejeitar (com motivo)
+     */
+    fun operar(c: Context, id: Int, tipo: String, valor: String?): Resultado {
+        val v = valor?.trim() ?: ""
         try {
             for (tentativa in 0..1) {
                 val h = historico(c, id)
                 if (!h.ok) return h
                 val d = h.dados ?: return Resultado(false, "Resposta inesperada do site.")
                 val tk = d.optJSONObject("ticket") ?: return Resultado(false, "Resposta inesperada do site.")
-                val cap = d.optJSONObject("capabilities")
-                if (cap != null && !cap.optBoolean("can_take", false))
-                    return Resultado(false, if (tk.isNull("assignee_user_id")) "Você não pode assumir este chamado." else "Este chamado já tem responsável.")
-                val r = chamar(c, "POST", "/helpdesk/tickets/$id/take", JSONObject().put("version", tk.optInt("version")))
-                if (r.first in 200..299) { depois(c, id); return Resultado(true, "Chamado assumido") }
+                val cap = d.optJSONObject("capabilities") ?: JSONObject()
+                val versao = tk.optInt("version")
+                val corpo = JSONObject().put("version", versao)
+                val (metodo, caminho, ok) = when (tipo) {
+                    "assumir" -> {
+                        if (!cap.optBoolean("can_take", false))
+                            return Resultado(false, if (tk.isNull("assignee_user_id")) "Você não pode assumir este chamado." else "Este chamado já tem responsável.")
+                        Triple("POST", "take", "Chamado assumido")
+                    }
+                    "status" -> {
+                        if (!cap.optBoolean("can_change_status", false)) return Resultado(false, "Você não pode alterar o status deste chamado.")
+                        corpo.put("status", v); Triple("PATCH", "status", "Status alterado para " + Engine.statusLabel(v))
+                    }
+                    "prioridade" -> {
+                        if (!cap.optBoolean("can_change_priority", false)) return Resultado(false, "Você não pode alterar a prioridade.")
+                        corpo.put("priority", v); Triple("PATCH", "priority", "Prioridade alterada")
+                    }
+                    "responsavel" -> {
+                        if (!cap.optBoolean("can_change_assignee", false)) return Resultado(false, "Você não pode trocar o responsável.")
+                        corpo.put("assignee_user_id", v.toIntOrNull() ?: JSONObject.NULL)
+                        Triple("PATCH", "assignee", if (v.isEmpty()) "Chamado ficou sem responsável" else "Responsável alterado")
+                    }
+                    "setor" -> {
+                        if (!cap.optBoolean("can_transfer", false)) return Resultado(false, "Você não pode transferir este chamado.")
+                        val q = v.toIntOrNull() ?: return Resultado(false, "Escolha o setor de destino.")
+                        corpo.put("queue_id", q); Triple("PATCH", "queue", "Chamado transferido")
+                    }
+                    "solucao" -> {
+                        if (!cap.optBoolean("can_propose_solution", false)) return Resultado(false, "Você não pode pedir a conclusão deste chamado.")
+                        if (v.isEmpty()) return Resultado(false, "Escreva a solução antes de enviar.")
+                        corpo.put("solution", v); Triple("POST", "solution", "Solução enviada para aprovação")
+                    }
+                    "aceitar" -> {
+                        if (!cap.optBoolean("can_review_solution", false)) return Resultado(false, "Você não pode aprovar esta solução.")
+                        Triple("POST", "solution/accept", "Solução aceita · chamado concluído")
+                    }
+                    "rejeitar" -> {
+                        if (!cap.optBoolean("can_review_solution", false)) return Resultado(false, "Você não pode rejeitar esta solução.")
+                        if (v.isEmpty()) return Resultado(false, "Escreva o motivo da rejeição.")
+                        corpo.put("reason", v); Triple("POST", "solution/reject", "Solução rejeitada")
+                    }
+                    else -> return Resultado(false, "Ação desconhecida.")
+                }
+                val r = chamar(c, metodo, "/helpdesk/tickets/$id/$caminho", corpo)
+                if (r.first in 200..299) { depois(c, id); return Resultado(true, ok) }
                 // versão antiga (alguém mexeu no meio-tempo): busca de novo uma vez
                 if (r.first == 409 && tentativa == 0 && r.second.contains("stale")) continue
-                return Resultado(false, erro(r.first, r.second, "Não consegui assumir"))
+                return Resultado(false, erro(r.first, r.second, "Não consegui concluir"))
             }
             return Resultado(false, "O chamado mudou enquanto eu tentava. Tente de novo.")
         } catch (e: Exception) {
-            return Resultado(false, "Não consegui assumir: " + Api.mensagem(e))
+            return Resultado(false, "Não consegui concluir: " + Api.mensagem(e))
         }
+    }
+
+    // ---------------- anexos ----------------
+
+    /** Lista de anexos do chamado (id, original_filename, size_bytes, uploaded_by_name, created_at). */
+    fun anexos(c: Context, id: Int): Resultado = try {
+        val r = chamar(c, "GET", "/helpdesk/tickets/$id/attachments", null)
+        if (r.first == 200) {
+            val t = r.second.trim()
+            val arr = if (t.startsWith("[")) org.json.JSONArray(t) else JSONObject(t).optJSONArray("items") ?: org.json.JSONArray()
+            Resultado(true, "", JSONObject().put("items", arr))
+        } else Resultado(false, erro(r.first, r.second, "Não consegui ver os anexos"))
+    } catch (e: Exception) { Resultado(false, "Não consegui ver os anexos: " + Api.mensagem(e)) }
+
+    val EXTENSOES = setOf("pdf", "png", "jpg", "jpeg", "txt", "xls", "xlsx", "doc", "docx")
+
+    fun anexar(c: Context, id: Int, nome: String, tipo: String, dados: ByteArray): Resultado {
+        val ext = nome.substringAfterLast('.', "").lowercase()
+        if (ext !in EXTENSOES) return Resultado(false, "Tipo de arquivo não aceito. Use PDF, imagem (PNG/JPG), texto, Excel ou Word.")
+        if (dados.size > 10 * 1024 * 1024) return Resultado(false, "O arquivo passa de 10 MB.")
+        return try {
+            val login = Store.login(c) ?: return Resultado(false, "Faça o login no app.")
+            val hp = Helpdesk.prefs(c)
+            var api = Api(login.first, login.second, hp.getString("cookie", "") ?: "")
+            if (api.cookie.isEmpty()) { api.entrar(); hp.edit().putString("cookie", api.cookie).apply() }
+            var r = api.enviarArquivo("/helpdesk/tickets/$id/attachments", nome, tipo, dados)
+            if (r.first == 401) {
+                api = Api(login.first, login.second); api.entrar(); hp.edit().putString("cookie", api.cookie).apply()
+                r = api.enviarArquivo("/helpdesk/tickets/$id/attachments", nome, tipo, dados)
+            }
+            when {
+                r.first in 200..299 -> { depois(c, id); Resultado(true, "Arquivo anexado") }
+                r.first == 413 -> Resultado(false, "O arquivo passa de 10 MB.")
+                r.first == 409 -> Resultado(false, "Este chamado já chegou no limite de anexos ou não aceita anexos agora.")
+                else -> Resultado(false, erro(r.first, r.second, "Não consegui anexar"))
+            }
+        } catch (e: Exception) { Resultado(false, "Não consegui anexar: " + Api.mensagem(e)) }
+    }
+
+    /** Endereço para baixar um anexo e o cookie da sessão (renovada se precisar). */
+    fun preparoDownload(c: Context, id: Int, anexo: Int): Pair<String, String>? {
+        val l = anexos(c, id)          // garante a sessão válida (entra de novo se tiver vencido)
+        if (!l.ok) return null
+        val cookie = Helpdesk.prefs(c).getString("cookie", "") ?: ""
+        return Pair(Api.BASE + "/helpdesk/tickets/$id/attachments/$anexo/download", cookie)
     }
 
     /** Depois de mexer no chamado: atualiza a lista (a ação própria entra só no histórico, sem aviso). */

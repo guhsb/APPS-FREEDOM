@@ -38,10 +38,12 @@ select{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-
 <script src="base.js"></script>
 <script>
 var STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
-  WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'] };
+  WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'],
+  REOPENED: ['Reaberto', '#6f93ff', 'rgba(79,124,255,.15)'], WAITING_SUPPLIER: ['Aguard. fornecedor', '#f0a53a', 'rgba(240,165,58,.15)'],
+  PENDING_APPROVAL: ['Aguard. aprovação', '#1fbf8f', 'rgba(31,191,143,.15)'] };
 var PRIO = { LOW: '#6b7489', MEDIUM: '#4f7cff', NORMAL: '#4f7cff', HIGH: '#f0a53a', URGENT: '#ef4444', CRITICAL: '#ef4444' };
 var PRIO_TXT = { LOW: 'Baixa', MEDIUM: 'Média', NORMAL: 'Normal', HIGH: 'Alta', URGENT: 'Urgente', CRITICAL: 'Crítica' };
-var ultimo = '';
+var ultimo = '', diagAberto = false;
 document.getElementById('btAt').innerHTML = F.ic('atualizar');
 
 function est() { try { return JSON.parse(App.helpdesk()); } catch (e) { return {}; } }
@@ -176,6 +178,10 @@ function render() {
     linhaBotao('btSom', 'som', 'Som e estilo dos avisos', 'Som, vibração e tela de bloqueio', 'var(--sf3)', 'var(--tx2)') +
     (e.bateriaOk ? '' : linhaBotao('btBat', 'bateria', 'Uso em segundo plano', 'Liberar a bateria para os avisos não atrasarem', 'var(--sf3)', 'var(--tx2)')) +
     linhaBotao('btVersao', 'atualizar', 'Versão do app', 'Versão ' + F.esc(ap.atual || '?') + (ap.nova ? ' · <b style="color:var(--rosa)">nova versão ' + F.int(ap.nova) + ' disponível</b>' : ' · toque para procurar atualização'), 'var(--sf3)', 'var(--tx2)') +
+    linhaBotao('btDiag', 'lista', 'Diagnóstico dos avisos', 'O que o app verificou e por que avisou (ou não). Ajuda a achar problemas.', 'var(--sf3)', 'var(--tx2)') +
+    (diagAberto ? '<div class="item" style="display:block"><pre style="margin:0;white-space:pre-wrap;font:12px/1.45 ui-monospace,monospace;color:var(--tx2);max-height:320px;overflow:auto">' +
+      ((e.diag || []).map(function (x) { return F.esc(quando(x.t) + ' · ' + x.x); }).join('\n') || 'Nada registrado ainda.') + '</pre>' +
+      '<button class="b2" id="btCopiarDiag" style="margin-top:10px;width:100%;border:0;border-radius:10px;padding:11px;font:inherit;font-weight:700;background:var(--sf3);color:var(--tx)">Copiar diagnóstico</button></div>' : '') +
     linhaBotao('sair', 'sair', 'Sair / trocar login', F.esc(e.email || ''), 'rgba(239,68,68,.12)', '#f87171', 'perigo') +
     '</div>';
   h += '<div class="rod">Toque num aviso ou chamado para abrir no site</div>';
@@ -187,6 +193,8 @@ function render() {
   document.getElementById('cInt').onchange = function () { cfg({ intervalo: parseInt(this.value, 10) }); };
   document.getElementById('btTeste').onclick = function () { try { App.testarNotificacao(); } catch (x) {} };
   document.getElementById('btSom').onclick = function () { try { App.configurarSom(); } catch (x) {} };
+  document.getElementById('btDiag').onclick = function () { diagAberto = !diagAberto; ultimo = ''; render(); };
+  var bcd = document.getElementById('btCopiarDiag'); if (bcd) bcd.onclick = function () { try { App.copiarDiagnostico(); } catch (x) {} };
   document.getElementById('btVersao').onclick = function () { try { App.atualizarApp(); } catch (x) {} };
   var bb = document.getElementById('btBat'); if (bb) bb.onclick = function () { try { App.liberarBateria(); } catch (x) {} };
   document.getElementById('sair').onclick = function () {
