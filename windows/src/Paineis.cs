@@ -76,6 +76,7 @@ namespace Freedom
             var o = api.Get("/dashboard/overview?" + qMes);
             var sv = api.Get("/dashboard/sellers?" + qMes);
             var g = Gestor(nome, o, sv, iniMes, fimMes, hoje);
+            PositivacaoVendedores(api, qMes, g);
             var gg = GraficoDe(api, qMes, iniMes, fimMes, hoje);
             if (gg != null) g.Put("diario", gg);
             var ag = Anterior(api, iniMes, g.OptDouble("dec", 0));
@@ -115,6 +116,7 @@ namespace Freedom
                 return new JSONObject().Put("tipo", "vendedor").Put("nome", nome).Put("periodo", titulo).Put("mes", g).Put("semVendas", N(o, "sales_revenue") <= 0);
             }
             var gp = Gestor(nome, o, GetOuVazio(api, "/dashboard/sellers?" + q), ini, fim, hoje).Put("periodo", titulo);
+            PositivacaoVendedores(api, q, gp);
             if (graf != null) gp.Put("diario", graf);
             bool algum = false;
             var vs = gp.OptJSONArray("vendedores");
@@ -124,6 +126,29 @@ namespace Freedom
         }
 
         /// <summary>Busca no site; "sem dados" (HTTP 400/404/422) vira objeto vazio. Login/acesso continuam dando erro.</summary>
+        /// <summary>A lista de vendedores não traz a positivação: vem do overview filtrado por vendedor
+        /// (igual ao filtro "Vendedor" do site). Busca 4 de cada vez; se falhar, fica o que tinha.</summary>
+        static void PositivacaoVendedores(Api api, string q, JSONObject g)
+        {
+            var vs = g.OptJSONArray("vendedores");
+            if (vs == null) return;
+            var itens = new List<JSONObject>();
+            for (int i = 0; i < vs.Length && i < 60; i++) { var v = vs.OptJSONObject(i); if (v != null && v.OptString("chave").Length > 0) itens.Add(v); }
+            System.Threading.Tasks.Parallel.ForEach(itens, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 4 }, v =>
+            {
+                try
+                {
+                    var o = api.Get("/dashboard/overview?" + q + "&seller=" + Uri.EscapeDataString(v.OptString("chave")));
+                    lock (v)
+                    {
+                        if (o.Has("positive_customer_count")) v.Put("pos", N(o, "positive_customer_count"));
+                        if (o.Has("positive_customer_target")) v.Put("metaPos", N(o, "positive_customer_target"));
+                    }
+                }
+                catch (Exception) { }
+            });
+        }
+
         static JSONObject GetOuVazio(Api api, string caminho)
         {
             try { return api.Get(caminho); }
@@ -220,6 +245,7 @@ namespace Freedom
                 double vf = N(x, "revenue"), vm = N(x, "meta_revenue");
                 vend.Put(new JSONObject()
                     .Put("nome", x.OptString("seller_name").Replace("SUPERVISOR - ", "SUP. "))
+                    .Put("chave", x.OptString("seller_name"))
                     .Put("valor", vf).Put("meta", vm).Put("p", vm > 0 ? vf / vm : 0.0)
                     .Put("ideal", vm * idealP).Put("falta", Math.Max(0, vm - vf))
                     .Put("pedidos", N(x, "order_count")).Put("clientes", N(x, "client_count"))

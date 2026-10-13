@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
 <style>
 body{padding-bottom:90px}
 .topo .bt.voltar{border:0;background:transparent;width:34px;margin-left:-8px}
@@ -161,7 +161,7 @@ function desenhar(ultimos) {
     return;
   }
   var h = '<div class="lista">' + itens.map(function (t) {
-    var s = F.STATUS[t.status] || [t.status, '#8b93a7', '#1d2230'], p = F.PRIO[t.priority];
+    var s = F.STATUS[t.status] || [t.status, '#8b93a7', 'var(--sf3)'], p = F.PRIO[t.priority];
     var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
     var corSla = sla === 'BREACHED' ? 'var(--vermelho)' : sla === 'AT_RISK' ? 'var(--laranja)' : 'var(--tx3)';
     var meta = [];

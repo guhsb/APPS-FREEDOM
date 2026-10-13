@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
 <style>
 .status{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);background:var(--sf);border:1px solid var(--ln);
   border-radius:999px;padding:7px 12px;margin:2px 0 14px;width:max-content;max-width:100%}
@@ -23,6 +23,12 @@
 .acoes.duas{grid-template-columns:1fr 1fr}
 .kpi[data-t]:active{background:var(--sf2)}
 .cfg .item{align-items:center}
+.cfgTopo{display:flex;align-items:center;gap:12px;width:100%;margin:22px 0 10px;padding:13px 14px;background:var(--sf);border:1px solid var(--ln);border-radius:var(--r);
+  color:var(--tx);font:inherit;text-align:left;cursor:pointer;box-shadow:var(--sombra)}
+.cfgTopo .ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--sf3);color:var(--tx2)}
+.cfgTopo .ico svg.ic{width:18px;height:18px}
+.cfgTopo .tx{flex:1;min-width:0}.cfgTopo b{display:block;font-size:14px}.cfgTopo em{display:block;font-style:normal;font-size:12.5px;color:var(--tx3);margin-top:2px}
+.cfgTopo .seta{color:var(--tx3);transition:transform .2s}.cfgTopo.on .seta{transform:rotate(180deg)}
 .cfg .item .tx b{font-size:14px;font-weight:600}
 .cfg .item p{-webkit-line-clamp:3}
 .sw{position:relative;width:46px;height:28px;flex:none}.sw input{opacity:0;width:0;height:0;position:absolute}
@@ -30,7 +36,7 @@
 .sw s:before{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
 .sw input:checked+s{background:var(--rosa)}.sw input:checked+s:before{transform:translateX(18px)}
 select{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;flex:none}
-.cfg .perigo b{color:#f6a3a3}
+.cfg .perigo b{color:var(--tx-vermelho)}
 .badge.voce{background:var(--sf3);color:var(--tx2);font-size:10px;padding:2px 7px}
 .item.meu{opacity:.78}
 </style></head><body>
@@ -39,13 +45,15 @@ select{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-
 <div id="conteudo"><div class="carregando"><i></i>Carregando…</div></div>
 <script src="base.js"></script>
 <script>
-var STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
-  WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'],
-  REOPENED: ['Reaberto', '#6f93ff', 'rgba(79,124,255,.15)'], WAITING_SUPPLIER: ['Aguard. fornecedor', '#f0a53a', 'rgba(240,165,58,.15)'],
-  PENDING_APPROVAL: ['Aguard. aprovação', '#1fbf8f', 'rgba(31,191,143,.15)'] };
+var STATUS = { OPEN: ['Aberto', 'var(--azul)', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', 'var(--violeta)', 'rgba(139,108,240,.16)'],
+  WAITING: ['Aguardando', 'var(--laranja)', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', 'var(--verde)', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', 'var(--tx3)', 'var(--sf3)'],
+  REOPENED: ['Reaberto', 'var(--azul)', 'rgba(79,124,255,.15)'], WAITING_SUPPLIER: ['Aguard. fornecedor', 'var(--laranja)', 'rgba(240,165,58,.15)'],
+  PENDING_APPROVAL: ['Aguard. aprovação', 'var(--verde)', 'rgba(31,191,143,.15)'] };
 var PRIO = { LOW: '#6b7489', MEDIUM: '#4f7cff', NORMAL: '#4f7cff', HIGH: '#f0a53a', URGENT: '#ef4444', CRITICAL: '#ef4444' };
 var PRIO_TXT = { LOW: 'Baixa', MEDIUM: 'Média', NORMAL: 'Normal', HIGH: 'Alta', URGENT: 'Urgente', CRITICAL: 'Crítica' };
-var ultimo = '', diagAberto = false;
+var ultimo = '', diagAberto = false, cfgAberta = false;   // configurações começam minimizadas
+// trocar o tema remonta a tela no Android: volta com as configurações abertas
+try { if (localStorage.getItem('cfgAbrir')) { cfgAberta = true; localStorage.removeItem('cfgAbrir'); } } catch (e) { }
 document.getElementById('btAt').innerHTML = F.ic('atualizar');
 
 function est() { try { return JSON.parse(App.helpdesk()); } catch (e) { return {}; } }
@@ -69,7 +77,7 @@ function tipoAviso(x) {
   if (x.novo) return ['mais2', 'var(--rosa)', 'var(--rosa-s)'];
   if (t.indexOf('sla') >= 0) return ['alerta', 'var(--laranja)', 'var(--laranja-s)'];
   if (t.indexOf('anexou') >= 0) return ['clipe', 'var(--tx2)', 'var(--sf3)'];
-  if (t.indexOf('status') >= 0 || t.indexOf('prioridade') >= 0 || t.indexOf('respons') >= 0 || t.indexOf('transferiu') >= 0) return ['troca', '#a48cff', 'var(--violeta-s)'];
+  if (t.indexOf('status') >= 0 || t.indexOf('prioridade') >= 0 || t.indexOf('respons') >= 0 || t.indexOf('transferiu') >= 0) return ['troca', 'var(--violeta)', 'var(--violeta-s)'];
   return ['msg', 'var(--azul)', 'var(--azul-s)'];
 }
 function kpi(rot, v, cor, alerta, tela) {
@@ -160,7 +168,7 @@ function render() {
   else {
     h += '<div class="lista">';
     ab.forEach(function (t) {
-      var s = STATUS[t.status] || [t.status, '#8b93a7', '#1d2230'];
+      var s = STATUS[t.status] || [t.status, '#8b93a7', 'var(--sf3)'];
       h += '<div class="item" data-c="/helpdesk/tickets/' + attr(t.id) + '">' +
         '<div class="ico" style="background:var(--sf2);border:1px solid var(--ln)"><i style="width:9px;height:9px;border-radius:50%;background:' + (PRIO[t.priority] || '#6b7489') + '"></i></div>' +
         '<div class="tx"><div class="t1"><b>' + F.esc(t.protocol) + '</b><span class="badge" style="color:' + s[1] + ';background:' + s[2] + '">' + F.esc(s[0]) + '</span></div>' +
@@ -174,7 +182,10 @@ function render() {
   var opts = [15, 30, 60, 120, 300, 600, 900, 1800].map(function (s) {
     return '<option value="' + s + '"' + (s === e.intervalo ? ' selected' : '') + '>' + rotInt(s) + '</option>';
   }).join('');
-  h += '<div class="sec"><h2>Configurações</h2><span></span></div><div class="lista cfg">' +
+  h += '<button class="cfgTopo' + (cfgAberta ? ' on' : '') + '" id="btCfg"><span class="ico">' + F.ic('engrenagem') + '</span><span class="tx"><b>Configurações</b>' +
+    '<em>Avisos, som, aparência, versão do app e login</em></span>' + F.ic('baixo', 'seta') + '</button>';
+  if (cfgAberta) h += '<div class="lista cfg">' +
+    linhaCfg('lua', 'Modo escuro', 'Desligado, o app fica claro, com as cores do site.', chave('cTema', F.tema() === 'escuro')) +
     linhaCfg('sino', 'Receber avisos', 'Novos chamados, respostas, status, prioridade, responsável e SLA', chave('cAtivo', e.ativo)) +
     linhaCfg('relogio', 'Modo tempo real', 'Aviso fixo na barra e verificação contínua. Desligado economiza bateria.', chave('cTR', e.tempoReal)) +
     linhaCfg('atualizar', 'Verificar a cada', 'Com a tela desligada, no máximo a cada 1 min', '<select id="cInt">' + opts + '</select>') +
@@ -187,11 +198,14 @@ function render() {
     (diagAberto ? '<div class="item" style="display:block"><pre style="margin:0;white-space:pre-wrap;font:12px/1.45 ui-monospace,monospace;color:var(--tx2);max-height:320px;overflow:auto">' +
       ((e.diag || []).map(function (x) { return F.esc(quando(x.t) + ' · ' + x.x); }).join('\n') || 'Nada registrado ainda.') + '</pre>' +
       '<button class="b2" id="btCopiarDiag" style="margin-top:10px;width:100%;border:0;border-radius:10px;padding:11px;font:inherit;font-weight:700;background:var(--sf3);color:var(--tx)">Copiar diagnóstico</button></div>' : '') +
-    linhaBotao('sair', 'sair', 'Sair / trocar login', F.esc(e.email || ''), 'rgba(239,68,68,.12)', '#f87171', 'perigo') +
+    linhaBotao('sair', 'sair', 'Sair / trocar login', F.esc(e.email || ''), 'rgba(239,68,68,.12)', 'var(--tx-vermelho)', 'perigo') +
     '</div>';
   h += '<div class="rod">Toque num número, aviso ou chamado para abrir</div>';
 
   document.getElementById('conteudo').innerHTML = h;
+  document.getElementById('btCfg').onclick = function () { cfgAberta = !cfgAberta; ultimo = ''; render(); if (cfgAberta) { var b = document.getElementById('btCfg'); if (b.scrollIntoView) b.scrollIntoView({ behavior: 'smooth', block: 'start' }); } };
+  if (!cfgAberta) return;
+  document.getElementById('cTema').onchange = function () { try { if (App.plataforma() === 'android') localStorage.setItem('cfgAbrir', '1'); } catch (e) { } F.definirTema(this.checked ? 'escuro' : 'claro'); };
   document.getElementById('cAtivo').onchange = function () { cfg({ ativo: this.checked }); };
   document.getElementById('cTR').onchange = function () { cfg({ tempoReal: this.checked }); };
   document.getElementById('cMeu').onchange = function () { cfg({ minhasAcoes: this.checked }); };

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="base.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
 <style>
 body{padding-bottom:96px}
 .topo .bt.voltar{border:0;background:transparent;width:34px;margin-left:-8px}
@@ -44,7 +44,7 @@ body{padding-bottom:96px}
 .msg.pend{opacity:.75;border-style:dashed}
 .msg .q{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
 .msg .q b{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.msg.eu .q b{color:#f6b3cf}
+.msg.eu .q b{color:var(--tx-rosa)}
 .msg .q em{font-style:normal;font-size:11px;color:var(--tx3);flex:none}
 .msg .q .tag{font-size:10px;font-weight:700;color:var(--tx3);background:var(--sf3);border-radius:999px;padding:1px 6px;flex:none}
 .msg .q .tag.ok{color:var(--verde);background:var(--verde-s)}
@@ -55,7 +55,7 @@ body{padding-bottom:96px}
 .dia{align-self:center;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--tx3);text-transform:uppercase;margin:6px 0 0}
 .anx .item{align-items:center}
 .anx .ico{background:var(--sf3);color:var(--tx2)}
-.caixa{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(11,13,18,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+.caixa{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--topo);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   border-top:1px solid var(--ln);padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
 .caixa textarea{flex:1;min-width:0;resize:none;max-height:140px;min-height:44px;background:var(--sf2);border:1px solid var(--ln2);border-radius:14px;color:var(--tx);
   font:inherit;font-size:15px;line-height:1.35;padding:11px 12px;outline:none}
@@ -86,12 +86,12 @@ F.IC.externo = '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1
 F.IC.baixar = '<path d="M12 4v11"/><path d="M7 10.5l5 5 5-5"/><path d="M5 20h14"/>';
 F.IC.arquivo = '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>';
 F.IC.x = '<path d="M6 6l12 12M18 6L6 18"/>';
-var STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
-  REOPENED: ['Reaberto', '#6f93ff', 'rgba(79,124,255,.15)'], WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'],
-  WAITING_SUPPLIER: ['Aguardando fornecedor', '#f0a53a', 'rgba(240,165,58,.15)'], PENDING_APPROVAL: ['Aguardando aprovação', '#1fbf8f', 'rgba(31,191,143,.15)'],
-  RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'],
-  CANCELED: ['Cancelado', '#8b93a7', '#1d2230'], CANCELLED: ['Cancelado', '#8b93a7', '#1d2230'] };
-var PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], HIGH: ['Alta', '#f0a53a'], URGENT: ['Urgente', '#ef4444'] };
+var STATUS = { OPEN: ['Aberto', 'var(--azul)', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', 'var(--violeta)', 'rgba(139,108,240,.16)'],
+  REOPENED: ['Reaberto', 'var(--azul)', 'rgba(79,124,255,.15)'], WAITING: ['Aguardando', 'var(--laranja)', 'rgba(240,165,58,.15)'],
+  WAITING_SUPPLIER: ['Aguardando fornecedor', 'var(--laranja)', 'rgba(240,165,58,.15)'], PENDING_APPROVAL: ['Aguardando aprovação', 'var(--verde)', 'rgba(31,191,143,.15)'],
+  RESOLVED: ['Resolvido', 'var(--verde)', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', 'var(--tx3)', 'var(--sf3)'],
+  CANCELED: ['Cancelado', 'var(--tx3)', 'var(--sf3)'], CANCELLED: ['Cancelado', 'var(--tx3)', 'var(--sf3)'] };
+var PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], HIGH: ['Alta', 'var(--laranja)'], URGENT: ['Urgente', '#ef4444'] };
 var SLA = { NOT_CONFIGURED: 'Sem SLA', ON_TRACK: 'No prazo', AT_RISK: 'Atenção', BREACHED: 'Vencido', MET: 'Cumprido' };
 var FECHADOS = ['RESOLVED', 'CLOSED', 'CANCELED', 'CANCELLED'];
 var ID = parseInt((location.hash || '').replace('#', ''), 10) || 0;
@@ -168,7 +168,7 @@ function render(d) {
   ['selStatus', 'selPrio', 'selResp', 'selSetor', 'txSolucao', 'txMotivo'].forEach(function (k) { var el = document.getElementById(k); if (el) guard[k] = el.value; });
 
   var t = d.ticket || {}, cap = d.capabilities || {}, itens = d.items || [];
-  var s = STATUS[t.status] || [t.status || '—', '#8b93a7', '#1d2230'], pr = PRIO[t.priority];
+  var s = STATUS[t.status] || [t.status || '—', '#8b93a7', 'var(--sf3)'], pr = PRIO[t.priority];
   var fechado = FECHADOS.indexOf(t.status) >= 0;
   var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
   document.getElementById('tit').textContent = t.protocol || ('Chamado #' + ID);
@@ -198,7 +198,7 @@ function render(d) {
       }
       h += '</div>';
     } else {
-      h += '<div class="aviso" style="background:var(--verde-s);border-color:rgba(31,191,143,.3);color:#9fe3cb">' + F.ic('relogio') +
+      h += '<div class="aviso" style="background:var(--verde-s);border-color:rgba(31,191,143,.3);color:var(--tx-verde)">' + F.ic('relogio') +
         '<span>Solução enviada. Aguardando o solicitante confirmar a conclusão.</span></div>';
     }
   }

@@ -63,11 +63,6 @@ class Tela : Activity() {
         private const val REQ_ANEXO = 33
         private const val REQ_PERMISSAO = 32
         private const val HOST = "relatorios.cbfreedom.com.br"
-        private val FUNDO = Color.parseColor("#0b0d12")
-        private val FUNDO_BARRA = Color.parseColor("#10131b")
-        private val COR_INATIVA = Color.parseColor("#8b93a7")
-        private val COR_LINHA = Color.parseColor("#1d2230")
-        private val ROSA_SUAVE = Color.parseColor("#2e1a26")      // rosa a ~16% sobre a barra
 
         /** Faz os downloads gerados por JavaScript no site (blob:/data:) virem para o app salvar. */
         private const val GANCHO_DOWNLOAD = "(function(){" +
@@ -150,9 +145,34 @@ class Tela : Activity() {
     // Montagem da tela
     // =====================================================================================
 
+    // ---- cores da parte nativa (abas, seletor de painel, aviso sem conexão): seguem o tema claro/escuro ----
+    private val claro by lazy { Tema.claro(this) }
+    private fun cor(claro: String, escuro: String) = Color.parseColor(if (this.claro) claro else escuro)
+    private val FUNDO by lazy { cor("#eef2f7", "#0b0d12") }
+    private val FUNDO_BARRA by lazy { cor("#ffffff", "#10131b") }
+    private val COR_INATIVA by lazy { cor("#6b7790", "#8b93a7") }
+    private val COR_LINHA by lazy { cor("#e1e7ef", "#1d2230") }
+    private val ROSA_SUAVE by lazy { cor("#fde4ee", "#2e1a26") }      // rosa suave atrás do ícone da aba ativa
+    private val TEXTO by lazy { cor("#0f1b3d", "#ffffff") }
+    private val TEXTO2 by lazy { cor("#4b5875", "#a3abbd") }
+    private val CARTAO by lazy { cor("#ffffff", "#12151d") }
+    private val SELECIONADO by lazy { cor("#e9eef6", "#232a3a") }
+
+    private fun pintarJanela() {
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(FUNDO))
+        @Suppress("DEPRECATION")
+        run {
+            window.statusBarColor = FUNDO
+            window.navigationBarColor = FUNDO_BARRA
+            window.decorView.systemUiVisibility = if (claro)
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
+        }
+    }
+
     override fun onCreate(estado: Bundle?) {
         super.onCreate(estado)
         Helpdesk.criarCanais(this)
+        pintarJanela()
 
         val raiz = LinearLayout(this)
         raiz.orientation = LinearLayout.VERTICAL
@@ -252,7 +272,7 @@ class Tela : Activity() {
             val cor = if (ativa) Cor.ROSA else COR_INATIVA
             iconesAba[id]?.let { par.first.setImageResource(if (ativa) it.second else it.first) }
             par.first.setColorFilter(cor)
-            par.second.setTextColor(if (ativa) Color.WHITE else COR_INATIVA)
+            par.second.setTextColor(if (ativa) TEXTO else COR_INATIVA)
             par.second.typeface = if (ativa) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
             val pilula = par.first.parent as? View ?: continue
             if (ativa) {
@@ -652,7 +672,7 @@ class Tela : Activity() {
             chips.setPadding(dp(3), dp(3), dp(3), dp(3))
             val trilho = GradientDrawable()
             trilho.cornerRadius = dp(12).toFloat()
-            trilho.setColor(Color.parseColor("#12151d"))
+            trilho.setColor(CARTAO)
             trilho.setStroke(dp(1), COR_LINHA)
             chips.background = trilho
             val rolagem = android.widget.HorizontalScrollView(this)
@@ -688,11 +708,11 @@ class Tela : Activity() {
             if (sel) {
                 val fundo = GradientDrawable()
                 fundo.cornerRadius = dp(9).toFloat()
-                fundo.setColor(Color.parseColor("#232a3a"))
+                fundo.setColor(SELECIONADO)
                 t.background = fundo
             }
             t.typeface = if (sel) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-            t.setTextColor(if (sel) Color.WHITE else Color.parseColor("#a3abbd"))
+            t.setTextColor(if (sel) TEXTO else TEXTO2)
             t.setOnClickListener { painelAtual = p.id; montarChips() }
             chips.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
@@ -868,13 +888,13 @@ class Tela : Activity() {
         val t = TextView(this)
         t.text = "Sem conexão"
         t.textSize = 20f
-        t.setTextColor(Color.parseColor("#f2f4f8"))
+        t.setTextColor(TEXTO)
         t.gravity = Gravity.CENTER
         v.addView(t)
         val m = TextView(this)
         m.tag = "motivo"
         m.textSize = 13f
-        m.setTextColor(Color.parseColor("#8b93a7"))
+        m.setTextColor(COR_INATIVA)
         m.gravity = Gravity.CENTER
         m.setPadding(0, dp(8), 0, dp(18))
         v.addView(m)
@@ -1289,6 +1309,17 @@ class Tela : Activity() {
 
         @JavascriptInterface
         fun atualizarApp() = runOnUiThread { iniciarAtualizacao() }
+
+        @JavascriptInterface
+        fun tema(): String = Tema.nome(this@Tela)
+
+        /** Troca claro/escuro: salva e remonta a tela inteira (abas, painéis e telas) com as cores novas. */
+        @JavascriptInterface
+        fun definirTema(t: String) = runOnUiThread {
+            if (t == Tema.nome(this@Tela)) return@runOnUiThread
+            Tema.definir(this@Tela, t)
+            recreate()
+        }
 
         @JavascriptInterface
         fun atualizarPeloNavegador() = runOnUiThread { Atualizacao.abrirNoNavegador(this@Tela) }

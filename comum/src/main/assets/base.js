@@ -1,6 +1,29 @@
 // Funções usadas pelas telas cheias dos dois apps
+
+// Aparência: claro (padrão, igual ao site) ou escuro — escolhida em Helpdesk > Configurações (guardada no app)
+(function () {
+  var t = 'claro';
+  try { if (window.App && App.tema) t = App.tema() || t; else t = localStorage.getItem('tema') || t; } catch (e) { }
+  document.documentElement.setAttribute('data-tema', t === 'escuro' ? 'escuro' : 'claro');
+})();
+/** O app trocou o tema (chamado pela parte nativa nas outras telas abertas). */
+window.temaMudou = function (t) {
+  document.documentElement.setAttribute('data-tema', t === 'escuro' ? 'escuro' : 'claro');
+  if (window.aoMudarTema) try { aoMudarTema(); } catch (e) { }
+};
+
 var F = {
   n: function (v) { v = Number(v); return isFinite(v) ? v : 0; },
+  tema: function () { return document.documentElement.getAttribute('data-tema') || 'claro'; },
+  /** Troca o tema: na hora nesta tela e, pelo app, nas outras (e na barra de abas). */
+  definirTema: function (t) {
+    t = t === 'escuro' ? 'escuro' : 'claro';
+    window.temaMudou(t);
+    try { localStorage.setItem('tema', t); } catch (e) { }
+    try { if (window.App && App.definirTema) App.definirTema(t); } catch (e) { }
+  },
+  /** Valor de uma cor do tema (para desenhos em SVG/canvas). */
+  cor: function (nome) { try { return getComputedStyle(document.documentElement).getPropertyValue('--' + nome).trim(); } catch (e) { return ''; } },
   num: function (v) { return F.n(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); },
   brl: function (v) { return 'R$ ' + F.num(v); },
   um: function (x, c) { var s = x.toFixed(c || 1).replace('.', ','); return s.indexOf(',') >= 0 ? s.replace(/0+$/, '').replace(/,$/, '') : s; },
@@ -26,6 +49,9 @@ var F = {
     sair: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M9 16l-4-4 4-4"/><path d="M5 12h11"/>',
     alerta: '<path d="M12 3.5l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
     sino: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.6 2H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+    lua: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    engrenagem: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    baixo: '<path d="m6 9 6 6 6-6"/>',
     msg: '<path d="M4 5h16v11H9.5L5 19.5z"/>',
     troca: '<path d="M4 8h14l-3.5-3.5"/><path d="M20 16H6l3.5 3.5"/>',
     clipe: '<path d="M19.5 11.5l-7.8 7.8a4.6 4.6 0 0 1-6.5-6.5l8.4-8.4a3 3 0 0 1 4.3 4.3l-8.3 8.3a1.5 1.5 0 0 1-2.1-2.1l7.5-7.5"/>',
@@ -105,11 +131,11 @@ F.erroApi = function (r, padrao) {
   if (Array.isArray(d) && d.length && d[0].msg) return padrao + ' (' + d[0].msg + ')';
   return padrao + ' (erro ' + r.status + ')';
 };
-F.STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
-  REOPENED: ['Reaberto', '#6f93ff', 'rgba(79,124,255,.15)'], WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'],
-  WAITING_SUPPLIER: ['Aguard. fornecedor', '#f0a53a', 'rgba(240,165,58,.15)'], PENDING_APPROVAL: ['Aguard. aprovação', '#1fbf8f', 'rgba(31,191,143,.15)'],
-  RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'], CANCELED: ['Cancelado', '#8b93a7', '#1d2230'] };
-F.PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], HIGH: ['Alta', '#f0a53a'], URGENT: ['Urgente', '#ef4444'] };
+F.STATUS = { OPEN: ['Aberto', 'var(--azul)', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', 'var(--violeta)', 'rgba(139,108,240,.16)'],
+  REOPENED: ['Reaberto', 'var(--azul)', 'rgba(79,124,255,.15)'], WAITING: ['Aguardando', 'var(--laranja)', 'rgba(240,165,58,.15)'],
+  WAITING_SUPPLIER: ['Aguard. fornecedor', 'var(--laranja)', 'rgba(240,165,58,.15)'], PENDING_APPROVAL: ['Aguard. aprovação', 'var(--verde)', 'rgba(31,191,143,.15)'],
+  RESOLVED: ['Resolvido', 'var(--verde)', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', 'var(--tx3)', 'var(--sf3)'], CANCELED: ['Cancelado', 'var(--tx3)', 'var(--sf3)'] };
+F.PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], HIGH: ['Alta', 'var(--laranja)'], URGENT: ['Urgente', '#ef4444'] };
 F.SLA = { NOT_CONFIGURED: 'Sem SLA', ON_TRACK: 'No prazo', AT_RISK: 'SLA em risco', BREACHED: 'SLA vencido', MET: 'SLA cumprido' };
 /** Datas do site vêm em UTC sem "Z". */
 F.data = function (s) {
@@ -175,6 +201,7 @@ var Base = {
       b.dataset.ok = '1'; b.querySelector('span').textContent = 'Toque de novo para confirmar';
     };
     window.recebido = Base.atualizarTela;
+    window.aoMudarTema = function () { Base.ultimo = ''; Base.atualizarTela(); };   // redesenha os gráficos com as cores novas
     Base.atualizarTela();
     setInterval(function () { var e = Base.estado(); if (e.atualizando) Base.atualizarTela(); }, 1500);
   },

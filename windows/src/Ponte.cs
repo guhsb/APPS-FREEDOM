@@ -23,6 +23,8 @@ namespace Freedom
 
         public string nome() { return "Freedom"; }
         public string plataforma() { return "windows"; }
+        public string tema() { return Janela.Claro ? "claro" : "escuro"; }
+        public void definirTema(string t) { Ui(() => j.DefinirTema(t)); }
 
         public string dadosPainel(string id) { return Atualizador.DadosPainel(id); }
         public string dados() { var l = Paineis.ParaAbaPainel(); return Atualizador.DadosPainel(l.Count > 0 ? l[0].Id : ""); }

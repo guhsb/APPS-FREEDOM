@@ -9,7 +9,7 @@ const { app, BrowserWindow, WebContentsView, ipcMain, Notification, Tray, Menu, 
 const path = require('path');
 const fs = require('fs');
 
-const { SITE, Pastas, Store, Api, Acesso } = require('./core/base');
+const { SITE, Pastas, Store, Api, Acesso, Prefs } = require('./core/base');
 const Helpdesk = require('./core/helpdesk');
 const { Chamado, Fila } = require('./core/chamado');
 const Paineis = require('./core/paineis');
@@ -28,12 +28,15 @@ let monitor = null, timerPaineis = null;
 
 const url = arq => 'file://' + path.join(WWW, arq);
 const logado = () => Store.logado();
+// aparência: claro (padrão, igual ao site) ou escuro — escolhida em Helpdesk > Configurações
+const temaClaro = () => Prefs.de('aparencia').getStr('tema', 'claro') !== 'escuro';
+const corFundo = () => temaClaro() ? '#eef2f7' : '#0b0d12';
 const resumoApp = () => Atualizacao.resumo(app.getVersion());
 
 // ---------------- início ----------------
 app.whenReady().then(() => {
-  nativeTheme.themeSource = 'dark';
   Pastas.iniciar(app.getPath('userData'));
+  nativeTheme.themeSource = temaClaro() ? 'light' : 'dark';
   Store.usarCifra({ disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: s => safeStorage.encryptString(s), abrir: b => safeStorage.decryptString(b) });
   Api.definirVersao(app.getVersion());
   Atualizacao.definirVersao(app.getVersion());
@@ -86,7 +89,7 @@ function opcoesTela(preload) {
 }
 
 function criarJanela() {
-  janela = new BrowserWindow({ width: 1180, height: 800, minWidth: 820, minHeight: 560, show: false, backgroundColor: '#0b0d12', title: 'Freedom',
+  janela = new BrowserWindow({ width: 1180, height: 800, minWidth: 820, minHeight: 560, show: false, backgroundColor: corFundo(), title: 'Freedom',
     webPreferences: { preload: path.join(__dirname, 'preload-shell.js'), contextIsolation: true } });
   janela.loadFile(path.join(__dirname, 'ui', 'shell.html'));
   janela.webContents.on('did-finish-load', atualizarBarra);
@@ -95,7 +98,7 @@ function criarJanela() {
   janela.on('show', posicionar);
 
   vApp = new WebContentsView(opcoesTela('preload.js'));
-  vApp.setBackgroundColor('#0b0d12');
+  vApp.setBackgroundColor(corFundo());
   janela.contentView.addChildView(vApp);
   protegerNavegacao(vApp.webContents, true);
   vApp.webContents.on('did-start-navigation', (e) => {
@@ -133,7 +136,7 @@ function abasDisponiveis() {
 function atualizarBarra() {
   if (!janela || janela.isDestroyed()) return;
   const n = aba === 'helpdesk' ? 0 : Helpdesk.naoVistos();
-  janela.webContents.send('barra-estado', { logado: logado(), abas: abasDisponiveis(), aba, selo: n,
+  janela.webContents.send('barra-estado', { tema: temaClaro() ? 'claro' : 'escuro', logado: logado(), abas: abasDisponiveis(), aba, selo: n,
     paineis: Paineis.paraAba().map(p => ({ id: p.id, nome: p.nomeModulo })), painel: painelAtual });
   const total = Helpdesk.naoVistos();
   try { app.dock && app.dock.setBadge(total > 0 ? String(total) : ''); } catch (e) { }
@@ -254,7 +257,7 @@ function garantirPainel(forcarTela) {
   const tela = Paineis.porId(painelAtual).tela;
   if (!vPainel) {
     vPainel = new WebContentsView(opcoesTela('preload.js'));
-    vPainel.setBackgroundColor('#0b0d12');
+    vPainel.setBackgroundColor(corFundo());
     vPainel.setVisible(false);
     janela.contentView.addChildView(vPainel);
     protegerNavegacao(vPainel.webContents, true);
@@ -342,6 +345,14 @@ const Q = s => JSON.stringify(String(s == null ? '' : s));
 const ponte = {
   nome: () => 'Freedom',
   plataforma: () => 'mac',
+  tema: () => temaClaro() ? 'claro' : 'escuro',
+  definirTema: (wc, t) => {
+    t = t === 'escuro' ? 'escuro' : 'claro';
+    Prefs.de('aparencia').editar().put('tema', t).commit();
+    nativeTheme.themeSource = t === 'claro' ? 'light' : 'dark';
+    if (janela) { janela.setBackgroundColor(corFundo()); js(janela.webContents, 'window.temaMudou && temaMudou(' + Q(t) + ')'); }
+    for (const v of [vApp, vPainel]) if (v) { try { v.setBackgroundColor(corFundo()); } catch (e) { } js(v.webContents, 'window.temaMudou && temaMudou(' + Q(t) + ')'); }
+  },
   dadosPainel: (wc, id) => JSON.stringify(Paineis.dadosPainel(id, resumoApp())),
   dados: () => { const l = Paineis.paraAba(); return JSON.stringify(Paineis.dadosPainel(l.length ? l[0].id : '', resumoApp())); },
   atualizar: () => { Paineis.atualizar(); },

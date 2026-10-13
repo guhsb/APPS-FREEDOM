@@ -22,11 +22,17 @@ namespace Freedom
         const string SITE_HOST = "relatorios.cbfreedom.com.br";
         static readonly string[] TELAS = { "lista.html", "novo.html" };
 
-        static readonly Color FUNDO = Color.FromArgb(11, 13, 18);
-        static readonly Color BARRA = Color.FromArgb(16, 19, 27);
-        static readonly Color LINHA = Color.FromArgb(29, 34, 48);
+        // cores da parte nativa (barra lateral, seletor de painel): seguem o tema claro (padrão, igual ao site) ou escuro
+        public static bool Claro = Prefs.De("aparencia").GetString("tema", "claro") != "escuro";
+        static Color C(int r, int g, int b, int r2, int g2, int b2) { return Claro ? Color.FromArgb(r, g, b) : Color.FromArgb(r2, g2, b2); }
+        static Color FUNDO { get { return C(238, 242, 247, 11, 13, 18); } }
+        static Color BARRA { get { return C(255, 255, 255, 16, 19, 27); } }
+        static Color LINHA { get { return C(225, 231, 239, 29, 34, 48); } }
         static readonly Color ROSA = Color.FromArgb(232, 75, 138);
-        static readonly Color CINZA = Color.FromArgb(139, 147, 167);
+        static Color CINZA { get { return C(107, 119, 144, 139, 147, 167); } }
+        static Color TEXTO { get { return C(15, 27, 61, 255, 255, 255); } }
+        static Color PILULA { get { return C(253, 228, 238, 46, 26, 38); } }
+        static Color SELECIONADO { get { return C(233, 238, 246, 35, 42, 58); } }
 
         readonly bool inicioOculto;
         readonly Panel nav = new Panel();
@@ -51,7 +57,7 @@ namespace Freedom
             ponte = new Ponte(this);
             Text = "Freedom";
             BackColor = FUNDO;
-            ForeColor = Color.White;
+            ForeColor = TEXTO;
             StartPosition = FormStartPosition.CenterScreen;
             Size = new Size(1200, 820);
             MinimumSize = new Size(820, 560);
@@ -143,7 +149,28 @@ namespace Freedom
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            try { int sim = 1; DwmSetWindowAttribute(Handle, 20, ref sim, 4); } catch (Exception) { }   // barra de título escura
+            BarraTitulo();
+        }
+
+        void BarraTitulo()
+        {
+            try { int sim = Claro ? 0 : 1; DwmSetWindowAttribute(Handle, 20, ref sim, 4); } catch (Exception) { }   // barra de título clara/escura
+        }
+
+        /// <summary>Troca claro/escuro: pinta de novo a parte nativa e recarrega as telas com as cores novas.</summary>
+        public void DefinirTema(string t)
+        {
+            t = t == "escuro" ? "escuro" : "claro";
+            Prefs.De("aparencia").Edit().Put("tema", t).Commit();
+            Claro = t == "claro";
+            BackColor = FUNDO; ForeColor = TEXTO; conteudo.BackColor = FUNDO; nav.BackColor = BARRA;
+            if (caixaPainel != null) caixaPainel.BackColor = FUNDO;
+            if (chips != null) chips.BackColor = FUNDO;
+            foreach (var w in new[] { webApp, webPainel }) if (w != null) { w.DefaultBackgroundColor = FUNDO; try { w.CoreWebView2.ExecuteScriptAsync("window.temaMudou&&temaMudou(" + "'" + t + "')"); } catch (Exception) { } }
+            BarraTitulo();
+            MontarChips();
+            foreach (var b in abas.Values) b.Invalidate();
+            nav.Invalidate();
         }
 
         [DllImport("dwmapi.dll")]
@@ -175,11 +202,11 @@ namespace Freedom
                 g.Clear(BARRA);
                 var pilula = new Rectangle((Width - 52) / 2, 8, 52, 32);
                 if (Ativa)
-                    using (var b = new SolidBrush(Color.FromArgb(46, 26, 38)))
+                    using (var b = new SolidBrush(PILULA))
                     using (var cam = Arredondado(pilula, 16)) g.FillPath(b, cam);
                 DesenharIcone(g, Icone, Ativa, pilula, Ativa ? ROSA : CINZA);
                 using (var f = new Font("Segoe UI", 8.5f, Ativa ? FontStyle.Bold : FontStyle.Regular))
-                using (var b = new SolidBrush(Ativa ? Color.White : CINZA))
+                using (var b = new SolidBrush(Ativa ? TEXTO : CINZA))
                 {
                     var sf = new StringFormat { Alignment = StringAlignment.Center };
                     g.DrawString(Rotulo, f, b, new RectangleF(0, 44, Width, 18), sf);
@@ -574,7 +601,7 @@ namespace Freedom
                 var b = new Button
                 {
                     Text = p.NomeModulo, AutoSize = true, FlatStyle = FlatStyle.Flat, Height = 32, Cursor = Cursors.Hand,
-                    BackColor = sel ? Color.FromArgb(35, 42, 58) : FUNDO, ForeColor = sel ? Color.White : CINZA,
+                    BackColor = sel ? SELECIONADO : FUNDO, ForeColor = sel ? TEXTO : CINZA,
                     Font = new Font("Segoe UI", 10f, sel ? FontStyle.Bold : FontStyle.Regular), Margin = new Padding(0, 0, 8, 0), Padding = new Padding(10, 0, 10, 0)
                 };
                 b.FlatAppearance.BorderColor = LINHA;

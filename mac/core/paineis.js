@@ -45,7 +45,7 @@ function gestor(nome, o, sv, ini, fim, hoje) {
   const falta = Math.max(0, meta - fat);
   const vendedores = lista.map(x => {
     const vf = N(x, 'revenue'), vm = N(x, 'meta_revenue');
-    return { nome: String(x.seller_name || '').replace('SUPERVISOR - ', 'SUP. '), valor: vf, meta: vm, p: vm > 0 ? vf / vm : 0,
+    return { nome: String(x.seller_name || '').replace('SUPERVISOR - ', 'SUP. '), chave: String(x.seller_name || ''), valor: vf, meta: vm, p: vm > 0 ? vf / vm : 0,
       ideal: vm * idealP, falta: Math.max(0, vm - vf), pedidos: N(x, 'order_count'), clientes: N(x, 'client_count'),
       pos: primeiro(x, ['positive_customer_count', 'positive_customers', 'positivation', 'positivacao', 'client_count']),
       metaPos: primeiro(x, ['positive_customer_target', 'positivation_target', 'meta_positivation', 'meta_positivacao', 'client_target']) };
@@ -135,9 +135,27 @@ async function comercial(api) {
   }
   const o = await api.get('/dashboard/overview?' + qMes), sv = await api.get('/dashboard/sellers?' + qMes);
   const g = gestor(nome, o, sv, iniMes, fimMes, hoje);
+  await positivacaoVendedores(api, qMes, g);
   const gg = await graficoDe(api, qMes, iniMes, fimMes, hoje); if (gg) g.diario = gg;
   const ag = await anterior(api, iniMes, g.dec); if (ag) g.anterior = ag;
   return g;
+}
+
+/** A lista de vendedores não traz a positivação: vem do overview filtrado por vendedor (igual ao filtro do site). 4 de cada vez. */
+async function positivacaoVendedores(api, q, g) {
+  const itens = (g.vendedores || []).slice(0, 60).filter(v => v.chave);
+  let i = 0;
+  const trabalhador = async () => {
+    while (i < itens.length) {
+      const v = itens[i++];
+      try {
+        const o = await api.get('/dashboard/overview?' + q + '&seller=' + encodeURIComponent(v.chave));
+        if (o.positive_customer_count != null) v.pos = N(o, 'positive_customer_count');
+        if (o.positive_customer_target != null) v.metaPos = N(o, 'positive_customer_target');
+      } catch (e) { }
+    }
+  };
+  await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
 }
 
 async function getOuVazio(api, caminho) {
@@ -160,6 +178,7 @@ async function periodo(api, iniTxt, fimTxt) {
     return { tipo: 'vendedor', nome, periodo: titulo, mes: g, semVendas: N(o, 'sales_revenue') <= 0 };
   }
   const g = gestor(nome, o, await getOuVazio(api, '/dashboard/sellers?' + q), ini, fim, hoje); g.periodo = titulo; if (graf) g.diario = graf;
+  await positivacaoVendedores(api, q, g);
   g.semVendas = N(o, 'sales_revenue') <= 0 && !g.vendedores.some(v => v.valor > 0);
   return g;
 }

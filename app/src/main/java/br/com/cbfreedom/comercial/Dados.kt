@@ -43,6 +43,7 @@ object Dados {
             val o = api.get("/dashboard/overview?$qMes")
             val sv = api.get("/dashboard/sellers?$qMes")
             val g = gestor(nome, o, sv, iniMes, fimMes, hoje)
+            positivacaoVendedores(api, qMes, g)
             graficoDe(api, qMes, iniMes, fimMes, hoje)?.let { g.put("diario", it) }
             anterior(api, iniMes, g.optDouble("dec", 0.0))?.let { g.put("anterior", it) }
             g
@@ -86,10 +87,34 @@ object Dados {
         } else {
             val sv = getOuVazio(api, "/dashboard/sellers?$q")
             val g = gestor(nome, o, sv, ini, fim, hoje).put("periodo", titulo)
+            positivacaoVendedores(api, q, g)
             if (graf != null) g.put("diario", graf)
             g.put("semVendas", n(o, "sales_revenue") <= 0.0 && (g.optJSONArray("vendedores")?.length() ?: 0).let { k ->
                 (0 until k).all { n(g.getJSONArray("vendedores").getJSONObject(it), "valor") <= 0.0 } })
         }
+    }
+
+    /**
+     * A lista de vendedores do site não traz a positivação; ela vem do overview filtrado por vendedor
+     * (o mesmo que o site faz ao escolher um vendedor no filtro). Busca 4 de cada vez; se falhar, fica o que tinha.
+     */
+    private fun positivacaoVendedores(api: Api, q: String, g: JSONObject) {
+        val vs = g.optJSONArray("vendedores") ?: return
+        val itens = (0 until minOf(vs.length(), 60)).map { vs.getJSONObject(it) }.filter { it.optString("chave").isNotEmpty() }
+        if (itens.isEmpty()) return
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
+        try {
+            val fut = itens.map { v ->
+                pool.submit(java.util.concurrent.Callable {
+                    try { api.get("/dashboard/overview?$q&seller=" + java.net.URLEncoder.encode(v.optString("chave"), "UTF-8").replace("+", "%20")) } catch (_: Exception) { null }
+                })
+            }
+            for ((v, f) in itens.zip(fut)) {
+                val o = try { f.get(30, java.util.concurrent.TimeUnit.SECONDS) } catch (_: Exception) { null } ?: continue
+                if (o.has("positive_customer_count")) v.put("pos", n(o, "positive_customer_count"))
+                if (o.has("positive_customer_target")) v.put("metaPos", n(o, "positive_customer_target"))
+            }
+        } finally { pool.shutdownNow() }
     }
 
     /** Busca no site; "sem dados" (HTTP 400/404/422) vira objeto vazio. Login/acesso continuam dando erro. */
@@ -171,6 +196,7 @@ object Dados {
             val vf = n(x, "revenue"); val vm = n(x, "meta_revenue")
             vend.put(JSONObject()
                 .put("nome", x.optString("seller_name").replace("SUPERVISOR - ", "SUP. "))
+                .put("chave", x.optString("seller_name"))
                 .put("valor", vf).put("meta", vm)
                 .put("p", if (vm > 0) vf / vm else 0.0)
                 .put("ideal", vm * idealP)
