@@ -14,20 +14,32 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 object Cor {
-    val ROSA = Color.parseColor("#e84b8a")
-    val AZUL = Color.parseColor("#4f7cff")
-    val VERDE = Color.parseColor("#1fbf8f")
-    val LARANJA = Color.parseColor("#f0a53a")
-    val VIOLETA = Color.parseColor("#8b6cf0")
-    val FUNDO = Color.parseColor("#0a0c12")
-    val FUNDO_ROSA = Color.parseColor("#1a0f1c")
-    val CARD = Color.parseColor("#12151f")
-    val LINHA = Color.parseColor("#232838")
-    val TRILHO = Color.parseColor("#1b2030")
-    val BRANCO = Color.parseColor("#f2f4f8")
-    val CINZA = Color.parseColor("#8b93a7")
-    val APAGADO = Color.parseColor("#5d6578")
-    val IDEAL = Color.parseColor("#c9ced9")
+    // cores de destaque: iguais nos dois temas (um pouco mais fortes no claro, para ler bem no branco)
+    var ROSA = Color.parseColor("#e84b8a"); private set
+    var AZUL = Color.parseColor("#4f7cff"); private set
+    var VERDE = Color.parseColor("#1fbf8f"); private set
+    var LARANJA = Color.parseColor("#f0a53a"); private set
+    var VIOLETA = Color.parseColor("#8b6cf0"); private set
+    // fundo, cartões e textos: mudam com o tema
+    var FUNDO = Color.parseColor("#0a0c12"); private set
+    var FUNDO_ROSA = Color.parseColor("#1a0f1c"); private set
+    var CARD = Color.parseColor("#12151f"); private set
+    var LINHA = Color.parseColor("#232838"); private set
+    var TRILHO = Color.parseColor("#1b2030"); private set
+    var BRANCO = Color.parseColor("#f2f4f8"); private set      // texto principal (branco no escuro, azul-marinho no claro)
+    var CINZA = Color.parseColor("#8b93a7"); private set
+    var APAGADO = Color.parseColor("#5d6578"); private set
+    var IDEAL = Color.parseColor("#c9ced9"); private set
+
+    /** Escolhe as cores do tema do app (claro = cores do site). Chamado antes de desenhar cada widget. */
+    fun aplicar(claro: Boolean) {
+        fun c(cl: String, es: String) = Color.parseColor(if (claro) cl else es)
+        ROSA = c("#e0457f", "#e84b8a"); AZUL = c("#3b5bfd", "#4f7cff"); VERDE = c("#0e9f6e", "#1fbf8f")
+        LARANJA = c("#d97706", "#f0a53a"); VIOLETA = c("#6d4fe0", "#8b6cf0")
+        FUNDO = c("#ffffff", "#0a0c12"); FUNDO_ROSA = c("#fdeef4", "#1a0f1c"); CARD = c("#f4f6fb", "#12151f")
+        LINHA = c("#e1e7ef", "#232838"); TRILHO = c("#e6ebf3", "#1b2030"); BRANCO = c("#0f1b3d", "#f2f4f8")
+        CINZA = c("#5f6b85", "#8b93a7"); APAGADO = c("#8a94aa", "#5d6578"); IDEAL = c("#0f1b3d", "#c9ced9")
+    }
 }
 
 /**

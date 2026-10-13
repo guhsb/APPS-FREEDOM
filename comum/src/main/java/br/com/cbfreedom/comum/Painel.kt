@@ -104,6 +104,8 @@ object Freedom {
 
     fun dados(c: Context, painel: Painel): String? = Store.cache(c).getString("dados_" + painel.id, null)
 
-    fun imagem(c: Context, painel: Painel, w: Float, h: Float, k: Float): Bitmap =
-        render(painel, w, h, k, logo(c), dados(c, painel), info(c, painel), Store.logado(c) && !Acesso.tem(c, painel.modulo))
+    fun imagem(c: Context, painel: Painel, w: Float, h: Float, k: Float): Bitmap {
+        Cor.aplicar(Tema.claro(c))      // o widget segue o modo claro/escuro escolhido no app
+        return render(painel, w, h, k, logo(c), dados(c, painel), info(c, painel), Store.logado(c) && !Acesso.tem(c, painel.modulo))
+    }
 }

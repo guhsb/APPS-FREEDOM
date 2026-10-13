@@ -1318,6 +1318,7 @@ class Tela : Activity() {
         fun definirTema(t: String) = runOnUiThread {
             if (t == Tema.nome(this@Tela)) return@runOnUiThread
             Tema.definir(this@Tela, t)
+            Thread { Widget.redesenharTodos(applicationContext) }.start()     // widgets na tela inicial mudam junto
             recreate()
         }
 

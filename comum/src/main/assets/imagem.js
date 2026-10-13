@@ -7,12 +7,20 @@
    ============================================================ */
 (function () {
   var W = 540, ESC = 2, M = 20, PAD = 16;
-  var C = { bg: '#0b0d12', sf: '#12151d', sf2: '#171b25', ln: '#232a3a', ln2: '#2c3447', tx: '#f3f5f9', tx2: '#a3abbd', tx3: '#6b7489',
-            rosa: '#e84b8a', azul: '#4f7cff', verde: '#1fbf8f', laranja: '#f0a53a', violeta: '#8b6cf0', vermelho: '#ef4444' };
+  // a imagem segue o tema do app (claro = cores do site)
+  var ESCURO = { bg: '#0b0d12', sf: '#12151d', sf2: '#171b25', ln: '#232a3a', ln2: '#2c3447', tx: '#f3f5f9', tx2: '#a3abbd', tx3: '#6b7489',
+            rosa: '#e84b8a', azul: '#4f7cff', verde: '#1fbf8f', laranja: '#f0a53a', violeta: '#8b6cf0', vermelho: '#ef4444',
+            marca: '#e9ecf3', pill: 'rgba(255,255,255,.07)' };
+  var CLARO = { bg: '#eef2f7', sf: '#ffffff', sf2: '#f6f8fc', ln: '#e1e7ef', ln2: '#e3e8f1', tx: '#0f1b3d', tx2: '#4b5875', tx3: '#7b879e',
+            rosa: '#e0457f', azul: '#3b5bfd', verde: '#0e9f6e', laranja: '#d97706', violeta: '#6d4fe0', vermelho: '#dc2626',
+            marca: '#0f1b3d', pill: '#e8edf5' };
+  var C = ESCURO;
+  // cores fixas que os painéis mandam (as do tema escuro) -> a mesma cor no tema claro
+  var EQUIV = { '#4f7cff': 'azul', '#e84b8a': 'rosa', '#1fbf8f': 'verde', '#f0a53a': 'laranja', '#8b6cf0': 'violeta', '#ef4444': 'vermelho', '#3a4154': 'ln2', '#8b93a7': 'tx3' };
   var FONTE = 'Roboto, "Segoe UI", system-ui, sans-serif';
 
   function fonte(ctx, tam, peso) { ctx.font = (peso || 400) + ' ' + tam + 'px ' + FONTE; }
-  function cor(c) { return C[c] || c || C.tx; }
+  function cor(c) { if (C === CLARO && c && EQUIV[String(c).toLowerCase()]) return C[EQUIV[String(c).toLowerCase()]]; return C[c] || c || C.tx; }
   function rr(ctx, x, y, w, h, r) {
     r = Math.min(r, h / 2, w / 2);
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -42,7 +50,7 @@
     ctx.fillStyle = C.ln2; rr(ctx, x, y, w, h, h / 2); ctx.fill();
     var pw = Math.max(0, Math.min(1, p)) * w;
     if (pw > 0) { ctx.fillStyle = cor(c); rr(ctx, x, y, Math.max(pw, h), h, h / 2); ctx.fill(); }
-    if (idealP != null) { ctx.fillStyle = '#e9ecf3'; ctx.fillRect(x + Math.max(0, Math.min(1, idealP)) * w - 1, y - 4, 2, h + 8); }
+    if (idealP != null) { ctx.fillStyle = C.marca; ctx.fillRect(x + Math.max(0, Math.min(1, idealP)) * w - 1, y - 4, 2, h + 8); }
   }
 
   // ---- cada bloco desenha a partir de y e devolve o novo y ----
@@ -56,7 +64,7 @@
       y += 46;
       if (b.pill) {
         fonte(ctx, 12, 700); var pw = ctx.measureText(b.pill).width + 20;
-        ctx.fillStyle = 'rgba(255,255,255,.07)'; rr(ctx, x, y, pw, 24, 12); ctx.fill();
+        ctx.fillStyle = C.pill; rr(ctx, x, y, pw, 24, 12); ctx.fill();
         ctx.fillStyle = C.tx2; ctx.fillText(b.pill, x + 10, y + 16);
         if (b.sub) { fonte(ctx, 12); ctx.fillStyle = C.tx3; texto(ctx, b.sub, x + pw + 10, y + 16, w - pw - 10); }
         y += 34;
@@ -112,7 +120,7 @@
       for (var i = 0; i < b.itens.length; i++) {
         var it = b.itens[i], h = 50;
         ctx.fillStyle = C.sf; rr(ctx, x, y, w, h, 12); ctx.fill(); ctx.strokeStyle = C.ln; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = it.cor || C.tx3; rr(ctx, x + 12, y + 15, 6, 20, 3); ctx.fill();
+        ctx.fillStyle = it.cor ? cor(it.cor) : C.tx3; rr(ctx, x + 12, y + 15, 6, 20, 3); ctx.fill();
         fonte(ctx, 14, 700); var vw = ctx.measureText(it.valor).width;
         ctx.fillStyle = C.tx; texto(ctx, it.valor, x + w - 12, y + 22, 0, 'right');
         fonte(ctx, 14, 600); texto(ctx, it.nome, x + 28, y + 22, w - 60 - vw);
@@ -126,7 +134,7 @@
       var tot = 0; b.partes.forEach(function (p) { tot += p.frac; });
       var cx = x;
       ctx.save(); rr(ctx, x, y, w, 10, 5); ctx.clip();
-      b.partes.forEach(function (p) { var pw = tot ? p.frac / tot * w : 0; ctx.fillStyle = p.cor; ctx.fillRect(cx, y, pw + 0.5, 10); cx += pw; });
+      b.partes.forEach(function (p) { var pw = tot ? p.frac / tot * w : 0; ctx.fillStyle = cor(p.cor); ctx.fillRect(cx, y, pw + 0.5, 10); cx += pw; });
       ctx.restore();
       return y + 22;
     },
@@ -188,7 +196,7 @@
       yy += PAD - 8;
       ctx.save(); ctx.globalCompositeOperation = 'destination-over';
       ctx.strokeStyle = C.ln; ctx.lineWidth = 1; rr(ctx, x + .5, y0 + .5, w - 1, yy - y0 - 1, 16); ctx.stroke();
-      ctx.fillStyle = b.cor || C.sf; rr(ctx, x, y0, w, yy - y0, 16); ctx.fill();
+      ctx.fillStyle = b.cor ? cor(b.cor) : C.sf; rr(ctx, x, y0, w, yy - y0, 16); ctx.fill();
       ctx.restore();
       return yy + 12;
     }
@@ -202,6 +210,7 @@
   F.desenharImagem = function (spec, pronto) {
     var logo = new Image();
     var fazer = function () {
+      C = F.tema && F.tema() === 'escuro' ? ESCURO : CLARO;
       var tela = document.createElement('canvas');
       tela.width = W * ESC; tela.height = 4600 * ESC;
       var ctx = tela.getContext('2d');
