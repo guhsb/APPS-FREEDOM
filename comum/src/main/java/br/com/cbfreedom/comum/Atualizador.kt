@@ -37,6 +37,7 @@ object Atualizador {
                         val d = p.buscar(api)
                         ed.putString("dados_" + p.id, d.toString()).putLong("hora_" + p.id, System.currentTimeMillis())
                             .remove("erro_" + p.id)
+                        if (p.temAvisos && Metas.ligado(c)) try { Metas.notificar(c, p, p.avisos(c, d)) } catch (_: Exception) { }
                     } catch (e: Exception) {
                         val m = Api.mensagem(e)
                         ed.putString("erro_" + p.id, m)

@@ -151,6 +151,7 @@ object Helpdesk {
 
     fun sair(c: Context) {
         prefs(c).edit().clear().commit()
+        Fila.limpar(c)
         aplicar(c)
         val n = nm(c)
         n.cancel(NOTIF_LOGIN); n.cancel(NOTIF_INFO); n.cancel(NOTIF_GRUPO)
@@ -319,15 +320,14 @@ object Helpdesk {
                 p.edit().putInt("sonda_rr", (rr + SONDA_RODIZIO) % resto.size).apply()
             }
             for (id in escolha) {
-                val conhecido = Engine.knownLastItem(estado, id)
-                if (conhecido < 0) {
+                if (!Engine.baselined(estado, id)) {
                     // histórico ainda não lido: a verificação completa lê agora (só linha de base, sem aviso)
                     forcar.add(id); resposta = true; continue
                 }
                 val r = try { api.bruto("/helpdesk/tickets/$id/timeline") } catch (_: Exception) { break }
                 if (r.first == 401) return true
                 if (r.first != 200) continue
-                if (Engine.maxItemId(r.second) > conhecido) {
+                if (Engine.timelineHasNew(estado, id, r.second)) {
                     forcar.add(id); resposta = true
                     diag(c, "Sondagem: item novo no histórico do chamado #$id")
                 }
@@ -354,6 +354,7 @@ object Helpdesk {
     fun cicloEmSegundoPlano(c: Context, depois: (() -> Unit)? = null) {
         val app = c.applicationContext
         Thread {
+            try { Fila.enviar(app) } catch (_: Exception) { }      // o que ficou guardado sem internet
             try { ciclo(app) } catch (_: Exception) { }
             depois?.invoke()
         }.start()
@@ -423,6 +424,7 @@ object Helpdesk {
             .put("monitorados", p.getInt("monitorados", 0))
             .put("notifOk", notificacoesPermitidas(c)).put("bateriaOk", bateriaLivre(c))
             .put("visto", p.getLong("visto", 0L))
+            .put("fila", Fila.quantos(c)).put("online", Fila.online(c))
         o.put("app", Atualizacao.resumo(c))
         o.put("diag", try { JSONArray(p.getString("diag", "[]")) } catch (_: Exception) { JSONArray() })
         o.put("feed", try { JSONArray(p.getString("feed", "[]")) } catch (_: Exception) { JSONArray() })

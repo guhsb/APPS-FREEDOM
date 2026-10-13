@@ -38,7 +38,13 @@ var F = {
     email: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/>',
     cadeado: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
     olho: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
-    grafico: '<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>'
+    grafico: '<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
+    imagem: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.7"/><path d="M4 17.5l5-5 4 4 2.5-2.5 4.5 4.5"/>',
+    compartilhar: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
+    copiar: '<rect x="8.5" y="8.5" width="12" height="12" rx="2.2"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/>',
+    camera: '<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.4"/>',
+    nuvem: '<path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.6 4.5 4.5 0 0 0 7 18.5z"/><path d="M4 4l16 16"/>',
+    baixar: '<path d="M12 4v11"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M4.5 19.5h15"/>'
   },
   ic: function (n, cls) { return '<svg class="ic ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (F.IC[n] || '') + '</svg>'; },
   topoSombra: function () {
@@ -46,6 +52,90 @@ var F = {
     var f = function () { t.classList.toggle('sombra', window.scrollY > 4); };
     window.addEventListener('scroll', f, { passive: true }); f();
   }
+};
+
+// ---- acesso ao Helpdesk do site pelo app (mesmos endereços que o site usa) ----
+F._req = 0; F._pend = {};
+/** F.api('GET', '/helpdesk/...', corpo?) -> Promise({status, json, texto}) */
+F.api = function (metodo, caminho, corpo) {
+  return new Promise(function (ok) {
+    var id = ++F._req; F._pend[id] = ok;
+    try { App.api(id, metodo, caminho, corpo ? JSON.stringify(corpo) : ''); }
+    catch (e) { delete F._pend[id]; ok({ status: 0, json: null, texto: 'O app não respondeu' }); }
+  });
+};
+window.apiResposta = function (id, status, texto) {
+  var f = F._pend[id]; if (!f) return; delete F._pend[id];
+  var j = null; try { j = JSON.parse(texto); } catch (e) { }
+  // 299 = sem internet: o app devolveu a última resposta guardada
+  if (status === 299 && j && j._corpo != null) {
+    var hora = j._offline, corpo = j._corpo; j = null; try { j = JSON.parse(corpo); } catch (e) { }
+    F.semInternet(hora);
+    return f({ status: 200, json: j, texto: corpo, offline: hora });
+  }
+  // 202 + _fila = sem internet: guardado para enviar quando a internet voltar
+  if (status === 202 && j && j._fila) return f({ status: 202, json: j, texto: texto, fila: true });
+  f({ status: status, json: j, texto: texto });
+};
+/** Faixa "sem internet" no topo das telas (dados guardados às hh:mm). */
+F.semInternet = function (hora) {
+  var id = 'faixaOffline', el = document.getElementById(id);
+  if (!el) { el = document.createElement('div'); el.id = id; el.className = 'aviso offline'; var av = document.getElementById('aviso'); (av ? av.parentNode : document.body).insertBefore(el, av || document.body.firstChild); }
+  el.innerHTML = F.ic('nuvem') + '<span>Sem internet. Mostrando o que foi salvo' + (hora ? ' às <b>' + F.hhmm(hora) + '</b>' : '') + '.</span>';
+  clearTimeout(F.semInternet.t);
+  F.semInternet.t = setTimeout(function () { var x = document.getElementById(id); if (x) x.remove(); }, 120000);
+};
+F.ERROS = {
+  helpdesk_ticket_already_assigned: 'Este chamado já foi assumido por outro atendente.',
+  stale_ticket_version: 'O chamado foi alterado por outra pessoa. Atualize e tente de novo.',
+  helpdesk_forbidden: 'Seu acesso a esta parte do Helpdesk não está disponível.',
+  resolved_helpdesk_ticket: 'Este chamado já foi resolvido.',
+  invalid_helpdesk_assignee: 'O responsável escolhido não pode atender este chamado.',
+  inactive_helpdesk_queue: 'O setor escolhido não está disponível.',
+  invalid_ticket_transition: 'Esta alteração de status não está mais disponível.'
+};
+F.erroApi = function (r, padrao) {
+  if (!r) return padrao;
+  if (r.status === 0) return r.texto || 'Sem conexão com o site.';
+  var d = r.json && r.json.detail;
+  var cod = typeof d === 'string' ? d : (d && d.code) || '';
+  if (F.ERROS[cod]) return F.ERROS[cod];
+  if (r.status === 401) return 'A sessão expirou. Tente de novo.';
+  if (r.status === 403 || r.status === 404) return 'Você não tem acesso a isso.';
+  if (Array.isArray(d) && d.length && d[0].msg) return padrao + ' (' + d[0].msg + ')';
+  return padrao + ' (erro ' + r.status + ')';
+};
+F.STATUS = { OPEN: ['Aberto', '#6f93ff', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', '#a48cff', 'rgba(139,108,240,.16)'],
+  REOPENED: ['Reaberto', '#6f93ff', 'rgba(79,124,255,.15)'], WAITING: ['Aguardando', '#f0a53a', 'rgba(240,165,58,.15)'],
+  WAITING_SUPPLIER: ['Aguard. fornecedor', '#f0a53a', 'rgba(240,165,58,.15)'], PENDING_APPROVAL: ['Aguard. aprovação', '#1fbf8f', 'rgba(31,191,143,.15)'],
+  RESOLVED: ['Resolvido', '#1fbf8f', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', '#8b93a7', '#1d2230'], CANCELED: ['Cancelado', '#8b93a7', '#1d2230'] };
+F.PRIO = { LOW: ['Baixa', '#6b7489'], MEDIUM: ['Média', '#4f7cff'], HIGH: ['Alta', '#f0a53a'], URGENT: ['Urgente', '#ef4444'] };
+F.SLA = { NOT_CONFIGURED: 'Sem SLA', ON_TRACK: 'No prazo', AT_RISK: 'SLA em risco', BREACHED: 'SLA vencido', MET: 'SLA cumprido' };
+/** Datas do site vêm em UTC sem "Z". */
+F.data = function (s) {
+  if (!s) return null;
+  s = String(s).replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1');
+  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s += 'Z';
+  var d = new Date(s); return isNaN(d) ? null : d;
+};
+F.quando = function (s) {
+  var d = F.data(s); if (!d) return '';
+  var seg = Math.round((Date.now() - d.getTime()) / 1000), min = Math.round(seg / 60);
+  if (seg < 60) return 'agora';
+  if (min < 60) return 'há ' + min + ' min';
+  if (min < 24 * 60 && d.toDateString() === new Date().toDateString()) return F.hhmm(d.getTime());
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+};
+F.toast = function (t) {
+  if (!t) return;
+  var el = document.getElementById('__toast');
+  if (!el) {
+    el = document.createElement('div'); el.id = '__toast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--sf3);color:var(--tx);border:1px solid var(--ln2);border-radius:12px;padding:10px 14px;font-size:13px;z-index:60;max-width:90%;box-shadow:0 8px 24px rgba(0,0,0,.4)';
+    document.body.appendChild(el);
+  }
+  el.textContent = t; el.style.display = 'block';
+  clearTimeout(F.toast.t); F.toast.t = setTimeout(function () { el.style.display = 'none'; }, 3500);
 };
 
 var Base = {
@@ -57,15 +147,26 @@ var Base = {
     document.body.insertAdjacentHTML('afterbegin',
       '<div class="topo"><img src="logo.png" alt="Freedom"><div class="tt"><h1 id="tit">Painel</h1><div class="st" id="st"></div></div>' +
       '<button class="bt" id="btAt" aria-label="Atualizar">' + F.ic('atualizar') + '</button>' +
+      (F.gerarImagem ? '<button class="bt" id="btImg" aria-label="Gerar imagem">' + F.ic('imagem') + '</button>' : '') +
       '<button class="bt" id="btMenu" aria-label="Menu">' + F.ic('mais') + '</button></div><div id="aviso"></div>');
     document.body.insertAdjacentHTML('beforeend',
       '<div class="fundo-modal" id="modal"><div class="modal"><h3 id="mNome">Freedom</h3><p id="mEmail"></p>' +
       '<button class="b2" id="mAt">' + F.ic('atualizar') + ' Atualizar agora</button>' +
+      (F.gerarImagem ? '<button class="b2" id="mImg">' + F.ic('imagem') + ' Gerar imagem (PNG)</button>' : '') +
+      '<button class="b2" id="mMeta" style="display:none">' + F.ic('sino') + ' <span>Avisos de meta</span></button>' +
       '<button class="b1" id="mSair">' + F.ic('sair') + ' <span>Sair / trocar login</span></button>' +
       '<button class="b3" id="mFechar">Fechar</button></div></div>');
     F.topoSombra();
     document.getElementById('btAt').onclick = function () { try { App.atualizar(); } catch (e) {} };
     document.getElementById('mAt').onclick = function () { Base.fechar(); try { App.atualizar(); } catch (e) {} };
+    if (F.gerarImagem) {
+      document.getElementById('btImg').onclick = function () { F.gerarImagem(); };
+      document.getElementById('mImg').onclick = function () { Base.fechar(); F.gerarImagem(); };
+    }
+    document.getElementById('mMeta').onclick = function () {
+      var e = Base.estado(); try { App.configurarAvisoMeta(!e.avisoMeta); } catch (x) {}
+      setTimeout(Base.atualizarTela, 150);
+    };
     document.getElementById('btMenu').onclick = function () { document.getElementById('modal').classList.add('on'); };
     document.getElementById('mFechar').onclick = Base.fechar;
     document.getElementById('modal').onclick = function (ev) { if (ev.target.id === 'modal') Base.fechar(); };
@@ -86,6 +187,11 @@ var Base = {
     document.getElementById('btAt').classList.toggle('gira', !!e.atualizando);
     document.getElementById('mNome').textContent = e.nome || 'Freedom';
     document.getElementById('mEmail').textContent = e.email ? 'Login: ' + e.email : '';
+    var mm = document.getElementById('mMeta');
+    if (mm) {
+      mm.style.display = e.avisoMeta === undefined ? 'none' : '';
+      mm.querySelector('span').innerHTML = 'Avisos de meta: <b>' + (e.avisoMeta ? 'ligados' : 'desligados') + '</b>';
+    }
     var ap = e.app || {};
     document.getElementById('aviso').innerHTML =
       (ap.baixando ? '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Baixando a versão nova do app… <b>' + F.int(ap.progresso) + '%</b></span></div>'

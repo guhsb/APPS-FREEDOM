@@ -16,6 +16,7 @@ class Tarefa : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         Thread {
             val app = applicationContext
+            try { Fila.enviar(app) } catch (_: Exception) { }
             try { Atualizador.atualizar(app) } catch (_: Exception) { }
             try { Atualizacao.conferir(app, false) } catch (_: Exception) { }   // versão nova do app (no máximo a cada 6 h)
             try {

@@ -97,3 +97,10 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;strok
 .rod{text-align:center;color:var(--tx3);font-size:11px;margin-top:20px}
 @media (min-width:700px){body{max-width:760px;margin:0 auto}}
 @media (max-width:360px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.big{font-size:28px}}
+
+/* prévia da imagem do painel */
+.modal.img{max-height:92vh;display:flex;flex-direction:column}
+.modal .previa{flex:1;min-height:120px;max-height:56vh;overflow:auto;border:1px solid var(--ln);border-radius:12px;background:var(--bg);margin-bottom:4px}
+.modal .previa img{display:block;width:100%;height:auto}
+.modal .previa .carregando{padding:30px 0}
+.aviso.offline{background:rgba(139,108,240,.12);border-color:rgba(139,108,240,.35);color:#c9bcff}

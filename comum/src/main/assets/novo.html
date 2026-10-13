@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css">
+<style>
+.topo .bt.voltar{border:0;background:transparent;width:34px;margin-left:-8px}
+.topo .bt.voltar svg.ic{transform:rotate(180deg);width:24px;height:24px}
+.form{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:16px}
+.campo{margin-bottom:16px}
+.campo:last-child{margin-bottom:0}
+.campo > label{display:block;font-size:12.5px;font-weight:700;color:var(--tx2);margin:0 2px 7px}
+.campo > label em{font-style:normal;color:var(--rosa)}
+.campo select,.campo input,.campo textarea{width:100%;background:var(--sf2);border:1px solid var(--ln2);border-radius:12px;color:var(--tx);font:inherit;font-size:15px;padding:12px;outline:none}
+.campo textarea{min-height:140px;resize:vertical;line-height:1.4}
+.campo select:focus,.campo input:focus,.campo textarea:focus{border-color:var(--rosa)}
+.dica{font-size:12px;color:var(--tx3);margin:6px 2px 0;line-height:1.4}
+.prios{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.prios button{border:1px solid var(--ln2);background:var(--sf2);color:var(--tx2);border-radius:10px;padding:10px 4px;font:inherit;font-size:13px;font-weight:700}
+.prios button i{display:block;width:8px;height:8px;border-radius:50%;margin:0 auto 5px}
+.prios button.on{border-color:var(--rosa);background:var(--rosa-s);color:var(--tx)}
+.enviar{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;border:0;border-radius:12px;padding:15px;background:var(--rosa);color:#fff;
+  font:inherit;font-size:16px;font-weight:700;box-shadow:0 8px 22px rgba(232,75,138,.28)}
+.enviar:disabled{opacity:.6}
+.cont{float:right;font-weight:500;color:var(--tx3)}
+</style></head><body>
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1>Abrir chamado</h1><div class="st">Vai para o setor escolhido no Helpdesk</div></div>
+</div>
+<div id="aviso"></div>
+<div id="conteudo"><div class="carregando"><i></i>Carregando setores…</div></div>
+<script src="base.js"></script>
+<script>
+var setores = [], prio = 'MEDIUM', enviando = false;
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
+
+function montar() {
+  var h = '<div class="form">' +
+    '<div class="campo"><label for="setor">Setor <em>*</em></label><select id="setor"><option value="">Escolha o setor…</option>' +
+    setores.map(function (q) { return '<option value="' + q.id + '">' + F.esc(q.name) + '</option>'; }).join('') + '</select><div class="dica" id="descSetor"></div></div>' +
+    '<div class="campo"><label for="titulo">Título <em>*</em><span class="cont" id="cTit"></span></label><input id="titulo" maxlength="200" placeholder="Resumo do problema ou pedido"></div>' +
+    '<div class="campo"><label>Prioridade</label><div class="prios" id="prios">' + Object.keys(F.PRIO).map(function (k) {
+      return '<button type="button" data-p="' + k + '" class="' + (k === prio ? 'on' : '') + '"><i style="background:' + F.PRIO[k][1] + '"></i>' + F.PRIO[k][0] + '</button>'; }).join('') + '</div></div>' +
+    '<div class="campo"><label for="desc">Descrição <em>*</em></label><textarea id="desc" maxlength="10000" placeholder="Explique o que aconteceu, números de pedido, nota, cliente…"></textarea></div>' +
+    '<div class="campo" id="campoResp" style="display:none"><label for="resp">Responsável (opcional)</label><select id="resp"><option value="">Deixar para o setor</option></select></div>' +
+    '</div><button class="enviar" id="btEnviar">' + F.ic('mais2') + 'Abrir chamado</button>' +
+    '<div class="rod">Depois de abrir, dá para anexar arquivos na tela do chamado</div>';
+  document.getElementById('conteudo').innerHTML = h;
+  var sel = document.getElementById('setor');
+  sel.onchange = function () {
+    var q = setores.filter(function (x) { return String(x.id) === sel.value; })[0];
+    document.getElementById('descSetor').textContent = q && q.description ? q.description : '';
+    carregarResponsaveis(sel.value);
+  };
+  document.getElementById('prios').onclick = function (ev) {
+    var b = ev.target.closest('[data-p]'); if (!b) return;
+    prio = b.getAttribute('data-p');
+    Array.prototype.forEach.call(document.querySelectorAll('#prios button'), function (x) { x.classList.toggle('on', x === b); });
+  };
+  var tit = document.getElementById('titulo');
+  tit.oninput = function () { document.getElementById('cTit').textContent = tit.value.length ? tit.value.length + '/200' : ''; };
+  document.getElementById('btEnviar').onclick = enviar;
+}
+
+function carregarResponsaveis(q) {
+  var campo = document.getElementById('campoResp'), sel = document.getElementById('resp');
+  campo.style.display = 'none'; sel.innerHTML = '<option value="">Deixar para o setor</option>';
+  if (!q) return;
+  F.api('GET', '/helpdesk/queues/' + encodeURIComponent(q) + '/assignees?limit=50').then(function (r) {
+    if (document.getElementById('setor').value !== q) return;
+    if (r.status === 200 && Array.isArray(r.json) && r.json.length) {
+      sel.innerHTML += r.json.map(function (p) { return '<option value="' + p.id + '">' + F.esc(p.name) + '</option>'; }).join('');
+      campo.style.display = '';
+    }
+  });
+}
+
+function enviar() {
+  if (enviando) return;
+  var q = document.getElementById('setor').value, t = document.getElementById('titulo').value.trim(),
+    d = document.getElementById('desc').value.trim(), resp = document.getElementById('resp').value;
+  if (!q || t.length < 3 || d.length < 3) {
+    F.toast(!q ? 'Escolha o setor.' : t.length < 3 ? 'Escreva o título (pelo menos 3 letras).' : 'Escreva a descrição (pelo menos 3 letras).');
+    return;
+  }
+  enviando = true;
+  var b = document.getElementById('btEnviar'); b.disabled = true; b.lastChild.textContent = 'Abrindo…';
+  var corpo = { queue_id: Number(q), title: t, priority: prio, description: d };
+  if (resp) corpo.assignee_user_id = Number(resp);
+  F.api('POST', '/helpdesk/tickets', corpo).then(function (r) {
+    enviando = false; b.disabled = false; b.lastChild.textContent = 'Abrir chamado';
+    if (r.fila) {
+      document.getElementById('conteudo').innerHTML = '<div class="card" style="text-align:center;padding:26px 16px">' + F.ic('nuvem') +
+        '<h3 style="margin:10px 0 6px">Chamado guardado</h3><p class="cinza" style="margin:0 0 16px">Você está sem internet. O chamado vai ser aberto sozinho assim que a conexão voltar, e você recebe um aviso.</p>' +
+        '<button class="enviar" onclick="try{App.voltar()}catch(e){history.back()}">Voltar</button></div>';
+      return;
+    }
+    if (r.status >= 200 && r.status < 300 && r.json && r.json.id) {
+      F.toast('Chamado ' + (r.json.protocol || '') + ' aberto');
+      location.replace('chamado.html#' + r.json.id);      // abre o chamado criado (sem voltar para o formulário)
+      return;
+    }
+    F.toast(F.erroApi(r, 'Não consegui abrir o chamado'));
+  });
+}
+
+F.api('GET', '/helpdesk/queues').then(function (r) {
+  if (r.status !== 200 || !Array.isArray(r.json)) {
+    document.getElementById('conteudo').innerHTML = '';
+    document.getElementById('aviso').innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(F.erroApi(r, 'Não consegui carregar os setores')) +
+      '</span><button onclick="location.reload()">Tentar</button></div>';
+    return;
+  }
+  setores = r.json;
+  montar();
+});
+F.topoSombra();
+</script>
+</body></html>

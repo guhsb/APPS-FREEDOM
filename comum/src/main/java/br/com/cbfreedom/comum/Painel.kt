@@ -27,6 +27,12 @@ interface Painel {
     /** Tipo de desenho para o tamanho: 'B' barra (1 linha), 'P' pequeno, 'M' médio, 'G' grande. */
     fun classe(w: Float, h: Float): Char = Freedom.classe(w, h)
     fun buscar(api: Api): JSONObject
+    /** Números de outro período (datas AAAA-MM-DD), escolhido na tela. null = este painel não tem. */
+    fun buscarPeriodo(api: Api, inicio: String, fim: String): JSONObject? = null
+    /** Tem avisos de meta (aparece a opção no menu do painel). */
+    val temAvisos: Boolean get() = false
+    /** Avisos de meta a partir dos números novos: lista de (título, texto). */
+    fun avisos(c: Context, agora: JSONObject): List<Pair<String, String>> = emptyList()
     /** classe: 'P' = pequeno, 'M' = médio, 'G' = grande */
     fun desenhar(p: Pintor, d: JSONObject, info: Info, classe: Char)
 }

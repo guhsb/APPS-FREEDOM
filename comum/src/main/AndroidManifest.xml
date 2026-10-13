@@ -19,6 +19,13 @@
     <!-- downloads do site em celulares antigos (Android 9 ou menor) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
+    <!-- apps de câmera (botão "Tirar foto" dos anexos) -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <application>
         <activity
             android:name="br.com.cbfreedom.comum.Tela"
@@ -32,6 +39,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- envia o que ficou guardado sem internet assim que a conexão voltar -->
+        <service
+            android:name="br.com.cbfreedom.comum.FilaTarefa"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- imagens PNG dos painéis para o "Compartilhar" (WhatsApp, e-mail…) -->
+        <provider
+            android:name="br.com.cbfreedom.comum.Imagens"
+            android:authorities="${applicationId}.imagens"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
         <service
             android:name="br.com.cbfreedom.comum.Tarefa"

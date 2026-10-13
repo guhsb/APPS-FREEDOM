@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css">
+<style>
+body{padding-bottom:90px}
+.topo .bt.voltar{border:0;background:transparent;width:34px;margin-left:-8px}
+.topo .bt.voltar svg.ic{transform:rotate(180deg);width:24px;height:24px}
+.seg{display:flex;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:3px;margin:2px 0 10px}
+.seg button{flex:1;border:0;background:transparent;color:var(--tx2);font:inherit;font-size:14px;font-weight:600;padding:9px 6px;border-radius:9px}
+.seg button.on{background:var(--sf3);color:var(--tx);font-weight:700}
+.busca{display:flex;align-items:center;gap:8px;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:0 12px;margin-bottom:10px}
+.busca:focus-within{border-color:var(--rosa)}
+.busca svg.ic{color:var(--tx3);width:18px;height:18px}
+.busca input{flex:1;min-width:0;background:transparent;border:0;color:var(--tx);font:inherit;font-size:15px;padding:12px 0;outline:none}
+.chips{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 8px;padding:0 16px 2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;background:var(--sf);border:1px solid var(--ln);color:var(--tx2);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:600}
+.chips button.on{background:var(--rosa);border-color:var(--rosa);color:#fff}
+.filtros{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:6px}
+.filtros select{width:100%;background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:10px 8px;font:inherit;font-size:13px}
+.filtros label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2);background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:0 10px}
+.filtros input[type=checkbox]{accent-color:var(--rosa);width:16px;height:16px}
+.res{font-size:12px;color:var(--tx3);margin:10px 2px 8px}
+.item .t1 .badge{margin-left:auto}
+.item .meta{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;font-size:12px;color:var(--tx3)}
+.item .meta i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:1px}
+.item .sla{font-weight:700}
+.mais{display:block;width:100%;margin-top:10px;border:1px solid var(--ln2);background:transparent;color:var(--tx2);border-radius:12px;padding:12px;font:inherit;font-weight:700}
+.fab{position:fixed;right:16px;bottom:20px;z-index:20;display:flex;align-items:center;gap:8px;border:0;border-radius:16px;padding:14px 18px;background:var(--rosa);color:#fff;
+  font:inherit;font-weight:700;font-size:15px;box-shadow:0 10px 26px rgba(232,75,138,.35)}
+.fab svg.ic{width:20px;height:20px}
+</style></head><body>
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1 id="tit">Chamados</h1><div class="st" id="sub"></div></div>
+  <button class="bt" id="btAt" aria-label="Atualizar"></button>
+</div>
+<div id="cabeca"></div>
+<div id="aviso"></div>
+<div id="lista"><div class="carregando"><i></i>Carregando…</div></div>
+<script src="base.js"></script>
+<script>
+F.IC.busca = '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>';
+// #meus · #fila · #comigo  (+ &sla=AT_RISK · &status=OPEN ...)
+var partes = (location.hash || '#meus').slice(1).split('&');
+var modo = partes[0] || 'meus';
+var f = { status: '', priority: '', queue: '', sla: '', sort: '', busca: '', sem: '' };
+partes.slice(1).forEach(function (p) { var kv = p.split('='); if (kv[0] in f) f[kv[0]] = decodeURIComponent(kv[1] || ''); });
+var pagina = 1, itens = [], total = null, maisBrutos = false, autoPag = 0, carregando = false, setores = {}, pessoas = {}, acesso = null, pedido = 0;
+
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btAt').innerHTML = F.ic('atualizar');
+document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
+document.getElementById('btAt').onclick = function () { recarregar(); };
+
+var STATUS_CHIPS = [['', 'Todos'], ['OPEN', 'Abertos'], ['IN_PROGRESS', 'Em andamento'], ['WAITING', 'Aguardando'],
+  ['WAITING_SUPPLIER', 'Aguard. fornecedor'], ['PENDING_APPROVAL', 'Aguard. aprovação'], ['REOPENED', 'Reabertos'], ['RESOLVED', 'Resolvidos']];
+
+function atendimento() { return modo === 'fila' || modo === 'comigo'; }
+
+function cabeca() {
+  document.getElementById('tit').textContent = atendimento() ? 'Atendimento' : 'Meus chamados';
+  var h = '';
+  if (atendimento()) h += '<div class="seg"><button data-m="fila" class="' + (modo === 'fila' ? 'on' : '') + '">Fila do setor</button>' +
+    '<button data-m="comigo" class="' + (modo === 'comigo' ? 'on' : '') + '">Comigo</button></div>';
+  h += '<div class="busca">' + F.ic('busca') + '<input id="busca" type="search" placeholder="Buscar por protocolo, título ou descrição" value="' + F.esc(f.busca) + '"></div>';
+  h += '<div class="chips" id="chips">' + STATUS_CHIPS.map(function (c) {
+    return '<button data-s="' + c[0] + '" class="' + (f.status === c[0] ? 'on' : '') + '">' + c[1] + '</button>';
+  }).join('') + '</div>';
+  h += '<div class="filtros"><select id="fPrio"><option value="">Toda prioridade</option>' +
+    Object.keys(F.PRIO).map(function (k) { return '<option value="' + k + '"' + (f.priority === k ? ' selected' : '') + '>' + F.PRIO[k][0] + '</option>'; }).join('') + '</select>';
+  if (atendimento()) {
+    h += '<select id="fSla"><option value="">Todo SLA</option>' + ['AT_RISK', 'BREACHED', 'ON_TRACK', 'MET', 'NOT_CONFIGURED'].map(function (k) {
+      return '<option value="' + k + '"' + (f.sla === k ? ' selected' : '') + '>' + F.SLA[k] + '</option>'; }).join('') + '</select>';
+    var qs = acesso && acesso.queues ? acesso.queues : [];
+    if (qs.length > 1) h += '<select id="fSetor"><option value="">Todos os setores</option>' + qs.map(function (q) {
+      return '<option value="' + q.id + '"' + (String(f.queue) === String(q.id) ? ' selected' : '') + '>' + F.esc(q.name) + '</option>'; }).join('') + '</select>';
+    h += '<label><input type="checkbox" id="fSort"' + (f.sort === 'sla' ? ' checked' : '') + '>Mais urgentes (SLA)</label>';
+    if (modo === 'fila') h += '<label><input type="checkbox" id="fSem"' + (f.sem ? ' checked' : '') + '>Só sem responsável</label>';
+  } else {
+    var qa = Object.keys(setores);
+    if (qa.length) h += '<select id="fSetor"><option value="">Todos os setores</option>' + qa.map(function (id) {
+      return '<option value="' + id + '"' + (String(f.queue) === id ? ' selected' : '') + '>' + F.esc(setores[id]) + '</option>'; }).join('') + '</select>';
+  }
+  h += '</div>';
+  document.getElementById('cabeca').innerHTML = h;
+  var t = null;
+  document.getElementById('busca').oninput = function () { var v = this.value; clearTimeout(t); t = setTimeout(function () { f.busca = v; recarregar(); }, 450); };
+  document.getElementById('chips').onclick = function (ev) { var b = ev.target.closest('[data-s]'); if (!b) return; f.status = b.getAttribute('data-s'); cabeca(); recarregar(); };
+  var seg = document.querySelector('.seg');
+  if (seg) seg.onclick = function (ev) { var b = ev.target.closest('[data-m]'); if (!b) return; modo = b.getAttribute('data-m'); cabeca(); recarregar(); };
+  function sel(id, k) { var el = document.getElementById(id); if (el) el.onchange = function () { f[k] = this.value; recarregar(); }; }
+  sel('fPrio', 'priority'); sel('fSla', 'sla'); sel('fSetor', 'queue');
+  var so = document.getElementById('fSort'); if (so) so.onchange = function () { f.sort = this.checked ? 'sla' : ''; recarregar(); };
+  var se = document.getElementById('fSem'); if (se) se.onchange = function () { f.sem = this.checked ? '1' : ''; recarregar(); };
+}
+function soSem() { return modo === 'fila' && !!f.sem; }
+
+function caminho() {
+  var q = atendimento() ? '/helpdesk/workspace/tickets?view=' + (modo === 'comigo' ? 'assigned' : 'queues') : '/helpdesk/tickets?view=requester';
+  q += '&page=' + pagina + '&page_size=20';
+  if (f.status) q += '&status=' + encodeURIComponent(f.status);
+  if (f.priority) q += '&priority=' + encodeURIComponent(f.priority);
+  if (f.queue) q += '&queue_id=' + encodeURIComponent(f.queue);
+  if (f.busca.trim()) q += '&search=' + encodeURIComponent(f.busca.trim());
+  if (atendimento() && f.sla) q += '&sla_status=' + encodeURIComponent(f.sla);
+  if (atendimento() && f.sort) q += '&sort=' + encodeURIComponent(f.sort);
+  if (soSem()) q += '&unassigned=true';
+  return q;
+}
+
+function recarregar() { pagina = 1; itens = []; total = null; autoPag = 0; buscar(); }
+
+function buscar() {
+  var meu = ++pedido;
+  carregando = true;
+  document.getElementById('btAt').classList.add('gira');
+  if (pagina === 1) document.getElementById('lista').innerHTML = '<div class="carregando"><i></i>Carregando…</div>';
+  F.api('GET', caminho()).then(function (r) {
+    if (meu !== pedido) return;          // chegou depois de outro filtro
+    carregando = false;
+    document.getElementById('btAt').classList.remove('gira');
+    var av = document.getElementById('aviso');
+    if (r.status !== 200 || !r.json) {
+      av.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(F.erroApi(r, 'Não consegui carregar os chamados')) + '</span><button onclick="recarregar()">Tentar</button></div>';
+      if (pagina === 1) document.getElementById('lista').innerHTML = '';
+      return;
+    }
+    av.innerHTML = '';
+    var brutos = r.json.items || [];
+    var tot = typeof r.json.total === 'number' ? r.json.total : null;
+    maisBrutos = tot != null ? pagina * 20 < tot : brutos.length >= 20;
+    // "Só sem responsável": o filtro é feito aqui, então busca mais páginas até ter uma lista boa
+    var novos = soSem() ? brutos.filter(function (t) { return !t.assignee_user_id; }) : brutos;
+    itens = itens.concat(novos);
+    total = soSem() ? null : tot;
+    if (soSem() && maisBrutos && novos.length < 10 && autoPag < 8) { autoPag++; pagina++; buscar(); return; }
+    autoPag = 0;
+    desenhar(novos.length);
+  });
+}
+
+function desenhar(ultimos) {
+  var el = document.getElementById('lista');
+  document.getElementById('sub').textContent = soSem() ? itens.length + (maisBrutos ? '+' : '') + ' sem responsável' :
+    total != null ? total + (total === 1 ? ' chamado' : ' chamados') : itens.length + ' chamado(s)';
+  if (!itens.length) {
+    if (soSem() && maisBrutos) { el.innerHTML = '<div class="vazio">Nenhum sem responsável nas primeiras páginas.</div><button class="mais" id="btMais">Procurar mais</button>';
+      document.getElementById('btMais').onclick = function () { if (carregando) return; pagina++; buscar(); }; return; }
+    el.innerHTML = '<div class="vazio">' + (f.busca || f.status || f.priority || f.queue || f.sla || f.sem ? 'Nenhum chamado com esses filtros.' :
+      modo === 'comigo' ? 'Nenhum chamado atribuído a você agora.' : modo === 'fila' ? 'Nenhum chamado na fila.' : 'Você ainda não abriu chamados.') + '</div>';
+    return;
+  }
+  var h = '<div class="lista">' + itens.map(function (t) {
+    var s = F.STATUS[t.status] || [t.status, '#8b93a7', '#1d2230'], p = F.PRIO[t.priority];
+    var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
+    var corSla = sla === 'BREACHED' ? 'var(--vermelho)' : sla === 'AT_RISK' ? 'var(--laranja)' : 'var(--tx3)';
+    var meta = [];
+    if (p) meta.push('<span><i style="background:' + p[1] + '"></i>' + p[0] + '</span>');
+    if (setores[t.queue_id]) meta.push('<span>' + F.esc(setores[t.queue_id]) + '</span>');
+    if (atendimento()) meta.push('<span>' + (t.assignee_user_id ? F.esc(pessoas[t.assignee_user_id] || 'Com responsável') : '<b style="color:var(--laranja)">Sem responsável</b>') + '</span>');
+    if (sla && sla !== 'NOT_CONFIGURED' && F.SLA[sla]) meta.push('<span class="sla" style="color:' + corSla + '">' + F.SLA[sla] + '</span>');
+    meta.push('<span>' + F.quando(t.updated_at) + '</span>');
+    return '<div class="item" data-id="' + t.id + '"><div class="tx"><div class="t1"><b>' + F.esc(t.protocol || ('#' + t.id)) + '</b>' +
+      '<span class="badge" style="color:' + s[1] + ';background:' + s[2] + '">' + F.esc(s[0]) + '</span></div>' +
+      '<p>' + F.esc(t.title || '') + '</p><div class="meta">' + meta.join('') + '</div></div><span class="seta">' + F.ic('seta') + '</span></div>';
+  }).join('') + '</div>';
+  var temMais = soSem() ? maisBrutos : total != null ? itens.length < total : ultimos >= 20;
+  if (temMais) h += '<button class="mais" id="btMais">Carregar mais</button>';
+  el.innerHTML = h;
+  var bm = document.getElementById('btMais');
+  if (bm) bm.onclick = function () { if (carregando) return; pagina++; bm.textContent = 'Carregando…'; buscar(); };
+}
+
+document.getElementById('lista').addEventListener('click', function (ev) {
+  var it = ev.target.closest ? ev.target.closest('[data-id]') : null;
+  if (it) { try { App.abrirSite('/helpdesk/tickets/' + it.getAttribute('data-id')); } catch (e) {} }
+});
+
+if (modo === 'meus') {
+  document.body.insertAdjacentHTML('beforeend', '<button class="fab" id="fab">' + F.ic('mais2') + 'Abrir chamado</button>');
+  document.getElementById('fab').onclick = function () { try { App.abrirTela('novo.html'); } catch (e) {} };
+}
+window.recebidoHelpdesk = function () { if (!carregando && pagina === 1 && !f.busca) buscar(); };
+
+// nomes de setores e pessoas para mostrar na lista
+Promise.all([F.api('GET', '/helpdesk/queues'), atendimento() ? F.api('GET', '/helpdesk/workspace/access') : Promise.resolve(null)]).then(function (rs) {
+  var q = rs[0] && rs[0].json; if (Array.isArray(q)) q.forEach(function (x) { setores[x.id] = x.name; });
+  if (rs[1] && rs[1].json) { acesso = rs[1].json; (acesso.assignees || []).forEach(function (p) { pessoas[p.id] = p.name; }); }
+  cabeca();
+  if (itens.length) desenhar(0);
+});
+F.topoSombra();
+cabeca();
+buscar();
+</script>
+</body></html>

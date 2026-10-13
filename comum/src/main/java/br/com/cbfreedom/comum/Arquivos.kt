@@ -72,6 +72,25 @@ object Arquivos {
         return true
     }
 
+    /** Imagem gerada pelo app: vai para a Galeria (Imagens/Freedom). Android antigo: pasta Downloads do app. */
+    fun salvarImagem(c: Context, dados: ByteArray, nome: String): String? {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val cr = c.contentResolver
+            val v = ContentValues()
+            v.put(MediaStore.MediaColumns.DISPLAY_NAME, nome)
+            v.put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Freedom/")
+            v.put(MediaStore.MediaColumns.IS_PENDING, 1)
+            val uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v) ?: return null
+            cr.openOutputStream(uri)?.use { it.write(dados) } ?: return null
+            v.clear()
+            v.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            cr.update(uri, v, null, null)
+            return "Galeria › Freedom"
+        }
+        return if (salvar(c, dados, nome, "image/png")) "Downloads" else null
+    }
+
     private fun avisar(c: Context, nome: String, uri: Uri, mime: String) {
         Helpdesk.criarCanais(c)
         val ver = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)

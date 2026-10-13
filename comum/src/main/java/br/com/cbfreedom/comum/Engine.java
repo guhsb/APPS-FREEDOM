@@ -192,7 +192,10 @@ public final class Engine {
             int version = t.optInt("version", 0);
 
             JSONObject old = known.optJSONObject(String.valueOf(id));
-            long lastItem = old != null ? old.optLong("last_item", -1) : -1;
+            // marca d'água do histórico POR TIPO: no site, mensagens e eventos têm numeração própria
+            // (uma resposta nova pode ter id menor que o último evento), então cada tipo é comparado com o seu
+            JSONObject oldWm = old != null ? old.optJSONObject("wm") : null;
+            JSONObject newWm = oldWm;
 
             boolean isNew = false, unknownTouched = false, touched = false, versionChanged = false;
             List<String> fieldChanges = new ArrayList<String>();
@@ -238,19 +241,17 @@ public final class Engine {
                         requesterName = tl.optString("requester_name", "");
                         queueName = tl.optString("queue_name", "");
                         JSONArray items = tl.optJSONArray("items");
-                        long maxId = lastItem;
+                        if (items != null) newWm = watermarks(items);
                         Set<String> seen = new LinkedHashSet<String>();
                         String openingBody = null;
                         if (items != null) {
                             for (int i = 0; i < items.length(); i++) {
                                 JSONObject it = items.optJSONObject(i);
                                 if (it == null) continue;
-                                long iid = it.optLong("id", -1);
-                                if (iid > maxId) maxId = iid;
                                 boolean fresh;
                                 if (firstRun || (old == null && !isNew && !unknownTouched)) fresh = false;
                                 else if (isNew) fresh = true;
-                                else if (lastItem >= 0) fresh = iid > lastItem;
+                                else if (oldWm != null) fresh = isFresh(oldWm, it);
                                 // histórico nunca lido: só conta como novo o que veio depois da última mudança
                                 // conhecida do chamado; sem mudança, é só a linha de base (não avisa o que é antigo)
                                 else fresh = touched && ts(it.optString("created_at", "")).compareTo(sinceTs) > 0;
@@ -279,7 +280,6 @@ public final class Engine {
                             }
                         }
                         lines.addAll(seen);
-                        lastItem = maxId;
                         timelineOk = true;
                     }
                 } catch (Exception ignored) {
@@ -367,7 +367,7 @@ public final class Engine {
                 rec.put("queue", queue);
                 rec.put("updated", updated);
                 rec.put("version", version);
-                rec.put("last_item", lastItem);
+                if (newWm != null) rec.put("wm", newWm);
                 if (mine.contains(id) || (old != null && old.optBoolean("mine", false))) rec.put("mine", true);
                 newKnown.put(String.valueOf(id), rec);
             } catch (JSONException ignored) {
@@ -461,28 +461,68 @@ public final class Engine {
         return out;
     }
 
-    /** Último item conhecido do histórico de um chamado (-1 = ainda não consultado). */
-    public static long knownLastItem(String stateJson, int id) {
+    /** Id numérico do item (-1 se o site mandar outro formato). */
+    static long numId(JSONObject it) {
+        Object o = it.opt("id");
+        if (o instanceof Number) return ((Number) o).longValue();
         try {
-            JSONObject r = new JSONObject(stateJson).optJSONObject("tickets").optJSONObject(String.valueOf(id));
-            return r == null ? -1 : r.optLong("last_item", -1);
+            return Long.parseLong(String.valueOf(o));
         } catch (Exception e) {
             return -1;
         }
     }
 
-    /** Maior id de item numa resposta de /tickets/{id}/timeline (-1 se não deu para ler). */
-    public static long maxItemId(String timelineBody) {
-        long max = -1;
+    /** Maior id e último horário de cada tipo de item (MESSAGE, EVENT, OPENING...). */
+    static JSONObject watermarks(JSONArray items) {
+        JSONObject wm = new JSONObject();
         try {
-            JSONArray items = new JSONObject(timelineBody).optJSONArray("items");
-            if (items != null) for (int i = 0; i < items.length(); i++) {
+            for (int i = 0; i < items.length(); i++) {
                 JSONObject it = items.optJSONObject(i);
-                if (it != null) max = Math.max(max, it.optLong("id", -1));
+                if (it == null) continue;
+                String k = it.optString("type", "");
+                long iid = numId(it);
+                if (iid >= 0 && iid > wm.optLong(k, -1)) wm.put(k, iid);
+                String t = ts(it.optString("created_at", ""));
+                if (t.compareTo(wm.optString(k + "@", "")) > 0) wm.put(k + "@", t);
+            }
+        } catch (JSONException ignored) {
+        }
+        return wm;
+    }
+
+    /** O item é posterior ao que já tinha sido visto do mesmo tipo? (tipo nunca visto = tudo novo) */
+    static boolean isFresh(JSONObject wm, JSONObject it) {
+        String k = it.optString("type", "");
+        long iid = numId(it);
+        if (iid >= 0) return iid > wm.optLong(k, -1);
+        return ts(it.optString("created_at", "")).compareTo(wm.optString(k + "@", "")) > 0;
+    }
+
+    /** O histórico deste chamado já foi lido alguma vez (tem marca d'água)? */
+    public static boolean baselined(String stateJson, int id) {
+        try {
+            JSONObject r = new JSONObject(stateJson).optJSONObject("tickets").optJSONObject(String.valueOf(id));
+            return r != null && r.optJSONObject("wm") != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Sondagem: a resposta de /tickets/{id}/timeline tem item que a última verificação não viu? */
+    public static boolean timelineHasNew(String stateJson, int id, String timelineBody) {
+        try {
+            JSONObject r = new JSONObject(stateJson).optJSONObject("tickets").optJSONObject(String.valueOf(id));
+            JSONObject wm = r != null ? r.optJSONObject("wm") : null;
+            if (wm == null) return true;
+            JSONArray items = new JSONObject(timelineBody).optJSONArray("items");
+            if (items == null) return false;
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it != null && isFresh(wm, it)) return true;
             }
         } catch (Exception ignored) {
         }
-        return max;
+        return false;
     }
 
     public static boolean isActive(String status) {

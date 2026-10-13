@@ -20,6 +20,8 @@
 .acao:active{background:var(--sf2)}
 .acao svg.ic{width:20px;height:20px;color:var(--tx2)}
 .acao.pri{background:var(--rosa);border-color:var(--rosa);color:#fff}.acao.pri svg.ic{color:#fff}
+.acoes.duas{grid-template-columns:1fr 1fr}
+.kpi[data-t]:active{background:var(--sf2)}
 .cfg .item{align-items:center}
 .cfg .item .tx b{font-size:14px;font-weight:600}
 .cfg .item p{-webkit-line-clamp:3}
@@ -70,9 +72,9 @@ function tipoAviso(x) {
   if (t.indexOf('status') >= 0 || t.indexOf('prioridade') >= 0 || t.indexOf('respons') >= 0 || t.indexOf('transferiu') >= 0) return ['troca', '#a48cff', 'var(--violeta-s)'];
   return ['msg', 'var(--azul)', 'var(--azul-s)'];
 }
-function kpi(rot, v, cor, alerta) {
+function kpi(rot, v, cor, alerta, tela) {
   v = F.int(v); var z = v === '0';
-  return '<div class="kpi' + (z ? ' zero' : '') + '" style="--c:' + (z ? 'var(--ln2)' : cor) + '"><b' + (alerta && !z ? ' style="color:' + cor + '"' : '') + '>' + v + '</b><span>' + rot + '</span></div>';
+  return '<div class="kpi' + (z ? ' zero' : '') + '"' + (tela ? ' data-t="' + tela + '"' : '') + ' style="--c:' + (z ? 'var(--ln2)' : cor) + '"><b' + (alerta && !z ? ' style="color:' + cor + '"' : '') + '>' + v + '</b><span>' + rot + '</span></div>';
 }
 function linhaCfg(icone, titulo, desc, controle) {
   return '<label class="item"><div class="ico" style="background:var(--sf3);color:var(--tx2)">' + F.ic(icone) + '</div>' +
@@ -113,6 +115,9 @@ function render() {
     h += '<div class="aviso">' + F.ic('sino') + '<span>As notificações do app estão bloqueadas.</span><button onclick="App.configurarNotificacoes()">Permitir</button></div>';
   else if (e.ativo && e.canalOk === false)
     h += '<div class="aviso">' + F.ic('som') + '<span>Os avisos estão <b>sem som</b> ou sem aparecer na tela.</span><button onclick="App.configurarSom()">Ajustar</button></div>';
+  if (e.fila > 0)
+    h += '<div class="aviso offline">' + F.ic('nuvem') + '<span>' + (e.fila === 1 ? '1 envio guardado' : e.fila + ' envios guardados') +
+      ' sem internet. ' + (e.online === false ? 'Vai ser enviado quando a conexão voltar.' : 'Enviando…') + '</span></div>';
   if (e.ativo && !e.bateriaOk)
     h += '<div class="aviso">' + F.ic('bateria') + '<span>Libere a bateria para os avisos chegarem com a tela bloqueada.</span><button onclick="App.liberarBateria()">Liberar</button></div>';
 
@@ -120,16 +125,16 @@ function render() {
   var r = e.resumo || {}, req = r.requester || {}, ws = r.workspace;
   h += '<div class="kpis">';
   if (ws) {
-    h += kpi('Na fila', ws.open, 'var(--azul)') + kpi('Comigo', ws.assigned_to_me_active, 'var(--violeta)') +
-      kpi('Sem responsável', ws.unassigned_active, 'var(--laranja)', true) + kpi('Meus chamados', req.active, 'var(--verde)') +
-      kpi('SLA em risco', ws.sla_at_risk, 'var(--laranja)', true) + kpi('SLA estourado', ws.sla_breached, 'var(--vermelho)', true);
-  } else h += kpi('Meus chamados', req.active, 'var(--verde)');
+    h += kpi('Na fila', ws.open, 'var(--azul)', false, 'lista.html#fila') + kpi('Comigo', ws.assigned_to_me_active, 'var(--violeta)', false, 'lista.html#comigo') +
+      kpi('Sem responsável', ws.unassigned_active, 'var(--laranja)', true, 'lista.html#fila&sem=1') + kpi('Meus chamados', req.active, 'var(--verde)', false, 'lista.html#meus') +
+      kpi('SLA em risco', ws.sla_at_risk, 'var(--laranja)', true, 'lista.html#fila&sla=AT_RISK') + kpi('SLA estourado', ws.sla_breached, 'var(--vermelho)', true, 'lista.html#fila&sla=BREACHED');
+  } else h += kpi('Meus chamados', req.active, 'var(--verde)', false, 'lista.html#meus');
   h += '</div>';
 
   // atalhos
-  h += '<div class="acoes"><button class="acao pri" data-c="/helpdesk/new">' + F.ic('mais2') + 'Abrir chamado</button>' +
-    '<button class="acao" data-c="/helpdesk/my-tickets">' + F.ic('lista') + 'Meus chamados</button>' +
-    '<button class="acao" data-c="/helpdesk/workspace">' + F.ic('fone') + 'Atendimento</button></div>';
+  h += '<div class="acoes' + (ws ? '' : ' duas') + '"><button class="acao pri" data-t="novo.html">' + F.ic('mais2') + 'Abrir chamado</button>' +
+    '<button class="acao" data-t="lista.html#meus">' + F.ic('lista') + 'Meus chamados</button>' +
+    (ws ? '<button class="acao" data-t="lista.html#fila">' + F.ic('fone') + 'Atendimento</button>' : '') + '</div>';
 
   // últimas atualizações
   var feed = e.feed || [];
@@ -184,7 +189,7 @@ function render() {
       '<button class="b2" id="btCopiarDiag" style="margin-top:10px;width:100%;border:0;border-radius:10px;padding:11px;font:inherit;font-weight:700;background:var(--sf3);color:var(--tx)">Copiar diagnóstico</button></div>' : '') +
     linhaBotao('sair', 'sair', 'Sair / trocar login', F.esc(e.email || ''), 'rgba(239,68,68,.12)', '#f87171', 'perigo') +
     '</div>';
-  h += '<div class="rod">Toque num aviso ou chamado para abrir no site</div>';
+  h += '<div class="rod">Toque num número, aviso ou chamado para abrir</div>';
 
   document.getElementById('conteudo').innerHTML = h;
   document.getElementById('cAtivo').onchange = function () { cfg({ ativo: this.checked }); };
@@ -205,6 +210,8 @@ function render() {
 
 document.getElementById('btAt').onclick = function () { this.classList.add('gira'); try { App.verificarHelpdesk(); } catch (e) {} };
 document.getElementById('conteudo').addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-t]') : null;
+  if (t) { try { App.abrirTela(t.getAttribute('data-t')); } catch (e) {} return; }
   var el = ev.target.closest ? ev.target.closest('[data-c]') : null;
   if (el) abrir(el.getAttribute('data-c'));
 });

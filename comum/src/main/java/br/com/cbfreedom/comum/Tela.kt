@@ -53,6 +53,7 @@ class Tela : Activity() {
         const val EXTRA_ABA = "aba"
         const val EXTRA_PAINEL = "painel"
         const val EXTRA_ATUALIZAR = "atualizar"
+        private val TELAS = setOf("lista.html", "novo.html")
         private val RE_CHAMADO = Regex("^(?:https://relatorios\\.cbfreedom\\.com\\.br)?/helpdesk/tickets/(\\d+)/?$")
         const val ABA_HELPDESK = "helpdesk"
         const val ABA_SITE = "site"
@@ -130,6 +131,8 @@ class Tela : Activity() {
     private lateinit var selo: TextView
     private val abas = LinkedHashMap<String, Pair<ImageView, TextView>>()
     private val itensAba = HashMap<String, View>()
+    /** Ícone normal (contorno) e ativo (preenchido) de cada aba. */
+    private val iconesAba = HashMap<String, Pair<Int, Int>>()
     private var avisoSite: View? = null
     private var urlComErro: String? = null
 
@@ -137,6 +140,7 @@ class Tela : Activity() {
     private var paginaApp = ""
     private var arquivoCallback: ValueCallback<Array<Uri>>? = null
     private var anexoPendente = 0          // chamado que vai receber o arquivo escolhido
+    private var fotoPendente: Pair<java.io.File, Uri>? = null   // foto que a câmera vai gravar
     private var logandoSite = false
     private var ultimoLoginSite = 0L
     private var destinoSite: String? = null
@@ -183,6 +187,9 @@ class Tela : Activity() {
             Triple(ABA_SITE, "Site", R.drawable.ic_aba_site),
             Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel)
         )
+        iconesAba[ABA_HELPDESK] = Pair(R.drawable.ic_aba_helpdesk, R.drawable.ic_aba_helpdesk_ativa)
+        iconesAba[ABA_SITE] = Pair(R.drawable.ic_aba_site, R.drawable.ic_aba_site_ativa)
+        iconesAba[ABA_PAINEL] = Pair(R.drawable.ic_aba_painel, R.drawable.ic_aba_painel_ativa)
         for ((id, rotulo, icone) in itens) {
             val item = LinearLayout(this)
             item.orientation = LinearLayout.VERTICAL
@@ -225,7 +232,7 @@ class Tela : Activity() {
                 // tocar de novo no Site volta para o início do site
                 when {
                     aba == id && id == ABA_SITE -> webSite?.let { abrirUrlSite(Helpdesk.SITE + "/") }
-                    aba == id && id == ABA_HELPDESK && paginaApp == "chamado" -> voltarHelpdesk()
+                    aba == id && id == ABA_HELPDESK && paginaApp == "sub" -> voltarHelpdesk()
                     else -> selecionar(id)
                 }
             }
@@ -243,6 +250,7 @@ class Tela : Activity() {
         for ((id, par) in abas) {
             val ativa = id == aba
             val cor = if (ativa) Cor.ROSA else COR_INATIVA
+            iconesAba[id]?.let { par.first.setImageResource(if (ativa) it.second else it.first) }
             par.first.setColorFilter(cor)
             par.second.setTextColor(if (ativa) Color.WHITE else COR_INATIVA)
             par.second.typeface = if (ativa) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
@@ -295,7 +303,7 @@ class Tela : Activity() {
         }
         linhaAbas.visibility = View.VISIBLE
         barraAbas.visibility = View.VISIBLE
-        if (paginaApp != "helpdesk" && paginaApp != "chamado") { webApp.loadUrl(ASSET + "helpdesk.html"); paginaApp = "helpdesk" }
+        if (paginaApp != "helpdesk" && paginaApp != "sub") { webApp.loadUrl(ASSET + "helpdesk.html"); paginaApp = "helpdesk" }
         val caminho = i?.getStringExtra(Helpdesk.EXTRA_CAMINHO)
         val atualizar = i?.getBooleanExtra(EXTRA_ATUALIZAR, false) ?: false
         i?.removeExtra(EXTRA_ATUALIZAR)
@@ -310,7 +318,7 @@ class Tela : Activity() {
             pedida != null && abaDisponivel(pedida) -> selecionar(pedida)
             else -> selecionar(aba)
         }
-        if (atualizar) { if (paginaApp == "chamado") voltarHelpdesk(); selecionar(ABA_HELPDESK); iniciarAtualizacao() }
+        if (atualizar) { if (paginaApp == "sub") voltarHelpdesk(); selecionar(ABA_HELPDESK); iniciarAtualizacao() }
         ajustarAbas()
         pedirPermissoes()
     }
@@ -341,13 +349,30 @@ class Tela : Activity() {
     private fun abrirChamado(id: Int) {
         Helpdesk.nm(this).cancel(Helpdesk.idNotificacao(id))
         webApp.loadUrl(ASSET + "chamado.html#" + id)
-        paginaApp = "chamado"
+        paginaApp = "sub"
         selecionar(ABA_HELPDESK)
     }
+
+    /** Telas do Helpdesk dentro do app (lista de chamados, abrir chamado). */
+    private fun abrirTela(arquivo: String) {
+        val nome = arquivo.substringBefore('#')
+        val resto = arquivo.substringAfter('#', "")
+        if (nome !in TELAS || !resto.matches(Regex("[A-Za-z0-9_=&%.-]*"))) return
+        webApp.loadUrl(ASSET + arquivo)
+        paginaApp = "sub"
+        selecionar(ABA_HELPDESK)
+    }
+
+    private var limparHistorico = false
 
     private fun voltarHelpdesk() {
         webApp.loadUrl(ASSET + "helpdesk.html")
         paginaApp = "helpdesk"
+        limparHistorico = true
+    }
+
+    private fun voltarApp() {
+        if (webApp.canGoBack()) webApp.goBack() else voltarHelpdesk()
     }
 
     // ---- atualização do app ----
@@ -392,17 +417,43 @@ class Tela : Activity() {
 
     // ---- anexos da tela do chamado ----
 
+    /** Intent da câmera gravando direto num arquivo do app. */
+    private fun intentCamera(): Intent? = try {
+        val foto = Imagens.novaFoto(this)
+        fotoPendente = foto
+        val cam = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+            .putExtra(android.provider.MediaStore.EXTRA_OUTPUT, foto.second)
+            .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        cam.clipData = android.content.ClipData.newRawUri("foto", foto.second)
+        cam
+    } catch (_: Exception) { null }
+
     private fun escolherAnexo(id: Int) {
         anexoPendente = id
         val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
             .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "image/png", "image/jpeg", "text/plain",
                 "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+        val escolha = Intent.createChooser(i, "Anexar arquivo ou tirar foto")
+        intentCamera()?.let { escolha.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(it)) }
         try {
             @Suppress("DEPRECATION")
-            startActivityForResult(Intent.createChooser(i, "Escolher arquivo para anexar"), REQ_ANEXO)
+            startActivityForResult(escolha, REQ_ANEXO)
         } catch (_: ActivityNotFoundException) {
             anexoPendente = 0; toast("Nenhum app de arquivos encontrado")
+        }
+    }
+
+    /** Botão "Tirar foto" da tela do chamado: abre a câmera direto. */
+    private fun fotoAnexo(id: Int) {
+        val cam = intentCamera() ?: return toast("Não consegui abrir a câmera")
+        anexoPendente = id
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(cam, REQ_ANEXO)
+        } catch (_: ActivityNotFoundException) {
+            anexoPendente = 0; fotoPendente = null; toast("Nenhum app de câmera encontrado")
+            js(webApp, "window.chamadoAcao && chamadoAcao($id,'anexo',false,'')")
         }
     }
 
@@ -480,7 +531,7 @@ class Tela : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val s = webSite
-        if (aba == ABA_HELPDESK && paginaApp == "chamado") { voltarHelpdesk(); return }
+        if (aba == ABA_HELPDESK && paginaApp == "sub") { voltarApp(); return }
         if (aba == ABA_SITE && s != null && avisoSite?.visibility == View.VISIBLE) {
             avisoSite?.visibility = View.GONE
             if (s.canGoBack()) { s.goBack(); return }
@@ -534,7 +585,7 @@ class Tela : Activity() {
         runOnUiThread { w.evaluateJavascript(codigo, null) }
     }
 
-    private fun avisarHelpdesk() { if (paginaApp == "helpdesk" || paginaApp == "chamado") js(webApp, "window.recebidoHelpdesk && recebidoHelpdesk()") }
+    private fun avisarHelpdesk() { if (paginaApp == "helpdesk" || paginaApp == "sub") js(webApp, "window.recebidoHelpdesk && recebidoHelpdesk()") }
     private fun avisarPainel() = runOnUiThread { for (w in websPainel.values) w.evaluateJavascript("window.recebido && recebido()", null) }
 
     private fun atualizarPainel() {
@@ -561,6 +612,24 @@ class Tela : Activity() {
         s.allowContentAccess = false
         w.addJavascriptInterface(Ponte(), "App")
         w.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(v: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                // qual tela do app está aberta (o voltar do celular depende disso)
+                if (::webApp.isInitialized && v === webApp && url != null && url.startsWith(ASSET)) {
+                    paginaApp = when {
+                        url.contains("login.html") -> "login"
+                        url.contains("helpdesk.html") -> "helpdesk"
+                        else -> "sub"
+                    }
+                }
+            }
+
+            override fun onPageFinished(v: WebView, url: String?) {
+                if (::webApp.isInitialized && v === webApp && limparHistorico && url != null && url.contains("helpdesk.html")) {
+                    limparHistorico = false
+                    v.clearHistory()
+                }
+            }
+
             override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
                 val u = r.url.toString()
                 if (u.startsWith(ASSET)) return false
@@ -874,8 +943,12 @@ class Tela : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQ_ANEXO) {
             val id = anexoPendente; anexoPendente = 0
+            val foto = fotoPendente; fotoPendente = null
             val uri = if (resultCode == RESULT_OK) data?.data else null
-            if (id > 0 && uri != null) enviarAnexo(id, uri)
+            if (id > 0 && uri != null && uri != foto?.second) enviarAnexo(id, uri)
+            else if (id > 0 && resultCode == RESULT_OK && foto != null && foto.first.length() > 0) {
+                Thread { Imagens.reduzirFoto(foto.first); runOnUiThread { enviarAnexo(id, foto.second) } }.start()
+            }
             else if (id > 0) js(webApp, "window.chamadoAcao && chamadoAcao($id,'anexo',false,'')")
             return
         }
@@ -987,6 +1060,7 @@ class Tela : Activity() {
                 info.erro?.let { o.put("erro", it) }
                 o.put("hora", info.hora)
                 o.put("titulo", p.nomeModulo)
+                if (p.temAvisos) o.put("avisoMeta", Metas.ligado(this@Tela))
             }
             o.put("atualizando", Atualizador.atualizando)
             o.put("app", Atualizacao.resumo(this@Tela))
@@ -1135,6 +1209,12 @@ class Tela : Activity() {
         }
 
         @JavascriptInterface
+        fun configurarAvisoMeta(ligado: Boolean) { Metas.ligar(applicationContext, ligado); toast(if (ligado) "Avisos de meta ligados" else "Avisos de meta desligados") }
+
+        @JavascriptInterface
+        fun fotoChamado(id: Int) = runOnUiThread { fotoAnexo(id) }
+
+        @JavascriptInterface
         fun anexarChamado(id: Int) = runOnUiThread { escolherAnexo(id) }
 
         @JavascriptInterface
@@ -1150,7 +1230,60 @@ class Tela : Activity() {
         }
 
         @JavascriptInterface
-        fun voltar() = runOnUiThread { voltarHelpdesk() }
+        fun voltar() = runOnUiThread { voltarApp() }
+
+        /** Painel num período escolhido na tela (não muda o widget nem o que fica guardado). */
+        @JavascriptInterface
+        fun buscarPainel(id: String, inicio: String, fim: String) {
+            val app = applicationContext
+            val alvo = websPainel[id]
+            Thread {
+                val p = Freedom.porId(id)
+                var dados: JSONObject? = null
+                var erro = ""
+                try {
+                    val l = Store.login(app) ?: throw ErroLogin("faça o login")
+                    val api = Api(l.first, l.second)
+                    api.entrar()
+                    try { dados = p?.buscarPeriodo(api, inicio, fim) } finally { api.sair() }
+                    if (dados == null) erro = "este painel não tem escolha de período"
+                } catch (e: Exception) { erro = Api.mensagem(e) }
+                js(alvo, "window.painelPeriodo && painelPeriodo(" + (dados?.toString() ?: "null") + "," + JSONObject.quote(erro) + ")")
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun abrirTela(arquivo: String) = runOnUiThread { this@Tela.abrirTela(arquivo) }
+
+        // ---- imagem (PNG) dos painéis ----
+        @JavascriptInterface
+        fun compartilharImagem(base64: String, nome: String) {
+            val dados = try { android.util.Base64.decode(base64, android.util.Base64.DEFAULT) } catch (_: Exception) { return toast("Imagem inválida") }
+            runOnUiThread {
+                try { Imagens.compartilhar(this@Tela, dados, nome) }
+                catch (e: Exception) { toast("Não consegui compartilhar: " + (e.message ?: "erro")) }
+            }
+        }
+
+        @JavascriptInterface
+        fun salvarImagem(base64: String, nome: String) {
+            val app = applicationContext
+            Thread {
+                val onde = try { Arquivos.salvarImagem(app, android.util.Base64.decode(base64, android.util.Base64.DEFAULT), Arquivos.nome(nome, "image/png")) }
+                           catch (_: Exception) { null }
+                toast(if (onde != null) "Imagem salva em $onde" else "Não consegui salvar a imagem")
+            }.start()
+        }
+
+        /** Acesso direto à API do Helpdesk (mesmos endereços do site) para as telas do app. */
+        @JavascriptInterface
+        fun api(req: Int, metodo: String, caminho: String, corpo: String) {
+            val app = applicationContext
+            Thread {
+                val r = Chamado.requisicao(app, metodo, caminho, corpo)
+                js(webApp, "window.apiResposta && apiResposta(" + req + "," + r.first + "," + JSONObject.quote(r.second) + ")")
+            }.start()
+        }
 
         // ---- atualização do app ----
 

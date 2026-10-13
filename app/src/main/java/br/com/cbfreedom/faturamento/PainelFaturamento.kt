@@ -72,7 +72,30 @@ object PainelFaturamento : Painel {
             val it = items.getJSONObject(i)
             if (snap == null || n(it, "id") > n(snap, "id")) snap = it
         }
+        // todos os dias que o site mandou (para escolher outro dia e comparar na tela)
+        val porData = java.util.TreeMap<String, JSONObject>()
+        for (i in 0 until dias.length()) {
+            val d = dias.optJSONObject(i) ?: continue
+            val dt = d.optString("invoice_date").take(10)
+            if (dt.length != 10) continue
+            val o = JSONObject().put("d", dt).put("v", n(d, "total_value")).put("p", n(d, "order_count"))
+            val tt = d.optJSONArray("types")
+            if (tt != null && tt.length() > 0) {
+                val ta = JSONArray()
+                for (k in 0 until tt.length()) { val t = tt.optJSONObject(k) ?: continue
+                    ta.put(JSONObject().put("codigo", t.optString("order_type_code")).put("nome", t.optString("order_type_label"))
+                        .put("valor", n(t, "value")).put("pedidos", n(t, "order_count"))) }
+                o.put("tipos", ta)
+            }
+            porData[dt] = o
+        }
+        val ultimo = dia.optString("invoice_date").take(10)
+        if (ultimo.length == 10) porData[ultimo] = (porData[ultimo] ?: JSONObject().put("d", ultimo))
+            .put("v", n(dia, "total_value")).put("p", n(dia, "order_count")).put("tipos", tiposOut)
+        val listaDias = JSONArray()
+        porData.values.toList().takeLast(70).forEach { listaDias.put(it) }
         return JSONObject()
+            .put("dias", listaDias)
             .put("dia", JSONObject()
                 .put("data", dia.optString("invoice_date").take(10))
                 .put("valor", n(dia, "total_value"))

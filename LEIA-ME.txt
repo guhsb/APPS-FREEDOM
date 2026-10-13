@@ -49,7 +49,25 @@ ABAS
        Em "Configurar avisos" tem "Testar notificação" e "Som e estilo dos avisos".
   2. Site: tocar de novo em "Site" volta ao início; segurar o dedo recarrega.
   3. Painel: os números de cada área liberada. Com mais de uma (ex.: Comercial e Faturamento),
-     aparece um seletor em cima.
+     aparece um seletor em cima. Em cima dá para escolher o período (este mês, esta semana, mês
+     passado ou datas). O botão de imagem (ou menu > "Gerar imagem (PNG)") monta uma imagem com os
+     números da tela para mandar no WhatsApp: no celular "Compartilhar" ou "Salvar na galeria"
+     (Galeria > Freedom); no Windows "Copiar imagem" (Ctrl+V) ou "Salvar em Imagens".
+     Comercial: gráfico "Evolução do mês" (vendido acumulado x ideal x meta, venda de cada dia;
+     usa /dashboard/overview/charts do site e some se o site não mandar os valores por dia),
+     lista de vendedores com ordenação e detalhe ao tocar (com imagem só do vendedor).
+     Comercial também compara com o mês passado até o mesmo dia útil e manda AVISOS DE META
+     (meta do mês/semana batida, vendedor que bateu, mais de 10 pontos abaixo do ideal depois das 14 h;
+     cada aviso uma vez; liga/desliga no menu do painel).
+     Faturamento: escolher outro dia (setas, lista ou barras dos últimos 20 dias) e comparar com o dia
+     anterior do mesmo tipo, a semana passada e o mês passado até o mesmo dia.
+
+SEM INTERNET (celular e Windows)
+  - As telas mostram o que foi salvo da última vez, com a faixa "Sem internet".
+  - Resposta num chamado e chamado novo feitos sem internet ficam guardados e são enviados sozinhos quando
+    a conexão volta (no Android até com o app fechado); chega um aviso quando cada um é enviado.
+  - Helpdesk: "Sem responsável" abre a fila só com chamados sem responsável; no celular, "Tirar foto"
+    anexa uma foto da câmera direto no chamado.
 
 NO CELULAR
 1. Instale o Freedom.apk (permita "instalar apps desta fonte").
@@ -103,3 +121,28 @@ PASTAS
   comum/    a base: login, abas, Helpdesk, site, acesso por módulo, widget, atualização automática
   .github/  instrução para o GitHub montar o APK (a chave vem dos Secrets; nunca coloque *.jks/*.keystore aqui)
   (as pastas antigas "comercial" e "faturamento" não são mais usadas e podem ser apagadas)
+
+FREEDOM PARA WINDOWS (Freedom-Windows.exe)
+O GitHub monta junto com o APK e publica em Releases (pasta windows/ do projeto).
+- Baixe o Freedom-Windows.exe e dê dois cliques. Se o Windows avisar "protegeu o computador",
+  clique em "Mais informações" > "Executar assim mesmo" (o programa não tem certificado pago).
+- Ele se instala sozinho na pasta do usuário (sem precisar de administrador), cria atalho no Menu
+  Iniciar e na Área de Trabalho e abre junto com o Windows (fica no ícone perto do relógio).
+- Mesmas telas e mesma lógica de avisos do celular: Helpdesk completo, site já logado e painéis.
+  Os avisos aparecem como notificação do Windows; clicar abre o chamado.
+- Fechar a janela só esconde; para sair de vez: clique direito no ícone perto do relógio > Sair.
+- Atualiza sozinho pelo GitHub ("Nova versão disponível" > Atualizar).
+- Desinstalar: Configurações do Windows > Aplicativos > Freedom.
+- Precisa do "Microsoft Edge WebView2 Runtime" (já vem no Windows 11 e na maioria dos Windows 10).
+
+FREEDOM PARA MAC (Freedom-Mac.dmg)
+O GitHub monta junto com o APK e o .exe (pasta mac/ do projeto, feito com Electron) e publica em Releases.
+- Funciona em Mac Intel e Apple Silicon (M1, M2, M3…), macOS 11 ou mais novo.
+- Baixe o Freedom-Mac.dmg, abra e arraste o Freedom para Aplicativos.
+- Primeira vez: o Mac avisa que o app não é de um desenvolvedor identificado (não tem a assinatura paga
+  da Apple). Clique com o botão direito no Freedom > Abrir > Abrir. No macOS 15: Ajustes do Sistema >
+  Privacidade e Segurança > "Abrir mesmo assim". É só uma vez.
+- Mesmas telas e avisos do celular e do Windows. Os avisos aparecem nas notificações do Mac; o ícone fica
+  na barra de menus (em cima) e o número de novidades no ícone do Dock. Fechar a janela só esconde.
+- Abre junto com o Mac. Atualiza sozinho pelo GitHub (baixa o Freedom-Mac.zip e troca o app).
+- Testes: node mac/teste/engine.test.js e node mac/teste/integracao.test.js (rodam também no GitHub).

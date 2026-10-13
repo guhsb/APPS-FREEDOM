@@ -27,20 +27,110 @@
 .duas .card span{display:block;font-size:12px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .duas .card b{display:block;font-size:18px;margin-top:6px;white-space:nowrap}
 @media (max-width:360px){.hero .big{font-size:32px}.duas .card b{font-size:15px}}
+.dsel{display:flex;gap:8px;align-items:center;margin:2px 0 12px}
+.dsel select{flex:1;min-width:0;background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:9px 10px;font:inherit;font-size:13.5px}
+.dsel button{width:40px;height:38px;flex:none;border:1px solid var(--ln);background:var(--sf);color:var(--tx);border-radius:10px;font-size:18px;line-height:1}
+.dsel button:disabled{opacity:.35}
+.cmp{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cmp span{font-size:12px;border-radius:999px;padding:4px 9px;background:var(--sf3);color:var(--tx2)}
+.cmp em{font-style:normal;font-weight:700}.cmp em.sobe{color:var(--verde)}.cmp em.desce{color:#f87171}
+.hist{display:flex;align-items:flex-end;gap:3px;height:74px;margin-top:10px}
+.hist i{flex:1;border-radius:3px 3px 0 0;background:rgba(79,124,255,.35);min-height:2px;cursor:pointer}
+.hist i.on{background:var(--rosa)}
+.hist i.fds{background:rgba(163,171,189,.18)}
+.histLeg{display:flex;justify-content:space-between;font-size:11px;color:var(--tx3);margin-top:4px}
 </style></head><body>
 <div id="conteudo"></div>
 <script>var PAINEL_ID = 'faturamento';</script>
 <script src="base.js"></script>
+<script src="logo-dados.js"></script>
+<script src="imagem.js"></script>
 <script>
 var CORES = { V: '#1fbf8f', C: '#8b6cf0', '1': '#4f7cff', B: '#f0a53a', P: '#2bb673', O: '#e5484d', D: '#3b82f6',
               Q: '#f59e0b', M: '#10b981', T: '#f97316', '5': '#a855f7', '7': '#ef4444', '6': '#7c3aed', A: '#60a5fa' };
-Base.iniciar(function (d, e) {
-  var dia = d.dia || {}, mes = d.mes || {}, tipos = (dia.tipos || []).slice(), tot = F.n(dia.valor);
-  tipos.sort(function (a, b) { return F.n(b.valor) - F.n(a.valor); });
-  var nPed = Math.round(F.n(dia.pedidos));
-  var h = '<div class="card hero"><div class="rot">Faturamento do dia</div>' +
-    '<div class="big"><small>R$</small>' + F.num(dia.valor) + '</div>' +
-    '<div class="meta"><span class="pill">' + F.esc(F.dataBR(dia.data) || 'hoje') + '</span>' +
+var mostrado = null, sel = null;   // sel = data escolhida (null = último dia)
+var SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+function dt(iso) { var p = String(iso).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function dm(iso) { return String(iso).slice(8, 10) + '/' + String(iso).slice(5, 7); }
+function variacao(a, b) { if (!(F.n(b) > 0)) return null; return F.n(a) / F.n(b) - 1; }
+function pctVar(v) { return (v >= 0 ? '▲ ' : '▼ ') + F.pct(Math.abs(v) * 100); }
+
+/** Dia mostrado + comparações (dia anterior com faturamento e mesmo dia da semana passada). */
+function diaMostrado(d) {
+  var dias = d.dias || [], ult = d.dia || {};
+  var idx = -1;
+  for (var i = 0; i < dias.length; i++) if (dias[i].d === (sel || ult.data)) idx = i;
+  var x = idx >= 0 ? dias[idx] : { d: ult.data, v: ult.valor, p: ult.pedidos, tipos: ult.tipos };
+  if (!sel || sel === ult.data) x = { d: ult.data, v: ult.valor, p: ult.pedidos, tipos: ult.tipos || x.tipos };
+  // dia anterior do mesmo tipo (dia útil com dia útil, fim de semana com fim de semana)
+  function fds(iso) { var w = dt(iso).getDay(); return w === 0 || w === 6; }
+  var ant = null; for (var j = idx - 1; j >= 0; j--) if (F.n(dias[j].v) > 0 && x.d && fds(dias[j].d) === fds(x.d)) { ant = dias[j]; break; }
+  var semana = null;
+  if (x.d) { var t = dt(x.d); t.setDate(t.getDate() - 7);
+    var iso = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+    dias.forEach(function (y) { if (y.d === iso) semana = y; }); }
+  return { x: x, idx: idx, ant: ant, semana: semana, ultimo: !sel || sel === ult.data };
+}
+/** Mês até o dia mostrado × mês passado até o mesmo dia (se o site mandou os dias do mês passado). */
+function mesComparado(d, iso) {
+  if (!iso) return null;
+  var dias = d.dias || [], ano = +iso.slice(0, 4), mes = +iso.slice(5, 7), dia = +iso.slice(8, 10);
+  var pa = mes === 1 ? ano - 1 : ano, pm = mes === 1 ? 12 : mes - 1;
+  var pref = ano + '-' + ('0' + mes).slice(-2), prefA = pa + '-' + ('0' + pm).slice(-2);
+  var atual = 0, antes = 0, temAntes = false;
+  dias.forEach(function (y) {
+    if (y.d.slice(0, 7) === pref && +y.d.slice(8, 10) <= dia) atual += F.n(y.v);
+    if (y.d.slice(0, 7) === prefA) { temAntes = true; if (+y.d.slice(8, 10) <= dia) antes += F.n(y.v); }
+  });
+  return temAntes && antes > 0 ? { atual: atual, antes: antes, ate: ('0' + dia).slice(-2) + '/' + ('0' + pm).slice(-2), v: atual / antes - 1 } : null;
+}
+
+Base.paraImagem = function () {
+  var d = mostrado; if (!d) return null;
+  var e = Base.estado(), m = diaMostrado(d), x = m.x, mes = d.mes || {}, tot = F.n(x.v), nPed = Math.round(F.n(x.p));
+  var tipos = (x.tipos || []).slice().sort(function (a, b) { return F.n(b.valor) - F.n(a.valor); });
+  var cmp = [];
+  if (m.ant) { var va = variacao(x.v, m.ant.v); if (va != null) cmp.push(pctVar(va) + ' vs ' + dm(m.ant.d)); }
+  if (m.semana) { var vs = variacao(x.v, m.semana.v); if (vs != null) cmp.push(pctVar(vs) + ' vs semana passada'); }
+  var hero = [{ tipo: 'hero', rot: 'Faturamento do dia ' + (F.dataBR(x.d) || ''), valor: x.v,
+                pill: nPed + (nPed === 1 ? ' pedido' : ' pedidos'), sub: cmp.join('  ·  ') }];
+  if (tot > 0 && tipos.length) hero.push({ tipo: 'dist', partes: tipos.map(function (t) { return { frac: Math.max(0.005, F.n(t.valor) / tot), cor: CORES[t.codigo] || '#8b93a7' }; }) });
+  var bl = [{ tipo: 'card', blocos: hero }];
+  if (tipos.length) {
+    bl.push({ tipo: 'secao', t: 'Por tipo de pedido', d: String(tipos.length) });
+    bl.push({ tipo: 'tipos', itens: tipos.map(function (t) {
+      var np = Math.round(F.n(t.pedidos));
+      return { nome: t.nome, valor: F.brl(t.valor), sub: np + (np === 1 ? ' pedido' : ' pedidos'), pct: tot ? F.pct(F.n(t.valor) / tot * 100) : '', cor: CORES[t.codigo] || '#8b93a7' };
+    }) });
+  }
+  var mc = mesComparado(d, x.d), linhas = [{ tipo: 'linha', r: 'Total de ' + (mes.nome || 'mês'), v: F.brl(mes.valor) }];
+  if (mc) linhas.push({ tipo: 'linha', r: 'Mês passado até ' + mc.ate, v: F.brl(mc.antes) + '  ' + pctVar(mc.v), c: mc.v >= 0 ? 'verde' : 'vermelho' });
+  linhas.push({ tipo: 'linha', r: 'Standby', v: F.brl(d.standby), c: 'laranja' }, { tipo: 'linha', r: 'PEND faturável (equipe)', v: F.brl(d.pend), c: 'violeta' });
+  bl.push({ tipo: 'secao', t: 'Mês e pendências' });
+  bl.push({ tipo: 'card', blocos: linhas });
+  var dh = e.hora ? new Date(e.hora) : null;
+  return { titulo: 'Faturamento', sub: 'Dia ' + (F.dataBR(x.d) || 'de hoje') + ' · ' + (mes.nome || ''),
+           quando: dh ? 'Números de ' + ('0' + dh.getDate()).slice(-2) + '/' + ('0' + (dh.getMonth() + 1)).slice(-2) + '/' + dh.getFullYear() + ' às ' + F.hhmm(e.hora) : '',
+           arquivo: 'Faturamento-' + dm(x.d || '').replace('/', '-'), blocos: bl };
+};
+
+function desenhar(d) {
+  var dias = d.dias || [], ult = d.dia || {}, mes = d.mes || {};
+  if (sel && !dias.some(function (y) { return y.d === sel; })) sel = null;
+  var m = diaMostrado(d), x = m.x, tot = F.n(x.v), nPed = Math.round(F.n(x.p));
+  var tipos = (x.tipos || []).slice().sort(function (a, b) { return F.n(b.valor) - F.n(a.valor); });
+  var h = '';
+  // escolher o dia
+  if (dias.length > 1) {
+    var lista = dias.slice().reverse();
+    h += '<div class="dsel"><button id="dAnt" aria-label="Dia anterior"' + (m.idx <= 0 ? ' disabled' : '') + '>‹</button><select id="dSel">' +
+      lista.map(function (y) { var w = SEM[dt(y.d).getDay()];
+        return '<option value="' + y.d + '"' + (y.d === x.d ? ' selected' : '') + '>' + (y.d === ult.data ? 'Último dia · ' : '') + w + ' ' + F.dataBR(y.d) + '</option>'; }).join('') +
+      '</select><button id="dProx" aria-label="Próximo dia"' + (m.ultimo ? ' disabled' : '') + '>›</button></div>';
+  }
+  h += '<div class="card hero"><div class="rot">Faturamento do dia' + (m.ultimo ? '' : ' escolhido') + '</div>' +
+    '<div class="big"><small>R$</small>' + F.num(x.v) + '</div>' +
+    '<div class="meta"><span class="pill">' + F.esc(F.dataBR(x.d) || 'hoje') + '</span>' +
     '<span class="pill">' + nPed + (nPed === 1 ? ' pedido' : ' pedidos') + '</span>' +
     (tipos.length ? '<span class="pill">' + tipos.length + (tipos.length === 1 ? ' tipo' : ' tipos') + '</span>' : '') + '</div>';
   if (tot > 0 && tipos.length) {
@@ -48,10 +138,23 @@ Base.iniciar(function (d, e) {
       return '<i style="flex:' + Math.max(0.5, F.n(t.valor) / tot * 100) + ';background:' + (CORES[t.codigo] || '#8b93a7') + '"></i>';
     }).join('') + '</div>';
   }
+  var cmp = '';
+  if (m.ant) { var va = variacao(x.v, m.ant.v); if (va != null) cmp += '<span><em class="' + (va >= 0 ? 'sobe' : 'desce') + '">' + pctVar(va) + '</em> vs ' + SEM[dt(m.ant.d).getDay()] + ' ' + dm(m.ant.d) + ' (' + F.brlK(m.ant.v) + ')</span>'; }
+  if (m.semana) { var vs = variacao(x.v, m.semana.v); if (vs != null) cmp += '<span><em class="' + (vs >= 0 ? 'sobe' : 'desce') + '">' + pctVar(vs) + '</em> vs semana passada (' + F.brlK(m.semana.v) + ')</span>'; }
+  if (cmp) h += '<div class="cmp">' + cmp + '</div>';
+  // últimos dias (tocar escolhe)
+  var ult20 = dias.slice(-20);
+  if (ult20.length > 2) {
+    var mx = 0; ult20.forEach(function (y) { mx = Math.max(mx, F.n(y.v)); });
+    h += '<div class="hist" id="hist">' + ult20.map(function (y) {
+      var fds = [0, 6].indexOf(dt(y.d).getDay()) >= 0;
+      return '<i data-d="' + y.d + '" class="' + (y.d === x.d ? 'on' : fds ? 'fds' : '') + '" style="height:' + (mx ? Math.max(3, F.n(y.v) / mx * 100) : 3) + '%" title="' + F.dataBR(y.d) + ' · ' + F.brl(y.v) + '"></i>';
+    }).join('') + '</div><div class="histLeg"><span>' + dm(ult20[0].d) + '</span><span>últimos ' + ult20.length + ' dias · toque para ver</span><span>' + dm(ult20[ult20.length - 1].d) + '</span></div>';
+  }
   h += '</div>';
 
   h += '<div class="sec"><h2>Por tipo de pedido</h2><span>' + (tipos.length || '') + '</span></div>';
-  if (!tipos.length) h += '<div class="vazio">Nenhum pedido faturado hoje até agora.</div>';
+  if (!tipos.length) h += '<div class="vazio">' + (tot > 0 ? 'O site só manda o detalhe por tipo do último dia.' : 'Nenhum pedido faturado neste dia.') + '</div>';
   else h += '<div class="lista">' + tipos.map(function (t) {
     var p = tot ? F.pct(F.n(t.valor) / tot * 100) : '';
     var np = Math.round(F.n(t.pedidos));
@@ -60,13 +163,24 @@ Base.iniciar(function (d, e) {
       '<div class="vl"><b>' + F.brl(t.valor) + '</b><span>' + p + '</span></div></div>';
   }).join('') + '</div>';
 
+  var mc = mesComparado(d, ult.data);
   h += '<div class="sec"><h2>Mês e pendências</h2><span></span></div>' +
     '<div class="card mes"><div class="ico">' + F.ic('grafico') + '</div><div class="tx"><div class="rot">Total de ' + F.esc(mes.nome || 'mês') + '</div>' +
-    '<b>' + F.brl(mes.valor) + '</b></div></div>' +
+    '<b>' + F.brl(mes.valor) + '</b>' + (mc ? '<div class="cmp" style="margin-top:6px"><span><em class="' + (mc.v >= 0 ? 'sobe' : 'desce') + '">' + pctVar(mc.v) +
+      '</em> vs mês passado até ' + mc.ate + ' (' + F.brlK(mc.antes) + ')</span></div>' : '') + '</div></div>' +
     '<div class="duas"><div class="card" style="--c:var(--laranja)"><span>Standby</span><b>' + F.brl(d.standby) + '</b></div>' +
     '<div class="card" style="--c:var(--violeta)"><span>PEND faturável (equipe)</span><b>' + F.brl(d.pend) + '</b></div></div>' +
     '<div class="rod">Atualiza sozinho a cada 15 minutos · toque em ↻ para atualizar agora</div>';
   document.getElementById('conteudo').innerHTML = h;
+  var s1 = document.getElementById('dSel'); if (s1) s1.onchange = function () { sel = this.value === ult.data ? null : this.value; desenhar(d); };
+  var a = document.getElementById('dAnt'); if (a) a.onclick = function () { if (m.idx > 0) { sel = dias[m.idx - 1].d; desenhar(d); } };
+  var b = document.getElementById('dProx'); if (b) b.onclick = function () { if (m.idx >= 0 && m.idx < dias.length - 1) { var n = dias[m.idx + 1].d; sel = n === ult.data ? null : n; desenhar(d); } };
+  var hi = document.getElementById('hist'); if (hi) hi.onclick = function (ev) { var t = ev.target.closest('[data-d]'); if (!t) return; var v = t.getAttribute('data-d'); sel = v === ult.data ? null : v; desenhar(d); };
+}
+
+Base.iniciar(function (d, e) {
+  mostrado = d;
+  desenhar(d);
 });
 </script>
 </body></html>

@@ -43,6 +43,39 @@ object Chamado {
         return r
     }
 
+    /**
+     * Requisição genérica das telas do app (lista, abrir chamado...). Só deixa passar endereços do Helpdesk.
+     * Devolve (código HTTP, corpo); código 0 = não conseguiu falar com o site.
+     */
+    fun requisicao(c: Context, metodo: String, caminho: String, corpo: String): Pair<Int, String> {
+        val m = metodo.uppercase()
+        if (m !in setOf("GET", "POST", "PATCH")) return Pair(0, "método não permitido")
+        if (!(caminho.startsWith("/helpdesk/") || caminho == "/auth/me") || caminho.contains("..")) return Pair(0, "endereço não permitido")
+        return try {
+            val json = if (corpo.isBlank()) null else JSONObject(corpo)
+            val r = chamar(c, m, caminho, json)
+            if (m == "GET" && r.first == 200) Fila.guardar(c, "GET $caminho", r.second)
+            r
+        } catch (e: Exception) {
+            if (Fila.semInternet(c, e)) {
+                // sem internet: consulta -> mostra a última resposta guardada; chamado novo -> guarda para enviar depois
+                if (m == "GET") Fila.guardado(c, "GET $caminho")?.let { g ->
+                    return Pair(299, JSONObject().put("_offline", g.first).put("_corpo", g.second).toString())
+                }
+                if (m == "POST" && caminho == "/helpdesk/tickets" && corpo.isNotBlank()) {
+                    Fila.adicionarChamado(c, corpo)
+                    return Pair(202, JSONObject().put("_fila", true).toString())
+                }
+            }
+            Pair(0, "Sem conexão com o site: " + Api.mensagem(e))
+        }
+    }
+
+    /** Usado pela fila: (código, corpo) ou null se continua sem internet. */
+    fun requisicaoDireta(c: Context, metodo: String, caminho: String, corpo: String): Pair<Int, String>? = try {
+        chamar(c, metodo, caminho, if (corpo.isBlank()) null else JSONObject(corpo))
+    } catch (e: Exception) { if (Fila.semInternet(c, e)) null else Pair(0, Api.mensagem(e)) }
+
     private fun erro(cod: Int, corpo: String, padrao: String): String {
         val det = try { JSONObject(corpo).opt("detail") } catch (_: Exception) { null }
         val codigo = (det as? String) ?: (det as? JSONObject)?.optString("code") ?: ""
@@ -56,19 +89,36 @@ object Chamado {
 
     fun historico(c: Context, id: Int): Resultado = try {
         val r = chamar(c, "GET", "/helpdesk/tickets/$id/timeline", null)
-        if (r.first == 200) Resultado(true, "", JSONObject(r.second))
+        if (r.first == 200) {
+            Fila.guardar(c, "timeline $id", r.second)
+            Resultado(true, "", JSONObject(r.second).put("pendentes", Fila.doChamado(c, id)))
+        }
         else Resultado(false, erro(r.first, r.second, "Não consegui abrir o chamado"))
-    } catch (e: Exception) { Resultado(false, "Não consegui abrir o chamado: " + Api.mensagem(e)) }
+    } catch (e: Exception) {
+        val g = if (Fila.semInternet(c, e)) Fila.guardado(c, "timeline $id") else null
+        if (g != null) Resultado(true, "offline:" + g.first, JSONObject(g.second).put("pendentes", Fila.doChamado(c, id)).put("_offline", g.first))
+        else Resultado(false, "Não consegui abrir o chamado: " + Api.mensagem(e))
+    }
+
+    class Envio(val ok: Boolean, val mensagem: String, val semInternet: Boolean)
+
+    /** Envia de verdade (usado também pela fila quando a internet volta). */
+    fun responderAgora(c: Context, id: Int, t: String): Envio = try {
+        val r = chamar(c, "POST", "/helpdesk/tickets/$id/messages", JSONObject().put("body", t))
+        if (r.first in 200..299) { depois(c, id); Envio(true, "Resposta enviada", false) }
+        else Envio(false, erro(r.first, r.second, "Não consegui enviar a resposta"), false)
+    } catch (e: Exception) { Envio(false, "Não consegui enviar: " + Api.mensagem(e), Fila.semInternet(c, e)) }
 
     fun responder(c: Context, id: Int, texto: String): Resultado {
         val t = texto.trim()
         if (t.isEmpty()) return Resultado(false, "Escreva uma mensagem antes de enviar.")
         if (t.length > 10_000) return Resultado(false, "A mensagem passou de 10.000 caracteres.")
-        return try {
-            val r = chamar(c, "POST", "/helpdesk/tickets/$id/messages", JSONObject().put("body", t))
-            if (r.first in 200..299) { depois(c, id); Resultado(true, "Resposta enviada") }
-            else Resultado(false, erro(r.first, r.second, "Não consegui enviar a resposta"))
-        } catch (e: Exception) { Resultado(false, "Não consegui enviar: " + Api.mensagem(e)) }
+        val r = responderAgora(c, id, t)
+        if (r.semInternet) {
+            Fila.adicionarResposta(c, id, t)
+            return Resultado(true, "Sem internet: a resposta foi guardada e vai ser enviada sozinha quando a internet voltar.")
+        }
+        return Resultado(r.ok, r.mensagem)
     }
 
     fun assumir(c: Context, id: Int): Resultado = operar(c, id, "assumir", null)

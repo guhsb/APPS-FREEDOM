@@ -24,6 +24,9 @@ object PainelComercial : Painel {
     override val classeWidget = WidgetComercial::class.java
 
     override fun buscar(api: Api): JSONObject = Dados.comercial(api)
+    override fun buscarPeriodo(api: Api, inicio: String, fim: String): JSONObject = Dados.periodo(api, inicio, fim)
+    override val temAvisos = true
+    override fun avisos(c: android.content.Context, agora: JSONObject): List<Pair<String, String>> = AvisosMeta.calcular(c, agora)
 
     override fun desenhar(p: Pintor, d: JSONObject, info: Info, classe: Char) {
         val vend = d.optString("tipo") == "vendedor"
@@ -78,8 +81,8 @@ object PainelComercial : Painel {
             val livre = (H - 12f - 30f) - y0
             val y = y0 + max(0f, (livre - 32f) / 2f) + 18f
             bloco(p, d, y, 17f, 10f, 8f, Cor.AZUL, Cor.ROSA)
-            p.linhaInfo(H - 12f - 15f, X0, iw, listOf(faltaT), 10f)
-            p.linhaInfo(H - 12f, X0, iw, listOf(metaT), 10f)
+            p.linhaInfo(H - 12f - 15f, X0, iw, listOf(metaT), 10f)
+            p.linhaInfo(H - 12f, X0, iw, listOf(porDiaT), 10f)
             return
         }
         if (cl == 'M') {

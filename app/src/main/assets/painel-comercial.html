@@ -19,11 +19,42 @@
 .v .trilho{height:6px;margin:9px 0 6px}.v .trilho>s{top:-3px;bottom:-3px}
 .v .d{display:flex;justify-content:space-between;font-size:12px;color:var(--tx3);gap:8px}
 .nota{font-size:12px;color:var(--tx3);margin-top:10px}
+.cmpMes{font-size:12.5px;color:var(--tx3);margin-top:10px}
+.cmpMes span{font-weight:700;margin-right:2px}.cmpMes .sobe{color:var(--verde)}.cmpMes .desce{color:#f87171}
+.graf h3{margin:0 0 2px;font-size:13px;letter-spacing:.06em;color:var(--tx2)}
+.graf svg{display:block;width:100%;height:auto;max-height:260px;margin-top:8px;touch-action:pan-y}
+.graf .leg2{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--tx3);margin-top:6px}
+.graf .leg2 i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.graf .dica{font-size:12.5px;color:var(--tx2);margin-top:8px;min-height:18px}
+.ord{display:flex;gap:8px;margin:0 0 10px}
+.ord select{flex:1;background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:12px;padding:10px;font:inherit;font-size:13.5px}
+.v{cursor:pointer}.v:active{background:var(--sf2)}
+.det .big{font-size:30px}
+.det .tiles{margin-top:10px}
+.tiles.dois{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tiles.dois .tile b{font-size:18px}
+.tiles.dois .tile span{white-space:normal}
+.tiles.dois+.tiles{margin-top:8px}
+.periodo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 12px}
+.periodo select,.periodo input{background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:9px 10px;font:inherit;font-size:13.5px}
+.periodo select{flex:1;min-width:150px}
+.periodo .datas{display:flex;gap:6px;flex:1 1 100%;align-items:center}
+.periodo .datas input{flex:1 1 0;width:0;min-width:0;color-scheme:dark}
+.periodo .datas button{flex:none}
+.periodo button{border:0;border-radius:10px;padding:9px 14px;background:var(--rosa);color:#fff;font:inherit;font-weight:700}
+.faixaPer{display:flex;align-items:center;gap:8px;background:var(--azul-s);border:1px solid rgba(79,124,255,.3);color:#b9c8ff;border-radius:12px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+.faixaPer span{flex:1}.faixaPer button{border:0;background:transparent;color:#fff;font:inherit;font-weight:700;text-decoration:underline}
 .vazio{text-align:center;color:var(--tx3);padding:30px 0}
 </style></head><body>
+<div class="periodo"><select id="perSel"><option value="mes">Este mês</option><option value="sem">Esta semana</option>
+<option value="ant">Mês passado</option><option value="dt">Escolher datas…</option></select>
+<div class="datas" id="perDatas" style="display:none"><input type="date" id="perIni"><span class="cinza">até</span><input type="date" id="perFim"><button id="perVer">Ver</button></div></div>
+<div id="faixaPer"></div>
 <div id="conteudo"></div>
 <script>var PAINEL_ID = 'comercial';</script>
 <script src="base.js"></script>
+<script src="logo-dados.js"></script>
+<script src="imagem.js"></script>
 <script>
 var filtro = 'todos', busca = '', dadosAtuais = null;
 
@@ -33,21 +64,136 @@ function hero(o, rotulo, sub, corOk, corRuim) {
     '<div class="big"><small>R$</small>' + F.num(o.valor) + '</div>' +
     '<span class="pill">' + F.pct(F.n(o.p) * 100) + ' da meta</span>' + (sub ? ' <span class="cinza" style="font-size:12px;margin-left:6px">' + sub + '</span>' : '') +
     F.barra(F.n(o.p), F.n(o.idealP), cor) +
-    '<div class="leg"><span>0</span><span>ideal hoje ' + F.pct(F.n(o.idealP) * 100) + '</span><span>' + F.brlK(o.meta) + '</span></div>';
+    '<div class="leg"><span>0</span><span>' + (o.periodo ? 'ideal no período ' : 'ideal hoje ') + F.pct(F.n(o.idealP) * 100) + '</span><span>' + F.brlK(o.meta) + '</span></div>';
 }
 
+/** Meta, falta, quanto vender por dia e ideal: em destaque (2 colunas, números inteiros na tela). */
+function destaque(o, rotMeta, rotIdeal) {
+  var r = F.n(o.rest);
+  return '<div class="tiles dois">' + F.tile(rotMeta, F.brlK(o.meta)) + F.tile('Falta', F.n(o.falta) > 0 ? F.brlK(o.falta) : 'Meta batida', F.n(o.falta) > 0 ? 'laranja' : 'verde') +
+    F.tile(r > 0 ? 'Vender por dia (' + F.int(r) + (r === 1 ? ' dia útil)' : ' dias úteis)') : 'Vender por dia', r > 0 && F.n(o.falta) > 0 ? F.brlK(o.porDia) : '—') +
+    F.tile(rotIdeal, F.brlK(o.ideal)) + '</div>';
+}
+
+/** Comparação com o mês passado até o mesmo dia útil. */
+function cmpAnterior(o) {
+  var a = o.anterior; if (!a || !(F.n(a.valor) > 0)) return '';
+  var v = F.n(o.valor) / F.n(a.valor) - 1;
+  return '<div class="cmpMes"><span class="' + (v >= 0 ? 'sobe' : 'desce') + '">' + (v >= 0 ? '▲ ' : '▼ ') + F.pct(Math.abs(v) * 100) + '</span>' +
+    ' vs mês passado até ' + F.esc(a.ate) + ' (' + F.brlK(a.valor) + ', mesmo dia útil)</div>';
+}
+/** Gráfico da evolução: vendido acumulado × ideal acumulado (+ venda de cada dia em barras). */
+function grafico(o, titulo) {
+  var dd = o.diario || [];
+  if (dd.length < 2 || !dd.some(function (x) { return F.n(x.a) > 0 || F.n(x.v) > 0; })) return '';
+  var W = 340, H = 160, L = 4, R = 4, T = 14, B = 22, meta = F.n(o.meta);
+  var maxY = meta;
+  dd.forEach(function (x) { maxY = Math.max(maxY, F.n(x.a), F.n(x.i)); });
+  maxY = maxY * 1.06 || 1;
+  var maxV = 0; dd.forEach(function (x) { maxV = Math.max(maxV, F.n(x.v)); });
+  var n = dd.length, pw = (W - L - R) / n;
+  function X(k) { return L + pw * (k + 0.5); }
+  function Y(v) { return T + (H - T - B) * (1 - v / maxY); }
+  var bar = '', idl = '', real = '', area = '', ultimo = -1;
+  dd.forEach(function (x, k) {
+    if (maxV > 0 && F.n(x.v) > 0) { var bh = (H - T - B) * 0.32 * F.n(x.v) / maxV; bar += '<rect x="' + (X(k) - pw * 0.32).toFixed(1) + '" y="' + (H - B - bh).toFixed(1) + '" width="' + (pw * 0.64).toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="1.5" fill="#4f7cff" opacity=".28"/>'; }
+    idl += (k ? 'L' : 'M') + X(k).toFixed(1) + ' ' + Y(F.n(x.i)).toFixed(1);
+    if (x.a != null) { real += (ultimo < 0 ? 'M' : 'L') + X(k).toFixed(1) + ' ' + Y(F.n(x.a)).toFixed(1); ultimo = k; }
+  });
+  if (ultimo >= 0) area = real + 'L' + X(ultimo).toFixed(1) + ' ' + (H - B) + 'L' + X(0).toFixed(1) + ' ' + (H - B) + 'Z';
+  var u = ultimo >= 0 ? dd[ultimo] : null;
+  var cor = u && F.n(u.a) >= F.n(u.i) ? '#4f7cff' : '#e84b8a';
+  function dm(t) { return String(t).slice(8, 10) + '/' + String(t).slice(5, 7); }
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" data-n="' + n + '">' +
+    '<defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + cor + '" stop-opacity=".30"/><stop offset="1" stop-color="' + cor + '" stop-opacity="0"/></linearGradient></defs>' +
+    '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="#2c3447"/>' +
+    (meta > 0 ? '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(meta).toFixed(1) + '" y2="' + Y(meta).toFixed(1) + '" stroke="#1fbf8f" stroke-dasharray="2 3" opacity=".8"/>' +
+      '<text x="' + (W - R) + '" y="' + (Y(meta) - 4).toFixed(1) + '" text-anchor="end" font-size="9.5" fill="#1fbf8f">meta ' + F.brlK(meta) + '</text>' : '') +
+    bar +
+    '<path d="' + idl + '" fill="none" stroke="#a3abbd" stroke-width="1.4" stroke-dasharray="4 3" opacity=".75"/>' +
+    (area ? '<path d="' + area + '" fill="url(#gArea)"/>' : '') +
+    (real ? '<path d="' + real + '" fill="none" stroke="' + cor + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>' : '') +
+    (u ? '<circle cx="' + X(ultimo).toFixed(1) + '" cy="' + Y(F.n(u.a)).toFixed(1) + '" r="3.6" fill="' + cor + '" stroke="#12151d" stroke-width="1.6"/>' : '') +
+    '<line class="cursor" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" stroke="#f3f5f9" stroke-width="1" opacity="0"/>' +
+    '<text x="' + X(0).toFixed(1) + '" y="' + (H - 6) + '" font-size="9.5" fill="#6b7489">' + dm(dd[0].d) + '</text>' +
+    '<text x="' + X(Math.floor((n - 1) / 2)).toFixed(1) + '" y="' + (H - 6) + '" font-size="9.5" fill="#6b7489" text-anchor="middle">' + dm(dd[Math.floor((n - 1) / 2)].d) + '</text>' +
+    '<text x="' + X(n - 1).toFixed(1) + '" y="' + (H - 6) + '" font-size="9.5" fill="#6b7489" text-anchor="end">' + dm(dd[n - 1].d) + '</text></svg>';
+  var dif = u ? F.n(u.a) - F.n(u.i) : 0;
+  return '<div class="card graf" data-graf="1"><h3>' + F.esc(titulo || 'EVOLUÇÃO') + '</h3>' +
+    '<div class="cinza" style="font-size:12.5px">' + (u ? (dif >= 0 ? '<b class="verde">' + F.brlK(dif) + ' acima</b> do ideal' : '<b class="laranja">' + F.brlK(-dif) + ' abaixo</b> do ideal') + ' até ' + dm(u.d) : '') + '</div>' + svg +
+    '<div class="leg2"><span><i style="background:' + cor + '"></i>Vendido (acumulado)</span><span><i style="background:#a3abbd"></i>Ideal</span>' +
+    (maxV > 0 ? '<span><i style="background:rgba(79,124,255,.45);height:8px;width:8px"></i>Venda do dia</span>' : '') + '</div>' +
+    '<div class="dica">Toque no gráfico para ver cada dia</div></div>';
+}
+/** toque/arraste no gráfico mostra os números do dia */
+function ligarGraficos(o) {
+  Array.prototype.forEach.call(document.querySelectorAll('[data-graf]'), function (card) {
+    var svg = card.querySelector('svg'), dica = card.querySelector('.dica'), cur = card.querySelector('.cursor'), dd = o.diario || [];
+    if (!svg) return;
+    function mostrar(ev) {
+      var r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) / r.width * 340;
+      var k = Math.max(0, Math.min(dd.length - 1, Math.floor((px - 4) / ((340 - 8) / dd.length)))), x = dd[k];
+      var cx = 4 + (340 - 8) / dd.length * (k + 0.5);
+      cur.setAttribute('x1', cx); cur.setAttribute('x2', cx); cur.setAttribute('opacity', '.5');
+      dica.innerHTML = '<b>' + String(x.d).slice(8, 10) + '/' + String(x.d).slice(5, 7) + '</b> · no dia ' + F.brlK(x.v) +
+        (x.a != null ? ' · acumulado <b>' + F.brlK(x.a) + '</b>' : '') + ' · ideal ' + F.brlK(x.i);
+    }
+    svg.addEventListener('click', mostrar);
+    svg.addEventListener('touchmove', mostrar, { passive: true });
+    svg.addEventListener('touchstart', mostrar, { passive: true });
+  });
+}
+
+var ordem = 'valor';
+
+/** Detalhe de um vendedor (tocar na lista). */
+function detalheVendedor(i) {
+  var d = dadosAtuais, x = (d.vendedores || [])[i]; if (!x) return;
+  var idealP = F.n(d.idealP), vf = F.n(x.valor), vm = F.n(x.meta), id = vm * idealP, f = Math.max(0, vm - vf), r = F.n(d.rest);
+  var ped = F.n(x.pedidos), cli = F.n(x.clientes), dif = vf - id;
+  var o = { valor: vf, meta: vm, p: vm ? vf / vm : 0, idealP: idealP, ideal: id, falta: f, porDia: r > 0 ? f / r : 0, rest: r, periodo: d.periodo };
+  var h = '<div class="det"><div class="cinza" style="font-size:12px;letter-spacing:.06em">' + (x.rank ? x.rank + 'º · ' : '') + (d.periodo ? F.esc(d.periodo) : 'MÊS ATUAL') + '</div>' +
+    '<h3 style="margin:2px 0 8px">' + F.esc(x.nome) + '</h3>' +
+    '<div class="big"><small>R$</small>' + F.num(vf) + '</div>' +
+    (vm ? '<span class="pill">' + F.pct(o.p * 100) + ' da meta</span> <span class="cinza" style="font-size:12px;margin-left:6px">' +
+      (dif >= 0 ? F.brlK(dif) + ' acima do ideal' : F.brlK(-dif) + ' abaixo do ideal') + '</span>' + F.barra(o.p, idealP, vf >= id ? '#4f7cff' : '#f0a53a') +
+      destaque(o, 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje') : '<div class="nota">Sem meta cadastrada para este vendedor.</div>') +
+    '<div class="tiles">' + (ped ? F.tile('Pedidos', F.int(ped)) : '') + (cli ? F.tile('Clientes', F.int(cli)) : '') +
+    (ped ? F.tile('Ticket médio', F.brlK(vf / ped)) : '') + (d.vendedores.length ? F.tile('Participação', F.pct(F.n(d.valor) ? vf / F.n(d.valor) * 100 : 0)) : '') + '</div></div>';
+  var m = document.getElementById('modalVend');
+  if (!m) {
+    document.body.insertAdjacentHTML('beforeend', '<div class="fundo-modal" id="modalVend"><div class="modal" style="max-height:90vh;overflow:auto"><div id="vendDet"></div>' +
+      (F.gerarImagem ? '<button class="b2" id="vendImg">' + F.ic('imagem') + ' Gerar imagem deste vendedor</button>' : '') +
+      '<button class="b3" id="vendFechar">Fechar</button></div></div>');
+    m = document.getElementById('modalVend');
+    m.onclick = function (ev) { if (ev.target.id === 'modalVend') m.classList.remove('on'); };
+    document.getElementById('vendFechar').onclick = function () { m.classList.remove('on'); };
+  }
+  document.getElementById('vendDet').innerHTML = h;
+  var bi = document.getElementById('vendImg');
+  if (bi) bi.onclick = function () { m.classList.remove('on'); F.gerarImagem(imgVendedor(x, o, d)); };
+  m.classList.add('on');
+}
+
+var mostrado = null;   // o que está na tela agora (mês ou período): é o que vai para a imagem
+
 function gestor(d) {
-  var h = '<div class="card">' + hero(d, 'FATURAMENTO DO MÊS' + (d.nome ? ' · ' + F.esc(d.nome).toUpperCase() : ''), '', '#4f7cff', '#e84b8a') +
+  mostrado = d;
+  var h = '<div class="card">' + hero(d, (d.periodo ? 'FATURAMENTO · ' + F.esc(d.periodo) : 'FATURAMENTO DO MÊS') + (d.nome ? ' · ' + F.esc(d.nome).toUpperCase() : ''), '', '#4f7cff', '#e84b8a') +
+    cmpAnterior(d) +
+    destaque(d, d.metaSoma ? 'Meta da equipe' : 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje') +
     '<div class="tiles">' +
-    F.tile('Meta', F.brlK(d.meta)) + F.tile('Ideal hoje', F.brlK(d.ideal)) + F.tile('Falta', F.brlK(d.falta), F.n(d.falta) > 0 ? 'laranja' : 'verde') +
-    F.tile('Por dia (' + F.int(d.rest) + ' dias)', F.n(d.rest) > 0 ? F.brlK(d.porDia) : '—') +
     F.tile('Positivação', F.int(d.pos) + '/' + F.int(d.metaPos), 'verde') + F.tile('Dias úteis', F.int(d.dec) + '/' + F.int(d.T)) +
     (F.n(d.pedidos) ? F.tile('Pedidos', F.int(d.pedidos)) : '') + (F.n(d.ticket) ? F.tile('Ticket médio', F.brlK(d.ticket)) : '') +
     (F.n(d.projecao) ? F.tile('Projeção', F.brlK(d.projecao)) : '') +
-    '</div></div>';
+    '</div>' + (d.metaSoma ? '<div class="nota">Meta = soma das metas dos vendedores da equipe.</div>' : '') + '</div>' +
+    grafico(d, d.periodo ? 'EVOLUÇÃO NO PERÍODO' : 'EVOLUÇÃO DO MÊS');
   var vs = d.vendedores || [];
   h += '<div class="vs"><h2>VENDEDORES <span>' + vs.length + ' no total</span></h2>' +
     '<div class="busca"><input id="busca" type="search" placeholder="Buscar vendedor" value="' + F.esc(busca) + '"></div>' +
+    '<div class="ord"><select id="ordem">' + [['valor', 'Ordenar: maior faturamento'], ['pct', 'Ordenar: % da meta'], ['falta', 'Ordenar: quem mais falta'],
+      ['abaixo', 'Ordenar: mais abaixo do ideal'], ['nome', 'Ordenar: nome (A–Z)']].map(function (o) {
+      return '<option value="' + o[0] + '"' + (ordem === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
     '<div class="filtros">' +
     [['todos', 'Todos'], ['abaixo', 'Abaixo do ideal'], ['bateram', 'Bateram a meta'], ['semmeta', 'Sem meta']].map(function (f) {
       return '<button data-f="' + f[0] + '" class="' + (filtro === f[0] ? 'on' : '') + '">' + f[1] + '</button>';
@@ -55,6 +201,8 @@ function gestor(d) {
   document.getElementById('conteudo').innerHTML = h;
   dadosAtuais = d;
   document.getElementById('busca').oninput = function () { busca = this.value; lista(); };
+  document.getElementById('ordem').onchange = function () { ordem = this.value; lista(); };
+  ligarGraficos(d);
   Array.prototype.forEach.call(document.querySelectorAll('.filtros button'), function (b) {
     b.onclick = function () { filtro = b.dataset.f; Array.prototype.forEach.call(document.querySelectorAll('.filtros button'), function (x) { x.classList.toggle('on', x === b); }); lista(); };
   });
@@ -71,35 +219,181 @@ function lista() {
     if (filtro === 'semmeta') return !(vm > 0);
     return true;
   });
+  function chave(x) {
+    var vf = F.n(x.valor), vm = F.n(x.meta);
+    if (ordem === 'pct') return vm ? -vf / vm : 1e9;
+    if (ordem === 'falta') return vm ? -(vm - vf) : 1e18;
+    if (ordem === 'abaixo') return vm ? vf - vm * idealP : 1e18;
+    return -vf;
+  }
+  if (ordem === 'nome') vs.sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
+  else if (ordem !== 'valor') vs.sort(function (a, b) { return chave(a) - chave(b); });
   document.getElementById('lista').innerHTML = vs.length ? vs.map(function (x) {
     var vf = F.n(x.valor), vm = F.n(x.meta), p = vm ? vf / vm : 0, id = vm * idealP, f = Math.max(0, vm - vf);
     var cor = !vm ? '#3a4154' : vf >= id ? '#4f7cff' : '#f0a53a';
-    return '<div class="v"><div class="l"><span><em>' + x.rank + 'º</em>' + F.esc(x.nome) + '</span><b>' + F.brlK(vf) + (vm ? '<i>' + F.pct(p * 100) + '</i>' : '') + '</b></div>' +
+    return '<div class="v" data-i="' + (x.rank - 1) + '"><div class="l"><span><em>' + x.rank + 'º</em>' + F.esc(x.nome) + '</span><b>' + F.brlK(vf) + (vm ? '<i>' + F.pct(p * 100) + '</i>' : '') + '</b></div>' +
       F.barra(p, vm ? idealP : null, cor) +
       (vm ? '<div class="d"><span>Meta ' + F.brlK(vm) + '</span><span>Ideal ' + F.brlK(id) + '</span><span>' + (f > 0 ? 'Falta ' + F.brlK(f) : '<b class="verde">meta batida</b>') + '</span></div>'
           : '<div class="d"><span>sem meta cadastrada</span>' + (F.n(x.pedidos) ? '<span>' + F.int(x.pedidos) + ' pedidos</span>' : '') + '</div>') + '</div>';
   }).join('') : '<div class="vazio">Nenhum vendedor neste filtro.</div>';
+  Array.prototype.forEach.call(document.querySelectorAll('#lista .v'), function (el) {
+    el.onclick = function () { detalheVendedor(parseInt(el.dataset.i, 10)); };
+  });
 }
 
 function vendedor(d) {
+  mostrado = d;
   var s = d.semana || {}, m = d.mes || {}, ac = F.n(s.acumulado);
+  if (d.periodo) {
+    document.getElementById('conteudo').innerHTML = '<div class="card">' + hero(m, F.esc(m.titulo || 'PERÍODO'), 'dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T), '#4f7cff', '#e84b8a') +
+      destaque(m, 'Meta', 'Ideal no período') + '<div class="tiles">' + F.tile('Positivação', F.int(m.pos) + '/' + F.int(m.metaPos), 'verde') +
+      F.tile('Dias úteis', F.int(m.dec) + '/' + F.int(m.T)) + '</div></div>' + grafico(m, 'EVOLUÇÃO NO PERÍODO');
+    ligarGraficos(m);
+    return;
+  }
   var nota = ac >= 0.01 ? 'A meta da semana inclui ' + F.brlK(ac) + ' que faltaram nas semanas anteriores.' :
              ac <= -0.01 ? 'Você vendeu ' + F.brlK(-ac) + ' a mais nas semanas anteriores: a meta desta semana ficou menor.' : '';
   var h = '<div class="card">' + hero(s, F.esc(s.titulo || 'SEMANA') + (d.nome ? ' · ' + F.esc(d.nome).toUpperCase() : ''), '', '#4f7cff', '#e84b8a') +
-    '<div class="tiles">' +
-    F.tile('Meta da semana', F.brlK(s.meta)) + F.tile('Ideal hoje', F.brlK(s.ideal)) + F.tile('Falta', F.brlK(s.falta), F.n(s.falta) > 0 ? 'laranja' : 'verde') +
-    F.tile('Para bater', F.n(s.restam) > 0 ? F.brlK(s.porDia) + '/dia' : '—') + F.tile('Dias restantes', F.int(s.restam)) +
+    destaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, rest: s.restam, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje') +
+    '<div class="tiles">' + F.tile('Dias restantes', F.int(s.restam)) +
     F.tile('Positivação', F.int(s.pos) + '/' + F.int(s.metaPos), 'verde') +
     '</div>' + (nota ? '<div class="nota">' + nota + '</div>' : '') + '</div>';
   h += '<div class="card">' + hero(m, 'MÊS', 'dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T), '#e84b8a', '#e84b8a') +
-    '<div class="tiles">' +
-    F.tile('Meta do mês', F.brlK(m.meta)) + F.tile('Ideal hoje', F.brlK(m.ideal)) + F.tile('Falta', F.brlK(m.falta), F.n(m.falta) > 0 ? 'laranja' : 'verde') +
-    F.tile('Por dia (' + F.int(m.rest) + ' dias)', F.n(m.rest) > 0 ? F.brlK(m.porDia) : '—') + F.tile('Positivação', F.int(m.pos) + '/' + F.int(m.metaPos), 'verde') +
-    F.tile('Dias úteis', F.int(m.dec) + '/' + F.int(m.T)) + '</div></div>';
+    cmpAnterior(m) + destaque(m, 'Meta do mês', 'Ideal até hoje') + '<div class="tiles">' + F.tile('Positivação', F.int(m.pos) + '/' + F.int(m.metaPos), 'verde') +
+    F.tile('Dias úteis', F.int(m.dec) + '/' + F.int(m.T)) + '</div></div>' + grafico(m, 'EVOLUÇÃO DO MÊS');
   document.getElementById('conteudo').innerHTML = h;
+  ligarGraficos(m);
 }
 
+// ---- imagem (PNG) do que está na tela ----
+function imgDestaque(o, rotMeta, rotIdeal, restam) {
+  var r = F.n(restam != null ? restam : o.rest);
+  return { tipo: 'tiles', cols: 2, itens: [
+    { r: rotMeta, v: F.brlK(o.meta) },
+    { r: 'Falta', v: F.n(o.falta) > 0 ? F.brlK(o.falta) : 'Meta batida', c: F.n(o.falta) > 0 ? 'laranja' : 'verde' },
+    { r: r > 0 ? 'Vender por dia (' + F.int(r) + (r === 1 ? ' dia útil)' : ' dias úteis)') : 'Vender por dia', v: r > 0 && F.n(o.falta) > 0 ? F.brlK(o.porDia) : '—' },
+    { r: rotIdeal, v: F.brlK(o.ideal) }] };
+}
+function imgHero(o, rot, sub, corOk, corRuim) {
+  return { tipo: 'hero', rot: rot, valor: o.valor, pill: F.pct(F.n(o.p) * 100) + ' da meta', sub: sub, p: F.n(o.p), idealP: F.n(o.idealP),
+           cor: F.n(o.valor) >= F.n(o.ideal) ? corOk : corRuim,
+           legIdeal: (o.periodo ? 'ideal no período ' : 'ideal hoje ') + F.pct(F.n(o.idealP) * 100), legMeta: F.brlK(o.meta) };
+}
+function dataHora(ms) { var d = new Date(ms); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear() + ' às ' + F.hhmm(ms); }
+function imgAnterior(o) {
+  var a = o.anterior; if (!a || !(F.n(a.valor) > 0)) return '';
+  var v = F.n(o.valor) / F.n(a.valor) - 1;
+  return (v >= 0 ? '▲ ' : '▼ ') + F.pct(Math.abs(v) * 100) + ' vs mês passado até ' + a.ate;
+}
+function imgGrafico(o, titulo) {
+  var dd = o.diario || [];
+  if (dd.length < 2 || !dd.some(function (x) { return F.n(x.a) > 0 || F.n(x.v) > 0; })) return null;
+  return { tipo: 'card', blocos: [{ tipo: 'grafico', titulo: titulo, dados: dd, meta: F.n(o.meta) }] };
+}
+function imgVendedor(x, o, d) {
+  var ped = F.n(x.pedidos), cli = F.n(x.clientes), outros = [];
+  if (ped) outros.push({ r: 'Pedidos', v: F.int(ped) });
+  if (cli) outros.push({ r: 'Clientes', v: F.int(cli) });
+  if (ped) outros.push({ r: 'Ticket médio', v: F.brlK(o.valor / ped) });
+  var card = [imgHero(o, (d.periodo ? 'FATURAMENTO · ' + d.periodo : 'FATURAMENTO DO MÊS'), (x.rank ? x.rank + 'º da equipe' : ''), '#4f7cff', '#f0a53a')];
+  if (o.meta) card.push(imgDestaque(o, 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje'));
+  if (outros.length) card.push({ tipo: 'tiles', cols: 3, itens: outros });
+  var e = Base.estado();
+  return { titulo: 'Comercial · ' + x.nome, sub: d.periodo ? 'Período ' + d.periodo : 'Mês atual',
+           quando: periodoAtivo ? 'Período ' + (d.periodo || '') : (e.hora ? 'Números de ' + dataHora(e.hora) : ''),
+           arquivo: 'Comercial-' + x.nome, blocos: [{ tipo: 'card', blocos: card }] };
+}
+Base.paraImagem = function () {
+  var d = mostrado; if (!d) return null;
+  var e = Base.estado();
+  var quando = periodoAtivo ? 'Período ' + (d.periodo || '') : (e.hora ? 'Números de ' + dataHora(e.hora) : '');
+  var nome = d.nome ? String(d.nome).toUpperCase() : '';
+  if (d.tipo === 'vendedor') {
+    var s = d.semana || {}, m = d.mes || {}, bl = [];
+    if (!d.periodo) {
+      var ac = F.n(s.acumulado);
+      bl.push({ tipo: 'card', blocos: [imgHero(s, s.titulo || 'SEMANA', '', '#4f7cff', '#e84b8a'),
+        imgDestaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje', s.restam),
+        { tipo: 'tiles', cols: 3, itens: [{ r: 'Dias restantes', v: F.int(s.restam) }, { r: 'Positivação', v: F.int(s.pos) + '/' + F.int(s.metaPos), c: 'verde' }] }]
+        .concat(ac >= 0.01 ? [{ tipo: 'nota', t: 'A meta da semana inclui ' + F.brlK(ac) + ' que faltaram nas semanas anteriores.' }] : []) });
+    }
+    bl.push({ tipo: 'card', blocos: [imgHero(m, d.periodo ? (m.titulo || 'PERÍODO') : 'MÊS', imgAnterior(m) || ('dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T)), '#4f7cff', '#e84b8a'),
+      imgDestaque(m, d.periodo ? 'Meta' : 'Meta do mês', d.periodo ? 'Ideal no período' : 'Ideal até hoje'),
+      { tipo: 'tiles', cols: 3, itens: [{ r: 'Positivação', v: F.int(m.pos) + '/' + F.int(m.metaPos), c: 'verde' }, { r: 'Dias úteis', v: F.int(m.dec) + '/' + F.int(m.T) }] }] });
+    var gm = imgGrafico(m, d.periodo ? 'Evolução no período' : 'Evolução do mês'); if (gm) bl.push(gm);
+    return { titulo: 'Comercial · ' + (d.nome || 'Vendedor'), sub: d.periodo ? 'Período ' + d.periodo : 'Semana e mês', quando: quando, arquivo: 'Comercial-' + (d.nome || 'vendedor'), blocos: bl };
+  }
+  var outros = [{ r: 'Positivação', v: F.int(d.pos) + '/' + F.int(d.metaPos), c: 'verde' }, { r: 'Dias úteis', v: F.int(d.dec) + '/' + F.int(d.T) }];
+  if (F.n(d.pedidos)) outros.push({ r: 'Pedidos', v: F.int(d.pedidos) });
+  if (F.n(d.ticket)) outros.push({ r: 'Ticket médio', v: F.brlK(d.ticket) });
+  if (F.n(d.projecao)) outros.push({ r: 'Projeção', v: F.brlK(d.projecao) });
+  var card = [imgHero(d, d.periodo ? 'FATURAMENTO · ' + d.periodo : 'FATURAMENTO DO MÊS', imgAnterior(d), '#4f7cff', '#e84b8a'),
+    imgDestaque(d, d.metaSoma ? 'Meta da equipe' : 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje'),
+    { tipo: 'tiles', cols: 3, itens: outros }];
+  if (d.metaSoma) card.push({ tipo: 'nota', t: 'Meta = soma das metas dos vendedores da equipe.' });
+  var bl = [{ tipo: 'card', blocos: card }];
+  var gg = imgGrafico(d, d.periodo ? 'Evolução no período' : 'Evolução do mês'); if (gg) bl.push(gg);
+  var vs = d.vendedores || [], idealP = F.n(d.idealP), MAX = 40;
+  if (vs.length) {
+    bl.push({ tipo: 'secao', t: 'Vendedores', d: vs.length + ' no total' });
+    bl.push({ tipo: 'ranking', mais: vs.length > MAX ? '+ ' + (vs.length - MAX) + ' vendedores' : '', itens: vs.slice(0, MAX).map(function (x, i) {
+      var vf = F.n(x.valor), vm = F.n(x.meta), p = vm ? vf / vm : 0, f = Math.max(0, vm - vf);
+      return { rank: i + 1, nome: x.nome, valor: F.brlK(vf), pct: vm ? F.pct(p * 100) : '', p: p, idealP: vm ? idealP : null,
+               cor: !vm ? '#3a4154' : vf >= vm * idealP ? '#4f7cff' : '#f0a53a',
+               sub: vm ? 'Meta ' + F.brlK(vm) + '  ·  Ideal ' + F.brlK(vm * idealP) + '  ·  ' + (f > 0 ? 'Falta ' + F.brlK(f) : 'meta batida') : 'sem meta cadastrada' };
+    }) });
+  }
+  return { titulo: 'Comercial · Equipe', sub: (d.periodo ? 'Período ' + d.periodo : 'Mês atual') + (nome ? ' · ' + nome : ''), quando: quando,
+           arquivo: 'Comercial-equipe', blocos: bl };
+};
+
+// ---- período escolhido (não muda o widget) ----
+var periodoAtivo = false;
+function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function pedirPeriodo(ini, fim) {
+  periodoAtivo = true;
+  document.getElementById('faixaPer').innerHTML = '';
+  document.getElementById('conteudo').innerHTML = '<div class="carregando"><i></i>Buscando o período…</div>';
+  try { App.buscarPainel(PAINEL_ID, ini, fim); } catch (e) { voltarMes(); }
+}
+function voltarMes() {
+  periodoAtivo = false;
+  document.getElementById('perSel').value = 'mes';
+  document.getElementById('perDatas').style.display = 'none';
+  document.getElementById('faixaPer').innerHTML = '';
+  Base.ultimo = ''; Base.atualizarTela();
+}
+window.painelPeriodo = function (d, erro) {
+  if (!periodoAtivo) return;
+  if (!d) {
+    document.getElementById('conteudo').innerHTML = '';
+    document.getElementById('faixaPer').innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>Não consegui buscar o período: ' + F.esc(erro || 'erro') + '</span><button onclick="voltarMes()">Voltar</button></div>';
+    return;
+  }
+  document.getElementById('faixaPer').innerHTML = '<div class="faixaPer"><span>Mostrando ' + F.esc(d.periodo || 'o período escolhido') + '</span><button onclick="voltarMes()">Voltar para este mês</button></div>';
+  if (d.tipo === 'vendedor') vendedor(d); else gestor(d);
+};
+document.getElementById('perSel').onchange = function () {
+  var v = this.value, h = new Date();
+  document.getElementById('perDatas').style.display = v === 'dt' ? 'flex' : 'none';
+  if (v === 'mes') return voltarMes();
+  if (v === 'sem') { var seg = new Date(h); seg.setDate(h.getDate() - ((h.getDay() + 6) % 7)); var dom = new Date(seg); dom.setDate(seg.getDate() + 6); pedirPeriodo(iso(seg), iso(dom)); }
+  if (v === 'ant') { var i = new Date(h.getFullYear(), h.getMonth() - 1, 1), f = new Date(h.getFullYear(), h.getMonth(), 0); pedirPeriodo(iso(i), iso(f)); }
+  if (v === 'dt') {
+    var ii = document.getElementById('perIni'), ff = document.getElementById('perFim');
+    if (!ii.value) ii.value = iso(new Date(h.getFullYear(), h.getMonth(), 1));
+    if (!ff.value) ff.value = iso(h);
+  }
+};
+document.getElementById('perVer').onclick = function () {
+  var i = document.getElementById('perIni').value, f = document.getElementById('perFim').value;
+  if (!i || !f) return;
+  if (f < i) { var t = i; i = f; f = t; }
+  pedirPeriodo(i, f);
+};
+
 Base.iniciar(function (d, e) {
+  if (periodoAtivo) return;
   if (d.tipo === 'vendedor') vendedor(d); else gestor(d);
   document.getElementById('conteudo').insertAdjacentHTML('beforeend', '<div class="rod">Atualiza sozinho a cada 15 minutos · toque em ↻ para atualizar agora</div>');
 });

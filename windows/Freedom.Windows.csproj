@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Freedom para Windows: um .exe só (telas e DLLs do WebView2 vão dentro). Montado pelo GitHub Actions. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>Freedom</AssemblyName>
+    <RootNamespace>Freedom</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Version>2.0.0</Version>
+    <Product>Freedom</Product>
+    <AssemblyTitle>Freedom</AssemblyTitle>
+    <Company>Freedom Tech</Company>
+    <Description>Freedom · Helpdesk, site e painéis</Description>
+    <ApplicationIcon>freedom.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="src\*.cs" />
+    <Reference Include="System.Security" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" GeneratePathProperty="true" />
+  </ItemGroup>
+  <!-- as mesmas telas do app do celular -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\comum\src\main\assets\*.*" LogicalName="www/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\app\src\main\assets\*.*" LogicalName="www/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PkgMicrosoft_Web_WebView2)' != ''">
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.Core.dll" LogicalName="dll/Microsoft.Web.WebView2.Core.dll" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.WinForms.dll" LogicalName="dll/Microsoft.Web.WebView2.WinForms.dll" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" LogicalName="dll/WebView2Loader.dll" />
+  </ItemGroup>
+</Project>

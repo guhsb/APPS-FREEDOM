@@ -70,3 +70,82 @@ jobs:
             Freedom.apk = app único: Helpdesk, site e painéis/widgets (Comercial, Faturamento) conforme o acesso de cada login
           files: Freedom.apk
           make_latest: true
+
+  windows:
+    needs: apk
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Montar o Freedom para Windows
+        run: dotnet build windows/Freedom.Windows.csproj -c Release -p:Version=2.${{ github.run_number }}.0
+
+      - name: Conferir e renomear
+        shell: pwsh
+        run: |
+          $exe = "windows/bin/Release/net48/Freedom.exe"
+          if (-not (Test-Path $exe)) { Write-Error "Freedom.exe não foi gerado"; exit 1 }
+          $tam = (Get-Item $exe).Length
+          Write-Host "Freedom.exe: $tam bytes"
+          if ($tam -lt 800000) { Write-Error "Freedom.exe pequeno demais (faltou o WebView2 dentro)"; exit 1 }
+          Copy-Item $exe Freedom-Windows.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Freedom-Windows
+          path: Freedom-Windows.exe
+
+      - name: Publicar em Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          files: Freedom-Windows.exe
+
+  mac:
+    needs: apk
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Testes (avisos, painéis, sem internet)
+        run: |
+          node mac/teste/engine.test.js
+          node mac/teste/integracao.test.js
+
+      - name: Montar o Freedom para Mac (Intel e Apple Silicon)
+        working-directory: mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          npm version 1.${{ github.run_number }}.0 --no-git-tag-version --allow-same-version
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Conferir
+        run: |
+          ls -la mac/dist
+          test -f mac/dist/Freedom-Mac.dmg
+          test -f mac/dist/Freedom-Mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Freedom-Mac
+          path: |
+            mac/dist/Freedom-Mac.dmg
+            mac/dist/Freedom-Mac.zip
+
+      - name: Publicar em Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          files: |
+            mac/dist/Freedom-Mac.dmg
+            mac/dist/Freedom-Mac.zip

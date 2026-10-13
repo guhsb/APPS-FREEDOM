@@ -1,0 +1,68 @@
+{
+  "name": "freedom-mac",
+  "productName": "Freedom",
+  "version": "1.0.0",
+  "description": "Freedom para Mac: Helpdesk, site e painéis",
+  "author": "Freedom Tech",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "telas": "node scripts/copiar-telas.js",
+    "start": "npm run telas && electron .",
+    "teste": "node teste/engine.test.js",
+    "build": "npm run telas && electron-builder --mac --universal --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "br.com.cbfreedom.mac",
+    "productName": "Freedom",
+    "copyright": "Freedom Tech",
+    "directories": {
+      "output": "dist",
+      "buildResources": "recursos"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-shell.js",
+      "core/**",
+      "ui/**",
+      "www/**",
+      "recursos/trayTemplate.png",
+      "recursos/trayTemplate@2x.png"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "recursos/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Freedom-Mac.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "NSUserNotificationAlertStyle": "alert"
+      }
+    },
+    "dmg": {
+      "title": "Freedom"
+    },
+    "afterPack": "scripts/assinar.js"
+  }
+}

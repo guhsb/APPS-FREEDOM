@@ -41,6 +41,7 @@ body{padding-bottom:96px}
 .msg{max-width:86%;align-self:flex-start;background:var(--sf);border:1px solid var(--ln);border-radius:16px 16px 16px 6px;padding:10px 12px}
 .msg.eu{align-self:flex-end;background:rgba(232,75,138,.13);border-color:rgba(232,75,138,.3);border-radius:16px 16px 6px 16px}
 .msg.solucao{border-color:rgba(31,191,143,.45)}
+.msg.pend{opacity:.75;border-style:dashed}
 .msg .q{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
 .msg .q b{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .msg.eu .q b{color:#f6b3cf}
@@ -160,6 +161,7 @@ function bt(id, txt, cls, icone) {
     (ocupado === id ? 'Aguarde…' : txt) + '</button>';
 }
 
+function temCamera() { try { return !(App.plataforma && App.plataforma() === 'windows') && typeof App.fotoChamado === 'function'; } catch (e) { return false; } }
 function render(d) {
   // guarda o que a pessoa estava escolhendo/escrevendo (a tela se atualiza sozinha)
   var guard = {};
@@ -254,12 +256,16 @@ function render(d) {
     h += '<div class="msg' + (eu ? ' eu' : '') + (ehSol ? ' solucao' : '') + '"><div class="q"><b>' + F.esc(eu ? 'Você' : quem) + '</b>' + tag +
       '<em>' + hora(it.created_at) + '</em></div><p>' + (corpo ? F.esc(corpo) : '<i style="color:var(--tx3)">(sem texto)</i>') + '</p></div>';
   });
-  if (!itens.length) h += '<div class="vazio">Nenhuma mensagem ainda.</div>';
+  (d.pendentes || []).forEach(function (pm) {
+    h += '<div class="msg eu pend"><div class="q"><b>Você</b><span class="tag">aguardando internet</span><em>' + F.hhmm(pm.criado) + '</em></div><p>' + F.esc(pm.texto) + '</p></div>';
+  });
+  if (!itens.length && !(d.pendentes || []).length) h += '<div class="vazio">Nenhuma mensagem ainda.</div>';
   h += '</div>';
 
   // anexos
   h += '<div class="sec"><h2>Anexos</h2><span id="nAnexos"></span></div><div id="anexosBox"></div>';
-  if (!fechado) h += '<div style="margin-top:8px">' + bt('btAnexar', enviandoAnexo ? 'Enviando ' + enviandoAnexo + '…' : 'Anexar arquivo', 'linha', 'clipe') + '</div>' +
+  if (!fechado) h += '<div style="margin-top:8px"' + (temCamera() ? ' class="duas"' : '') + '>' + bt('btAnexar', enviandoAnexo ? 'Enviando ' + enviandoAnexo + '…' : 'Anexar arquivo', 'linha', 'clipe') +
+    (temCamera() && !enviandoAnexo ? bt('btFoto', 'Tirar foto', 'linha', 'camera') : '') + '</div>' +
     '<div class="nota">PDF, imagem, texto, Excel ou Word · até 10 MB</div>';
   h += '<div class="rod">Tudo aqui é o mesmo chamado do site · ' + F.ic('externo').replace('class="ic ', 'class="ic " style="width:12px;height:12px;vertical-align:-2px"') + ' abre no site</div>';
   document.getElementById('conteudo').innerHTML = h;
@@ -317,6 +323,7 @@ function ligar(d) {
   on('btRejCancelar', function () { abertoRej = false; render(dados); });
   on('btRejeitar', function () { var v = val('txMotivo').trim(); if (!v) { mostrarToast('Escreva o motivo da rejeição'); return; } operar('btRejeitar', 'rejeitar', v); });
   on('btAnexar', function () { if (enviandoAnexo) return; try { App.anexarChamado(ID); } catch (e) {} });
+  on('btFoto', function () { if (enviandoAnexo) return; try { App.fotoChamado(ID); } catch (e) {} });
   var box = document.getElementById('anexosBox');
   if (box) box.onclick = function (ev) {
     var el = ev.target.closest ? ev.target.closest('[data-anexo]') : null; if (!el || !anexos) return;
@@ -345,6 +352,7 @@ window.chamadoCarregado = function (id, ok, msg, d) {
     return;
   }
   av.innerHTML = '';
+  if (msg && String(msg).indexOf('offline:') === 0) F.semInternet(parseInt(String(msg).slice(8), 10));
   var chave = JSON.stringify(d);
   if (chave === ultimaChave) return;
   var primeira = !dados, desce = primeira || perto();
@@ -369,7 +377,7 @@ window.chamadoAcao = function (id, tipo, ok, msg) {
     enviando = false;
     var tx = document.getElementById('texto');
     tx.disabled = false;
-    if (ok) { tx.value = ''; ajustar(); mostrarToast('Resposta enviada'); }
+    if (ok) { tx.value = ''; ajustar(); mostrarToast(msg || 'Resposta enviada'); }
     else mostrarToast(msg);
     atualizarBotao();
   } else if (tipo === 'anexo') {
