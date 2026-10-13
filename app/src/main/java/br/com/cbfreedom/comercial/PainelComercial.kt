@@ -66,23 +66,42 @@ object PainelComercial : Painel {
         return yb + altBarra
     }
 
+    /**
+     * Widget pequeno: valor, % e barra, e embaixo Meta · Ideal · Falta (e Por dia, se couber), uma por linha.
+     * Com pouca altura fica Meta, Ideal e Falta; com menos ainda, Meta e Falta.
+     */
+    private fun pequeno(p: Pintor, o: JSONObject, y0: Float, linhas: List<Triple<String, String, Int?>>) {
+        val H = p.alt; val iw = p.larg - 2 * X0
+        val passo = 13f
+        val cabem = ((H - 57f - y0) / passo).toInt() + 1      // valor + barra precisam de ~45 abaixo do título
+        val usar = when {
+            cabem >= 4 -> linhas
+            cabem == 3 -> linhas.take(3)
+            else -> listOf(linhas[0], linhas[2])
+        }
+        val faltaCor = if (o.v("falta") > 0) Cor.LARANJA else Cor.VERDE
+        val ultimo = H - 12f
+        val primeiro = ultimo - (usar.size - 1) * passo
+        val livre = (primeiro - 13f) - y0
+        val y = y0 + max(0f, (livre - 26f) / 2f) + 18f
+        bloco(p, o, y, 17f, 10f, 7f, Cor.AZUL, Cor.ROSA)
+        for ((i, l) in usar.withIndex())
+            p.linhaInfo(primeiro + i * passo, X0, iw, listOf(if (l.first == "Falta") Triple(l.first, l.second, faltaCor as Int?) else l), 9.5f)
+    }
+
     // ---------------- GESTOR ----------------
     private fun gestor(p: Pintor, d: JSONObject, info: Info, cl: Char) {
         val W = p.larg; val H = p.alt; val iw = W - 2 * X0
         val y0 = p.cabecalho("FATURAMENTO DO MÊS", info, X0, 12f, cl == 'P')
         val metaT = Triple("Meta", Fmt.brlK(d.v("meta")), null as Int?)
         val idealT = Triple("Ideal", Fmt.brlK(d.v("ideal")), null as Int?)
-        val faltaT = Triple("Falta", Fmt.brlK(d.v("falta")), null as Int?)
+        val faltaT = Triple("Falta", Fmt.brlK(d.v("falta")), (if (d.v("falta") > 0) Cor.LARANJA else Cor.VERDE) as Int?)
         val porDiaT = Triple("Por dia", if (d.v("rest") > 0) Fmt.brlK(d.v("porDia")) else "—", null as Int?)
         val posT = Triple("Positivação", pos(d), Cor.VERDE as Int?)
         val diasT = Triple("Dias", Fmt.int(d.v("dec")) + "/" + Fmt.int(d.v("T")), null as Int?)
 
         if (cl == 'P') {
-            val livre = (H - 12f - 30f) - y0
-            val y = y0 + max(0f, (livre - 32f) / 2f) + 18f
-            bloco(p, d, y, 17f, 10f, 8f, Cor.AZUL, Cor.ROSA)
-            p.linhaInfo(H - 12f - 15f, X0, iw, listOf(metaT), 10f)
-            p.linhaInfo(H - 12f, X0, iw, listOf(porDiaT), 10f)
+            pequeno(p, d, y0, listOf(metaT, idealT, faltaT, porDiaT))
             return
         }
         if (cl == 'M') {
@@ -153,7 +172,7 @@ object PainelComercial : Painel {
         val y0 = p.cabecalho(s.optString("titulo", "SEMANA"), info, X0, 12f, cl == 'P')
         val metaT = Triple("Meta", Fmt.brlK(s.v("meta")), null as Int?)
         val idealT = Triple("Ideal", Fmt.brlK(s.v("ideal")), null as Int?)
-        val faltaT = Triple("Falta", Fmt.brlK(s.v("falta")), null as Int?)
+        val faltaT = Triple("Falta", Fmt.brlK(s.v("falta")), (if (s.v("falta") > 0) Cor.LARANJA else Cor.VERDE) as Int?)
         val restam = s.v("restam") > 0
         val paraBater = Triple("Para bater", if (restam) Fmt.brlK(s.v("porDia")) + "/dia" else "—", null as Int?)
         val posT = Triple("Positivação", pos(s), Cor.VERDE as Int?)
@@ -165,11 +184,7 @@ object PainelComercial : Painel {
         }
 
         if (cl == 'P') {
-            val livre = (H - 12f - 30f) - y0
-            val y = y0 + max(0f, (livre - 32f) / 2f) + 18f
-            bloco(p, s, y, 17f, 10f, 8f, Cor.AZUL, Cor.ROSA)
-            p.linhaInfo(H - 12f - 15f, X0, iw, listOf(faltaT), 10f)
-            p.linhaInfo(H - 12f, X0, iw, listOf(Triple("Por dia", if (restam) Fmt.brlK(s.v("porDia")) else "—", null as Int?)), 10f)
+            pequeno(p, s, y0, listOf(metaT, idealT, faltaT, Triple("Por dia", if (restam) Fmt.brlK(s.v("porDia")) else "—", null as Int?)))
             return
         }
         fun semana(baseInfo1: Float, topo: Float) {

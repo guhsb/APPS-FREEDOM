@@ -21,6 +21,11 @@
 .v .trilho{height:6px;margin:9px 0 6px}.v .trilho>s{top:-3px;bottom:-3px}
 .v .d{display:flex;justify-content:space-between;font-size:12px;color:var(--tx3);gap:8px}
 .nota{font-size:12px;color:var(--tx3);margin-top:10px}
+.vazioPer{text-align:center;padding:30px 18px}.vazioPer .ico{width:46px;height:46px;border-radius:50%;background:var(--azul-s);color:var(--azul);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.vazioPer h3{margin:0 0 6px;font-size:17px}.vazioPer p{margin:0 0 16px;color:var(--tx3);font-size:13.5px}
+.vazioPer button{border:0;border-radius:10px;padding:10px 16px;background:var(--sf3);color:var(--tx);font:inherit;font-weight:700}
+.leg3{font-size:12px;gap:8px;margin-top:2px}.leg3 b{color:var(--tx2);font-weight:700}.leg3 i{font-style:normal}
+.leg3 span:nth-child(2){text-align:center}.leg3 span:last-child{text-align:right}
 .cmpMes{font-size:12.5px;color:var(--tx3);margin-top:10px}
 .cmpMes span{font-weight:700;margin-right:2px}.cmpMes .sobe{color:var(--verde)}.cmpMes .desce{color:#f87171}
 .graf h3{margin:0 0 2px;font-size:13px;letter-spacing:.06em;color:var(--tx2)}
@@ -66,7 +71,14 @@ function hero(o, rotulo, sub, corOk, corRuim) {
     '<div class="big"><small>R$</small>' + F.num(o.valor) + '</div>' +
     '<span class="pill">' + F.pct(F.n(o.p) * 100) + ' da meta</span>' + (sub ? ' <span class="cinza" style="font-size:12px;margin-left:6px">' + sub + '</span>' : '') +
     F.barra(F.n(o.p), F.n(o.idealP), cor) +
-    '<div class="leg"><span>0</span><span>' + (o.periodo ? 'ideal no período ' : 'ideal hoje ') + F.pct(F.n(o.idealP) * 100) + '</span><span>' + F.brlK(o.meta) + '</span></div>';
+    legenda(o);
+}
+/** Embaixo da barra: Meta · Ideal (até hoje) · Falta — igual às linhas dos vendedores. */
+function legenda(o) {
+  var f = F.n(o.falta);
+  return '<div class="leg leg3"><span>Meta <b>' + F.brlK(o.meta) + '</b></span>' +
+    '<span>Ideal <b>' + F.brlK(o.ideal) + '</b> <i>(' + F.pct(F.n(o.idealP) * 100) + ')</i></span>' +
+    '<span>' + (f > 0 ? 'Falta <b class="laranja">' + F.brlK(f) + '</b>' : '<b class="verde">meta batida</b>') + '</span></div>';
 }
 
 /** Meta, falta, quanto vender por dia e ideal: em destaque (2 colunas, números inteiros na tela). */
@@ -77,6 +89,20 @@ function destaque(o, rotMeta, rotIdeal) {
     F.tile(rotIdeal, F.brlK(o.ideal)) + '</div>';
 }
 
+/** Positivação: quantos clientes já positivou, a meta e quantos faltam. */
+function posTiles(o) {
+  var pos = F.n(o.pos), meta = F.n(o.metaPos);
+  if (!(meta > 0)) return F.tile('Positivação', F.int(pos), 'verde');
+  var f = Math.max(0, meta - pos);
+  return F.tile('Positivação', F.int(pos) + '/' + F.int(meta), 'verde') +
+    F.tile(f > 0 ? 'Falta positivar' : 'Positivação', f > 0 ? F.int(f) + (f === 1 ? ' cliente' : ' clientes') : 'meta batida', f > 0 ? 'laranja' : 'verde');
+}
+function posItens(o) {
+  var pos = F.n(o.pos), meta = F.n(o.metaPos);
+  if (!(meta > 0)) return [{ r: 'Positivação', v: F.int(pos), c: 'verde' }];
+  var f = Math.max(0, meta - pos);
+  return [{ r: 'Positivação', v: F.int(pos) + '/' + F.int(meta), c: 'verde' }, f > 0 ? { r: 'Falta positivar', v: F.int(f), c: 'laranja' } : { r: 'Positivação', v: 'meta batida', c: 'verde' }];
+}
 /** Comparação com o mês passado até o mesmo dia útil. */
 function cmpAnterior(o) {
   var a = o.anterior; if (!a || !(F.n(a.valor) > 0)) return '';
@@ -149,6 +175,20 @@ function ligarGraficos(o) {
 var ordem = 'valor';
 
 /** Detalhe de um vendedor (tocar na lista). */
+// Números do vendedor em linhas completas: positivação, falta e participação lado a lado; depois pedidos, clientes e ticket.
+function tilesVend(x, vf, ped, cli, d) {
+  var t = [], temMeta = F.n(x.metaPos) > 0;
+  var part = d.vendedores.length ? F.tile('Participação', F.pct(F.n(d.valor) ? vf / F.n(d.valor) * 100 : 0)) : '';
+  if (temMeta) t.push(posTiles(x)); else if (cli) t.push(F.tile('Positivação', F.int(cli), 'verde'));
+  if (part) t.push(part);
+  if (ped) t.push(F.tile('Pedidos', F.int(ped)));
+  if (temMeta && cli) t.push(F.tile('Clientes', F.int(cli)));
+  if (ped) t.push(F.tile('Ticket médio', F.brlK(vf / ped)));
+  var h = t.join(''), n = (h.match(/class="tile"/g) || []).length;
+  if (!n) return '';
+  return '<div class="tiles' + (n % 3 && n % 2 === 0 ? ' dois' : '') + '">' + h + '</div>';
+}
+
 function detalheVendedor(i) {
   var d = dadosAtuais, x = (d.vendedores || [])[i]; if (!x) return;
   var idealP = F.n(d.idealP), vf = F.n(x.valor), vm = F.n(x.meta), id = vm * idealP, f = Math.max(0, vm - vf), r = F.n(d.rest);
@@ -158,10 +198,9 @@ function detalheVendedor(i) {
     '<h3 style="margin:2px 0 8px">' + F.esc(x.nome) + '</h3>' +
     '<div class="big"><small>R$</small>' + F.num(vf) + '</div>' +
     (vm ? '<span class="pill">' + F.pct(o.p * 100) + ' da meta</span> <span class="cinza" style="font-size:12px;margin-left:6px">' +
-      (dif >= 0 ? F.brlK(dif) + ' acima do ideal' : F.brlK(-dif) + ' abaixo do ideal') + '</span>' + F.barra(o.p, idealP, vf >= id ? '#4f7cff' : '#f0a53a') +
+      (dif >= 0 ? F.brlK(dif) + ' acima do ideal' : F.brlK(-dif) + ' abaixo do ideal') + '</span>' + F.barra(o.p, idealP, vf >= id ? '#4f7cff' : '#f0a53a') + legenda(o) +
       destaque(o, 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje') : '<div class="nota">Sem meta cadastrada para este vendedor.</div>') +
-    '<div class="tiles">' + (ped ? F.tile('Pedidos', F.int(ped)) : '') + (cli ? F.tile('Clientes', F.int(cli)) : '') +
-    (ped ? F.tile('Ticket médio', F.brlK(vf / ped)) : '') + (d.vendedores.length ? F.tile('Participação', F.pct(F.n(d.valor) ? vf / F.n(d.valor) * 100 : 0)) : '') + '</div></div>';
+    tilesVend(x, vf, ped, cli, d) + '</div>';
   var m = document.getElementById('modalVend');
   if (!m) {
     document.body.insertAdjacentHTML('beforeend', '<div class="fundo-modal" id="modalVend"><div class="modal" style="max-height:90vh;overflow:auto"><div id="vendDet"></div>' +
@@ -185,7 +224,7 @@ function gestor(d) {
     cmpAnterior(d) +
     destaque(d, d.metaSoma ? 'Meta da equipe' : 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje') +
     '<div class="tiles">' +
-    F.tile('Positivação', F.int(d.pos) + '/' + F.int(d.metaPos), 'verde') + F.tile('Dias úteis', F.int(d.dec) + '/' + F.int(d.T)) +
+    posTiles(d) + F.tile('Dias úteis', F.int(d.dec) + '/' + F.int(d.T)) +
     (F.n(d.pedidos) ? F.tile('Pedidos', F.int(d.pedidos)) : '') + (F.n(d.ticket) ? F.tile('Ticket médio', F.brlK(d.ticket)) : '') +
     (F.n(d.projecao) ? F.tile('Projeção', F.brlK(d.projecao)) : '') +
     '</div>' + (d.metaSoma ? '<div class="nota">Meta = soma das metas dos vendedores da equipe.</div>' : '') + '</div>' +
@@ -248,7 +287,7 @@ function vendedor(d) {
   var s = d.semana || {}, m = d.mes || {}, ac = F.n(s.acumulado);
   if (d.periodo) {
     document.getElementById('conteudo').innerHTML = '<div class="card">' + hero(m, F.esc(m.titulo || 'PERÍODO'), 'dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T), '#4f7cff', '#e84b8a') +
-      destaque(m, 'Meta', 'Ideal no período') + '<div class="tiles">' + F.tile('Positivação', F.int(m.pos) + '/' + F.int(m.metaPos), 'verde') +
+      destaque(m, 'Meta', 'Ideal no período') + '<div class="tiles">' + posTiles(m) +
       F.tile('Dias úteis', F.int(m.dec) + '/' + F.int(m.T)) + '</div></div>' + grafico(m, 'EVOLUÇÃO NO PERÍODO');
     ligarGraficos(m);
     return;
@@ -258,10 +297,10 @@ function vendedor(d) {
   var h = '<div class="card">' + hero(s, F.esc(s.titulo || 'SEMANA') + (d.nome ? ' · ' + F.esc(d.nome).toUpperCase() : ''), '', '#4f7cff', '#e84b8a') +
     destaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, rest: s.restam, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje') +
     '<div class="tiles">' + F.tile('Dias restantes', F.int(s.restam)) +
-    F.tile('Positivação', F.int(s.pos) + '/' + F.int(s.metaPos), 'verde') +
+    posTiles(s) +
     '</div>' + (nota ? '<div class="nota">' + nota + '</div>' : '') + '</div>';
   h += '<div class="card">' + hero(m, 'MÊS', 'dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T), '#e84b8a', '#e84b8a') +
-    cmpAnterior(m) + destaque(m, 'Meta do mês', 'Ideal até hoje') + '<div class="tiles">' + F.tile('Positivação', F.int(m.pos) + '/' + F.int(m.metaPos), 'verde') +
+    cmpAnterior(m) + destaque(m, 'Meta do mês', 'Ideal até hoje') + '<div class="tiles">' + posTiles(m) +
     F.tile('Dias úteis', F.int(m.dec) + '/' + F.int(m.T)) + '</div></div>' + grafico(m, 'EVOLUÇÃO DO MÊS');
   document.getElementById('conteudo').innerHTML = h;
   ligarGraficos(m);
@@ -279,7 +318,8 @@ function imgDestaque(o, rotMeta, rotIdeal, restam) {
 function imgHero(o, rot, sub, corOk, corRuim) {
   return { tipo: 'hero', rot: rot, valor: o.valor, pill: F.pct(F.n(o.p) * 100) + ' da meta', sub: sub, p: F.n(o.p), idealP: F.n(o.idealP),
            cor: F.n(o.valor) >= F.n(o.ideal) ? corOk : corRuim,
-           legIdeal: (o.periodo ? 'ideal no período ' : 'ideal hoje ') + F.pct(F.n(o.idealP) * 100), legMeta: F.brlK(o.meta) };
+           legEsq: 'Meta ' + F.brlK(o.meta), legIdeal: 'Ideal ' + F.brlK(o.ideal) + ' (' + F.pct(F.n(o.idealP) * 100) + ')',
+           legMeta: F.n(o.falta) > 0 ? 'Falta ' + F.brlK(o.falta) : 'meta batida' };
 }
 function dataHora(ms) { var d = new Date(ms); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear() + ' às ' + F.hhmm(ms); }
 function imgAnterior(o) {
@@ -293,13 +333,15 @@ function imgGrafico(o, titulo) {
   return { tipo: 'card', blocos: [{ tipo: 'grafico', titulo: titulo, dados: dd, meta: F.n(o.meta) }] };
 }
 function imgVendedor(x, o, d) {
-  var ped = F.n(x.pedidos), cli = F.n(x.clientes), outros = [];
+  var ped = F.n(x.pedidos), cli = F.n(x.clientes), temMeta = F.n(x.metaPos) > 0;
+  var outros = temMeta ? posItens(x) : (cli ? [{ r: 'Positivação', v: F.int(cli), c: 'verde' }] : []);
+  if ((d.vendedores || []).length) outros.push({ r: 'Participação', v: F.pct(F.n(d.valor) ? o.valor / F.n(d.valor) * 100 : 0) });
   if (ped) outros.push({ r: 'Pedidos', v: F.int(ped) });
-  if (cli) outros.push({ r: 'Clientes', v: F.int(cli) });
+  if (temMeta && cli) outros.push({ r: 'Clientes', v: F.int(cli) });
   if (ped) outros.push({ r: 'Ticket médio', v: F.brlK(o.valor / ped) });
   var card = [imgHero(o, (d.periodo ? 'FATURAMENTO · ' + d.periodo : 'FATURAMENTO DO MÊS'), (x.rank ? x.rank + 'º da equipe' : ''), '#4f7cff', '#f0a53a')];
   if (o.meta) card.push(imgDestaque(o, 'Meta', d.periodo ? 'Ideal no período' : 'Ideal até hoje'));
-  if (outros.length) card.push({ tipo: 'tiles', cols: 3, itens: outros });
+  if (outros.length) card.push({ tipo: 'tiles', cols: outros.length % 3 && outros.length % 2 === 0 ? 2 : 3, itens: outros });
   var e = Base.estado();
   return { titulo: 'Comercial · ' + x.nome, sub: d.periodo ? 'Período ' + d.periodo : 'Mês atual',
            quando: periodoAtivo ? 'Período ' + (d.periodo || '') : (e.hora ? 'Números de ' + dataHora(e.hora) : ''),
@@ -316,16 +358,16 @@ Base.paraImagem = function () {
       var ac = F.n(s.acumulado);
       bl.push({ tipo: 'card', blocos: [imgHero(s, s.titulo || 'SEMANA', '', '#4f7cff', '#e84b8a'),
         imgDestaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje', s.restam),
-        { tipo: 'tiles', cols: 3, itens: [{ r: 'Dias restantes', v: F.int(s.restam) }, { r: 'Positivação', v: F.int(s.pos) + '/' + F.int(s.metaPos), c: 'verde' }] }]
+        { tipo: 'tiles', cols: 3, itens: [{ r: 'Dias restantes', v: F.int(s.restam) }, ...posItens(s)] }]
         .concat(ac >= 0.01 ? [{ tipo: 'nota', t: 'A meta da semana inclui ' + F.brlK(ac) + ' que faltaram nas semanas anteriores.' }] : []) });
     }
     bl.push({ tipo: 'card', blocos: [imgHero(m, d.periodo ? (m.titulo || 'PERÍODO') : 'MÊS', imgAnterior(m) || ('dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T)), '#4f7cff', '#e84b8a'),
       imgDestaque(m, d.periodo ? 'Meta' : 'Meta do mês', d.periodo ? 'Ideal no período' : 'Ideal até hoje'),
-      { tipo: 'tiles', cols: 3, itens: [{ r: 'Positivação', v: F.int(m.pos) + '/' + F.int(m.metaPos), c: 'verde' }, { r: 'Dias úteis', v: F.int(m.dec) + '/' + F.int(m.T) }] }] });
+      { tipo: 'tiles', cols: 3, itens: [...posItens(m), { r: 'Dias úteis', v: F.int(m.dec) + '/' + F.int(m.T) }] }] });
     var gm = imgGrafico(m, d.periodo ? 'Evolução no período' : 'Evolução do mês'); if (gm) bl.push(gm);
     return { titulo: 'Comercial · ' + (d.nome || 'Vendedor'), sub: d.periodo ? 'Período ' + d.periodo : 'Semana e mês', quando: quando, arquivo: 'Comercial-' + (d.nome || 'vendedor'), blocos: bl };
   }
-  var outros = [{ r: 'Positivação', v: F.int(d.pos) + '/' + F.int(d.metaPos), c: 'verde' }, { r: 'Dias úteis', v: F.int(d.dec) + '/' + F.int(d.T) }];
+  var outros = posItens(d).concat([{ r: 'Dias úteis', v: F.int(d.dec) + '/' + F.int(d.T) }]);
   if (F.n(d.pedidos)) outros.push({ r: 'Pedidos', v: F.int(d.pedidos) });
   if (F.n(d.ticket)) outros.push({ r: 'Ticket médio', v: F.brlK(d.ticket) });
   if (F.n(d.projecao)) outros.push({ r: 'Projeção', v: F.brlK(d.projecao) });
@@ -373,13 +415,21 @@ window.painelPeriodo = function (d, erro) {
     return;
   }
   document.getElementById('faixaPer').innerHTML = '<div class="faixaPer"><span>Mostrando ' + F.esc(d.periodo || 'o período escolhido') + '</span><button onclick="voltarMes()">Voltar para este mês</button></div>';
+  if (d.semVendas) {
+    // igual ao site: avisa que não tem vendas no período (em vez de números zerados)
+    mostrado = null;
+    document.getElementById('conteudo').innerHTML = '<div class="card vazioPer"><div class="ico">' + F.ic('grafico') + '</div>' +
+      '<h3>Nenhuma venda neste período</h3><p>Não há vendas registradas de ' + F.esc(d.periodo || '') + '.</p>' +
+      '<button onclick="voltarMes()">Voltar para este mês</button></div>';
+    return;
+  }
   if (d.tipo === 'vendedor') vendedor(d); else gestor(d);
 };
 document.getElementById('perSel').onchange = function () {
   var v = this.value, h = new Date();
   document.getElementById('perDatas').style.display = v === 'dt' ? 'flex' : 'none';
   if (v === 'mes') return voltarMes();
-  if (v === 'sem') { var seg = new Date(h); seg.setDate(h.getDate() - ((h.getDay() + 6) % 7)); var dom = new Date(seg); dom.setDate(seg.getDate() + 6); pedirPeriodo(iso(seg), iso(dom)); }
+  if (v === 'sem') { var dom = new Date(h); dom.setDate(h.getDate() - h.getDay()); var sab = new Date(dom); sab.setDate(dom.getDate() + 6); pedirPeriodo(iso(dom), iso(sab)); }   // domingo a sábado, como no site
   if (v === 'ant') { var i = new Date(h.getFullYear(), h.getMonth() - 1, 1), f = new Date(h.getFullYear(), h.getMonth(), 0); pedirPeriodo(iso(i), iso(f)); }
   if (v === 'dt') {
     var ii = document.getElementById('perIni'), ff = document.getElementById('perFim');

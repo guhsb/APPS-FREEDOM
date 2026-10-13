@@ -15,6 +15,7 @@ const srv = http.createServer((req, res) => {
     if (!logado) return ok({ detail: 'auth' }, 401);
     if (p === '/auth/me') return ok({ role: 'manager', display_name: 'Gustavo', modules: ['helpdesk', 'commercial', 'logistics'] });
     if (p === '/auth/logout') return ok({});
+    if (p.startsWith('/dashboard/') && u.searchParams.get('start_date') === '2020-01-05') return ok({ detail: 'no data' }, 422);
     if (p === '/dashboard/overview') return ok({ sales_revenue: u.searchParams.get('start_date').slice(5, 7) === hoje.slice(5, 7) ? 1000 : 800, business_days_total: 22, business_days_elapsed: 10, business_days_remaining: 12 });
     if (p === '/dashboard/sellers') return ok({ sellers: [{ seller_name: 'SUPERVISOR - ANA', revenue: 600, meta_revenue: 500 }, { seller_name: 'BIA', revenue: 400, meta_revenue: 1000 }] });
     if (p === '/dashboard/overview/charts') return ok({ daily: [{ sale_date: hoje.slice(0, 8) + '01', revenue: 300, ideal_cumulative_revenue: 100 }] });
@@ -55,7 +56,9 @@ srv.listen(0, async () => {
   const f = Paineis.dadosPainel('faturamento', {}).dados;
   check(f && f.dia.valor === 51126.78 && f.dia.tipos[0].nome === 'Venda' && f.dias.length === 1 && f.pend === 20, 'faturamento');
   const per = await Paineis.buscarPeriodo('comercial', hoje.slice(0, 8) + '01', hoje);
-  check(per && per.periodo && per.tipo === 'gestor', 'período escolhido');
+  check(per && per.periodo && per.tipo === 'gestor' && !per.semVendas, 'período escolhido');
+  const vazio = await Paineis.buscarPeriodo('comercial', '2020-01-05', '2020-01-11');
+  check(vazio && vazio.semVendas === true && vazio.valor === 0, 'semana sem vendas não dá erro');
 
   console.log('3) helpdesk');
   const o = await Helpdesk.verificar(true);

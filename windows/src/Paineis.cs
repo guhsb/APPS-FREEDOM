@@ -105,17 +105,35 @@ namespace Freedom
             var me = api.Get("/auth/me");
             var nome = me.OptString("display_name", me.OptString("seller_name", ""));
             var titulo = ini.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + " a " + fim.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-            var o = api.Get("/dashboard/overview?" + q);
+            // período sem vendas: o site pode responder "sem dados" (4xx) em vez de zeros — vira painel vazio, não erro
+            var o = GetOuVazio(api, "/dashboard/overview?" + q);
             var graf = GraficoDe(api, q, ini, fim, hoje);
             if (me.OptString("role") == "seller")
             {
                 var g = Gestor(nome, o, new JSONObject(), ini, fim, hoje).Put("titulo", "PERÍODO " + titulo);
                 if (graf != null) g.Put("diario", graf);
-                return new JSONObject().Put("tipo", "vendedor").Put("nome", nome).Put("periodo", titulo).Put("mes", g);
+                return new JSONObject().Put("tipo", "vendedor").Put("nome", nome).Put("periodo", titulo).Put("mes", g).Put("semVendas", N(o, "sales_revenue") <= 0);
             }
-            var gp = Gestor(nome, o, api.Get("/dashboard/sellers?" + q), ini, fim, hoje).Put("periodo", titulo);
+            var gp = Gestor(nome, o, GetOuVazio(api, "/dashboard/sellers?" + q), ini, fim, hoje).Put("periodo", titulo);
             if (graf != null) gp.Put("diario", graf);
+            bool algum = false;
+            var vs = gp.OptJSONArray("vendedores");
+            if (vs != null) for (int i = 0; i < vs.Length; i++) if (N(vs.OptJSONObject(i), "valor") > 0) algum = true;
+            gp.Put("semVendas", N(o, "sales_revenue") <= 0 && !algum);
             return gp;
+        }
+
+        /// <summary>Busca no site; "sem dados" (HTTP 400/404/422) vira objeto vazio. Login/acesso continuam dando erro.</summary>
+        static JSONObject GetOuVazio(Api api, string caminho)
+        {
+            try { return api.Get(caminho); }
+            catch (SemAcesso) { throw; }
+            catch (ErroLogin) { throw; }
+            catch (System.IO.IOException e)
+            {
+                if (System.Text.RegularExpressions.Regex.IsMatch(e.Message ?? "", "HTTP (400|404|422)")) return new JSONObject();
+                throw;
+            }
         }
 
         /// <summary>Mês passado até o mesmo dia útil (igual ao Android). null se falhar.</summary>
@@ -175,6 +193,12 @@ namespace Freedom
             return r;
         }
 
+        static double Primeiro(JSONObject o, params string[] ks)
+        {
+            foreach (var k in ks) if (o.Has(k) && !o.IsNull(k)) return N(o, k);
+            return 0;
+        }
+
         static JSONObject Gestor(string nome, JSONObject o, JSONObject sv, DateTime ini, DateTime fim, DateTime hoje)
         {
             double fat = N(o, "sales_revenue");
@@ -198,7 +222,9 @@ namespace Freedom
                     .Put("nome", x.OptString("seller_name").Replace("SUPERVISOR - ", "SUP. "))
                     .Put("valor", vf).Put("meta", vm).Put("p", vm > 0 ? vf / vm : 0.0)
                     .Put("ideal", vm * idealP).Put("falta", Math.Max(0, vm - vf))
-                    .Put("pedidos", N(x, "order_count")).Put("clientes", N(x, "client_count")));
+                    .Put("pedidos", N(x, "order_count")).Put("clientes", N(x, "client_count"))
+                    .Put("pos", Primeiro(x, "positive_customer_count", "positive_customers", "positivation", "positivacao", "client_count"))
+                    .Put("metaPos", Primeiro(x, "positive_customer_target", "positivation_target", "meta_positivation", "meta_positivacao", "client_target")));
             }
             return new JSONObject()
                 .Put("tipo", "gestor").Put("nome", nome)

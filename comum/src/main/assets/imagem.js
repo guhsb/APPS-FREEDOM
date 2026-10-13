@@ -65,9 +65,9 @@
         barra(ctx, x, y, w, 10, b.p, b.idealP, b.cor || C.azul);
         y += 22;
         fonte(ctx, 11); ctx.fillStyle = C.tx3;
-        ctx.fillText('0', x, y + 4);
+        texto(ctx, b.legEsq || '0', x, y + 4, w / 3);
         if (b.legIdeal) texto(ctx, b.legIdeal, x + w / 2, y + 4, w / 2, 'center');
-        if (b.legMeta) texto(ctx, b.legMeta, x + w, y + 4, w / 3, 'right');
+        if (b.legMeta) { if (/^Falta/.test(b.legMeta)) ctx.fillStyle = C.laranja; else if (b.legEsq) ctx.fillStyle = C.verde; texto(ctx, b.legMeta, x + w, y + 4, w / 3, 'right'); }
         y += 14;
       }
       return y + 4;

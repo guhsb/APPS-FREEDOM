@@ -74,18 +74,28 @@ object Dados {
         val nome = me.optString("display_name", me.optString("seller_name", ""))
         fun dm(d: LocalDate) = "%02d/%02d/%d".format(d.dayOfMonth, d.monthValue, d.year)
         val titulo = "${dm(ini)} a ${dm(fim)}"
-        val o = api.get("/dashboard/overview?$q")
+        // período sem vendas: o site pode responder "sem dados" (4xx) em vez de zeros — vira painel vazio, não erro
+        val o = getOuVazio(api, "/dashboard/overview?$q")
         val graf = graficoDe(api, q, ini, fim, hoje)
         return if (me.optString("role") == "seller") {
             val g = gestor(nome, o, JSONObject(), ini, fim, hoje)
             g.put("titulo", "PERÍODO $titulo")
             if (graf != null) g.put("diario", graf)
             JSONObject().put("tipo", "vendedor").put("nome", nome).put("periodo", titulo).put("mes", g)
+                .put("semVendas", n(o, "sales_revenue") <= 0.0)
         } else {
-            val g = gestor(nome, o, api.get("/dashboard/sellers?$q"), ini, fim, hoje).put("periodo", titulo)
+            val sv = getOuVazio(api, "/dashboard/sellers?$q")
+            val g = gestor(nome, o, sv, ini, fim, hoje).put("periodo", titulo)
             if (graf != null) g.put("diario", graf)
-            g
+            g.put("semVendas", n(o, "sales_revenue") <= 0.0 && (g.optJSONArray("vendedores")?.length() ?: 0).let { k ->
+                (0 until k).all { n(g.getJSONArray("vendedores").getJSONObject(it), "valor") <= 0.0 } })
         }
+    }
+
+    /** Busca no site; "sem dados" (HTTP 400/404/422) vira objeto vazio. Login/acesso continuam dando erro. */
+    private fun getOuVazio(api: Api, caminho: String): JSONObject = try { api.get(caminho) } catch (e: java.io.IOException) {
+        if (e is br.com.cbfreedom.comum.SemAcesso || e is br.com.cbfreedom.comum.ErroLogin) throw e
+        if (Regex("HTTP (400|404|422)").containsMatchIn(e.message ?: "")) JSONObject() else throw e
     }
 
     /**
@@ -141,6 +151,8 @@ object Dados {
         return r
     }
 
+    private fun primeiro(o: JSONObject, vararg k: String): Double = k.firstOrNull { o.has(it) && !o.isNull(it) }?.let { n(o, it) } ?: 0.0
+
     fun gestor(nome: String, o: JSONObject, sv: JSONObject, ini: LocalDate, fim: LocalDate, hoje: LocalDate): JSONObject {
         val fat = n(o, "sales_revenue")
         var t = n(o, "business_days_total"); var dec = n(o, "business_days_elapsed"); var rest = n(o, "business_days_remaining")
@@ -164,7 +176,10 @@ object Dados {
                 .put("ideal", vm * idealP)
                 .put("falta", maxOf(0.0, vm - vf))
                 .put("pedidos", n(x, "order_count"))
-                .put("clientes", n(x, "client_count")))
+                .put("clientes", n(x, "client_count"))
+                // positivação do vendedor (o site pode mandar com nomes diferentes; sem meta, mostra só quantos)
+                .put("pos", primeiro(x, "positive_customer_count", "positive_customers", "positivation", "positivacao", "client_count"))
+                .put("metaPos", primeiro(x, "positive_customer_target", "positivation_target", "meta_positivation", "meta_positivacao", "client_target")))
         }
         return JSONObject()
             .put("tipo", "gestor").put("nome", nome)

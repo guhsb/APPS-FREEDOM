@@ -30,6 +30,8 @@ function diasUteis(ini, fim, hoje) {
   return [t, dec, rest];
 }
 
+const primeiro = (o, ks) => { const k = ks.find(k => o[k] != null); return k ? N(o, k) : 0; };
+
 function gestor(nome, o, sv, ini, fim, hoje) {
   const fat = N(o, 'sales_revenue');
   let t = N(o, 'business_days_total'), dec = N(o, 'business_days_elapsed'), rest = N(o, 'business_days_remaining');
@@ -44,7 +46,9 @@ function gestor(nome, o, sv, ini, fim, hoje) {
   const vendedores = lista.map(x => {
     const vf = N(x, 'revenue'), vm = N(x, 'meta_revenue');
     return { nome: String(x.seller_name || '').replace('SUPERVISOR - ', 'SUP. '), valor: vf, meta: vm, p: vm > 0 ? vf / vm : 0,
-      ideal: vm * idealP, falta: Math.max(0, vm - vf), pedidos: N(x, 'order_count'), clientes: N(x, 'client_count') };
+      ideal: vm * idealP, falta: Math.max(0, vm - vf), pedidos: N(x, 'order_count'), clientes: N(x, 'client_count'),
+      pos: primeiro(x, ['positive_customer_count', 'positive_customers', 'positivation', 'positivacao', 'client_count']),
+      metaPos: primeiro(x, ['positive_customer_target', 'positivation_target', 'meta_positivation', 'meta_positivacao', 'client_target']) };
   });
   return { tipo: 'gestor', nome, valor: fat, meta, p: meta > 0 ? fat / meta : 0, idealP, ideal: meta * idealP, falta, porDia: rest > 0 ? falta / rest : 0,
     pos: N(o, 'positive_customer_count'), metaPos: N(o, 'positive_customer_target'), pedidos: N(o, 'order_count'), ticket: N(o, 'average_order_value'),
@@ -136,6 +140,11 @@ async function comercial(api) {
   return g;
 }
 
+async function getOuVazio(api, caminho) {
+  try { return await api.get(caminho); }
+  catch (e) { if (!(e instanceof SemAcesso) && !(e instanceof ErroLogin) && /HTTP (400|404|422)/.test(e.message || '')) return {}; throw e; }
+}
+
 async function periodo(api, iniTxt, fimTxt) {
   const ini = D.de(iniTxt), fim = D.de(fimTxt);
   if (fim < ini) throw new Error('a data final é antes da inicial');
@@ -143,13 +152,15 @@ async function periodo(api, iniTxt, fimTxt) {
   const me = await api.get('/auth/me');
   const nome = me.display_name || me.seller_name || '';
   const titulo = D.dmy(ini) + ' a ' + D.dmy(fim);
-  const o = await api.get('/dashboard/overview?' + q);
+  // período sem vendas: o site pode responder "sem dados" (4xx) em vez de zeros — vira painel vazio, não erro
+  const o = await getOuVazio(api, '/dashboard/overview?' + q);
   const graf = await graficoDe(api, q, ini, fim, hoje);
   if (me.role === 'seller') {
     const g = gestor(nome, o, {}, ini, fim, hoje); g.titulo = 'PERÍODO ' + titulo; if (graf) g.diario = graf;
-    return { tipo: 'vendedor', nome, periodo: titulo, mes: g };
+    return { tipo: 'vendedor', nome, periodo: titulo, mes: g, semVendas: N(o, 'sales_revenue') <= 0 };
   }
-  const g = gestor(nome, o, await api.get('/dashboard/sellers?' + q), ini, fim, hoje); g.periodo = titulo; if (graf) g.diario = graf;
+  const g = gestor(nome, o, await getOuVazio(api, '/dashboard/sellers?' + q), ini, fim, hoje); g.periodo = titulo; if (graf) g.diario = graf;
+  g.semVendas = N(o, 'sales_revenue') <= 0 && !g.vendedores.some(v => v.valor > 0);
   return g;
 }
 
