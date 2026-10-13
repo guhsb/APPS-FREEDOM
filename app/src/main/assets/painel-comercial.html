@@ -95,7 +95,7 @@ function posTiles(o) {
   if (!(meta > 0)) return F.tile('Positivação', F.int(pos), 'verde');
   var f = Math.max(0, meta - pos);
   return F.tile('Positivação', F.int(pos) + '/' + F.int(meta), 'verde') +
-    F.tile(f > 0 ? 'Falta positivar' : 'Positivação', f > 0 ? F.int(f) + (f >= 100 ? '' : f === 1 ? ' cliente' : ' clientes') : 'meta batida', f > 0 ? 'laranja' : 'verde');
+    F.tile(f > 0 ? 'Falta positivar' : 'Positivação', f > 0 ? F.int(f) : 'meta batida', f > 0 ? 'laranja' : 'verde');
 }
 function posItens(o) {
   var pos = F.n(o.pos), meta = F.n(o.metaPos);
