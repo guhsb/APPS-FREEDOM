@@ -15,6 +15,10 @@ body{padding-bottom:90px}
 .busca input{flex:1;min-width:0;background:transparent;border:0;color:var(--tx);font:inherit;font-size:15px;padding:12px 0;outline:none}
 .chips{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 8px;padding:0 16px 2px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
+/* celular: a fileira desliza para o lado (o fim esmaece para mostrar que tem mais); tela larga: quebra em linhas */
+.chips{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent)}
+.chips.fim{-webkit-mask-image:none;mask-image:none}
+@media (min-width:560px){.chips{flex-wrap:wrap;overflow:visible;margin:0 0 8px;padding:0;-webkit-mask-image:none;mask-image:none}}
 .chips button{flex:none;background:var(--sf);border:1px solid var(--ln);color:var(--tx2);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:600}
 .chips button.on{background:var(--rosa);border-color:var(--rosa);color:#fff}
 .filtros{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:6px}
@@ -87,6 +91,10 @@ function cabeca() {
   document.getElementById('cabeca').innerHTML = h;
   var t = null;
   document.getElementById('busca').oninput = function () { var v = this.value; clearTimeout(t); t = setTimeout(function () { f.busca = v; recarregar(); }, 450); };
+  var ch = document.getElementById('chips');
+  var fimCh = function () { ch.classList.toggle('fim', ch.scrollLeft + ch.clientWidth >= ch.scrollWidth - 4); };
+  ch.addEventListener('scroll', fimCh, { passive: true }); fimCh();
+  var chipOn = ch.querySelector('.on'); if (chipOn && ch.scrollWidth > ch.clientWidth) ch.scrollLeft = Math.max(0, chipOn.offsetLeft - 16);
   document.getElementById('chips').onclick = function (ev) { var b = ev.target.closest('[data-s]'); if (!b) return; f.status = b.getAttribute('data-s'); cabeca(); recarregar(); };
   var seg = document.querySelector('.seg');
   if (seg) seg.onclick = function (ev) { var b = ev.target.closest('[data-m]'); if (!b) return; modo = b.getAttribute('data-m'); cabeca(); recarregar(); };
