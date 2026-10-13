@@ -34,6 +34,43 @@ body{padding-bottom:90px}
 .fab{position:fixed;right:16px;bottom:20px;z-index:20;display:flex;align-items:center;gap:8px;border:0;border-radius:16px;padding:14px 18px;background:var(--rosa);color:#fff;
   font:inherit;font-weight:700;font-size:15px;box-shadow:0 10px 26px rgba(232,75,138,.35)}
 .fab svg.ic{width:20px;height:20px}
+/* ---------- Kanban (Windows e Mac): arrastar o cartão muda o status ---------- */
+body.kb{max-width:none!important;margin:0!important}
+.vis{display:inline-flex;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:3px;margin:0 0 10px;gap:2px}
+.vis button{border:0;background:transparent;color:var(--tx2);font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.vis button.on{background:var(--sf3);color:var(--tx);font-weight:700}
+.vis svg.ic{width:16px;height:16px}
+.kb .filtros{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.kanban{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;align-items:flex-start}
+.col{flex:1 1 0;min-width:142px;background:var(--sf2);border:1px solid var(--ln);border-radius:14px;display:flex;flex-direction:column;
+  max-height:calc(100vh - 230px);transition:opacity .15s,background .15s,outline-color .15s;outline:2px dashed transparent;outline-offset:-2px}
+.col h4{margin:0;padding:10px 10px 8px;font-size:12px;white-space:nowrap;font-weight:700;display:flex;align-items:center;gap:7px;color:var(--tx)}
+.col h4 i{width:9px;height:9px;border-radius:50%;flex:none}
+.col h4 span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.col h4 em{margin-left:auto;font-style:normal;font-size:11.5px;font-weight:700;color:var(--tx3);background:var(--sf3);border-radius:999px;padding:1px 8px}
+.col .cards{overflow-y:auto;padding:2px 6px 8px;display:flex;flex-direction:column;gap:8px;min-height:90px}
+.col .cards .vz{font-size:12px;color:var(--tx3);text-align:center;padding:18px 6px;border:1px dashed var(--ln2);border-radius:10px}
+.col.pode{outline-color:var(--verde)}
+.col.nao{opacity:.42}
+.col.sobre{background:var(--azul-s);outline-color:var(--azul)}
+.col .maisCol{font-size:11.5px;color:var(--tx3);text-align:center;padding:4px}
+.kc{background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:9px 10px;cursor:grab;box-shadow:var(--sombra);user-select:none}
+.kc:hover{border-color:var(--ln2)}
+.kc:active{cursor:grabbing}
+.kc.arrastando{opacity:.35}
+.kc.movendo{opacity:.55;pointer-events:none}
+.kc .p1{display:flex;align-items:center;gap:6px;font-size:12.5px}
+.kc .p1 b{font-size:13px}
+.kc .p1 i{width:7px;height:7px;border-radius:50%;margin-left:auto;flex:none}
+.kc p{margin:4px 0 6px;font-size:13px;color:var(--tx);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kc .m{display:flex;flex-wrap:wrap;gap:3px 8px;font-size:11.5px;color:var(--tx3)}
+.kdica{font-size:12px;color:var(--tx3);margin:0 2px 8px}
+.fundoSol{position:fixed;inset:0;background:var(--escuro-fundo);display:flex;align-items:center;justify-content:center;z-index:50}
+.caixaSol{width:min(460px,92vw);background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.caixaSol h3{margin:0 0 4px;font-size:16px}.caixaSol p{margin:0 0 10px;font-size:13px;color:var(--tx3)}
+.caixaSol textarea{width:100%;min-height:110px;resize:vertical;background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:10px;font:inherit;font-size:14px}
+.caixaSol .bts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.caixaSol button{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}
 </style></head><body>
 <div class="topo">
   <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
@@ -58,6 +95,9 @@ document.getElementById('btAt').innerHTML = F.ic('atualizar');
 document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
 document.getElementById('btAt').onclick = function () { recarregar(); };
 
+// Kanban só no computador (Windows e Mac): na tela do celular as colunas não cabem
+var desktop = false; try { desktop = App.plataforma() !== 'android'; } catch (e) { }
+var kanban = false; try { kanban = desktop && localStorage.getItem('kanban') === '1'; } catch (e) { }
 var STATUS_CHIPS = [['', 'Todos'], ['OPEN', 'Abertos'], ['IN_PROGRESS', 'Em andamento'], ['WAITING', 'Aguardando'],
   ['WAITING_SUPPLIER', 'Aguard. fornecedor'], ['PENDING_APPROVAL', 'Aguard. aprovação'], ['REOPENED', 'Reabertos'], ['RESOLVED', 'Resolvidos']];
 
@@ -68,8 +108,10 @@ function cabeca() {
   var h = '';
   if (atendimento()) h += '<div class="seg"><button data-m="fila" class="' + (modo === 'fila' ? 'on' : '') + '">Fila do setor</button>' +
     '<button data-m="comigo" class="' + (modo === 'comigo' ? 'on' : '') + '">Comigo</button></div>';
+  if (desktop) h += '<div class="vis" id="vis"><button data-v="lista" class="' + (kanban ? '' : 'on') + '">' + F.ic('lista') + 'Lista</button>' +
+    '<button data-v="kanban" class="' + (kanban ? 'on' : '') + '">' + F.ic('colunas') + 'Kanban</button></div>';
   h += '<div class="busca">' + F.ic('busca') + '<input id="busca" type="search" placeholder="Buscar por protocolo, título ou descrição" value="' + F.esc(f.busca) + '"></div>';
-  h += '<div class="chips" id="chips">' + STATUS_CHIPS.map(function (c) {
+  h += '<div class="chips" id="chips"' + (kanban ? ' style="display:none"' : '') + '>' + STATUS_CHIPS.map(function (c) {
     return '<button data-s="' + c[0] + '" class="' + (f.status === c[0] ? 'on' : '') + '">' + c[1] + '</button>';
   }).join('') + '</div>';
   h += '<div class="filtros"><select id="fPrio"><option value="">Toda prioridade</option>' +
@@ -88,7 +130,15 @@ function cabeca() {
       return '<option value="' + id + '"' + (String(f.queue) === id ? ' selected' : '') + '>' + F.esc(setores[id]) + '</option>'; }).join('') + '</select>';
   }
   h += '</div>';
+  if (kanban) h += '<div class="kdica">Arraste um chamado para outra coluna para mudar o status. Clique para abrir.</div>';
   document.getElementById('cabeca').innerHTML = h;
+  var vis = document.getElementById('vis');
+  if (vis) vis.onclick = function (ev) {
+    var b = ev.target.closest('[data-v]'); if (!b) return;
+    var k = b.getAttribute('data-v') === 'kanban'; if (k === kanban) return;
+    kanban = k; try { localStorage.setItem('kanban', k ? '1' : ''); } catch (e) { }
+    document.body.classList.toggle('kb', kanban); cabeca(); recarregar();
+  };
   var t = null;
   document.getElementById('busca').oninput = function () { var v = this.value; clearTimeout(t); t = setTimeout(function () { f.busca = v; recarregar(); }, 450); };
   var ch = document.getElementById('chips');
@@ -118,7 +168,7 @@ function caminho() {
   return q;
 }
 
-function recarregar() { pagina = 1; itens = []; total = null; autoPag = 0; buscar(); }
+function recarregar() { pagina = 1; itens = []; total = null; autoPag = 0; if (kanban) buscarKanban(); else buscar(); }
 
 function buscar() {
   var meu = ++pedido;
@@ -190,17 +240,196 @@ if (modo === 'meus') {
   document.body.insertAdjacentHTML('beforeend', '<button class="fab" id="fab">' + F.ic('mais2') + 'Abrir chamado</button>');
   document.getElementById('fab').onclick = function () { try { App.abrirTela('novo.html'); } catch (e) {} };
 }
-window.recebidoHelpdesk = function () { if (!carregando && pagina === 1 && !f.busca) buscar(); };
+window.recebidoHelpdesk = function () { if (kanban) { if (!arrastando && !movendo) buscarKanban(true); return; } if (!carregando && pagina === 1 && !f.busca) buscar(); };
 
 // nomes de setores e pessoas para mostrar na lista
 Promise.all([F.api('GET', '/helpdesk/queues'), atendimento() ? F.api('GET', '/helpdesk/workspace/access') : Promise.resolve(null)]).then(function (rs) {
   var q = rs[0] && rs[0].json; if (Array.isArray(q)) q.forEach(function (x) { setores[x.id] = x.name; });
   if (rs[1] && rs[1].json) { acesso = rs[1].json; (acesso.assignees || []).forEach(function (p) { pessoas[p.id] = p.name; }); }
   cabeca();
-  if (itens.length) desenhar(0);
+  if (kanban) { if (kbDados) desenharKanban(); } else if (itens.length) desenhar(0);
+});
+
+// =====================================================================
+// Kanban: uma coluna por status; arrastar o cartão muda o status no site
+// (as mesmas regras do site: só os status que o chamado permite)
+// =====================================================================
+var COLS = [['OPEN', 'Aberto'], ['REOPENED', 'Reaberto'], ['IN_PROGRESS', 'Em andamento'], ['WAITING', 'Aguardando'],
+  ['WAITING_SUPPLIER', 'Aguard. fornecedor'], ['PENDING_APPROVAL', 'Aguard. aprovação'], ['RESOLVED', 'Resolvido']];
+var kbDados = null, kbPedido = 0, arrastando = null, movendo = false, regras = {};
+
+function caminhoCol(st) {
+  var salva = f.status; f.status = st; var sp = pagina; pagina = 1;
+  var q = caminho().replace('page_size=20', 'page_size=' + (st === 'RESOLVED' ? 15 : 50));
+  f.status = salva; pagina = sp; return q;
+}
+
+function buscarKanban(silencioso) {
+  var meu = ++kbPedido;
+  document.getElementById('btAt').classList.add('gira');
+  if (!silencioso || !kbDados) document.getElementById('lista').innerHTML = '<div class="carregando"><i></i>Carregando…</div>';
+  Promise.all(COLS.map(function (c) { return F.api('GET', caminhoCol(c[0])); })).then(function (rs) {
+    if (meu !== kbPedido) return;
+    document.getElementById('btAt').classList.remove('gira');
+    var av = document.getElementById('aviso'), falhou = rs.filter(function (r) { return r.status !== 200 || !r.json; })[0];
+    if (falhou) { av.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(F.erroApi(falhou, 'Não consegui carregar os chamados')) + '</span><button onclick="recarregar()">Tentar</button></div>'; }
+    else av.innerHTML = '';
+    kbDados = {};
+    COLS.forEach(function (c, i) {
+      var j = rs[i] && rs[i].json || {}, its = j.items || [];
+      if (soSem()) its = its.filter(function (t) { return !t.assignee_user_id; });
+      kbDados[c[0]] = { itens: its, total: typeof j.total === 'number' && !soSem() ? j.total : its.length };
+    });
+    desenharKanban();
+  });
+}
+
+function cartao(t) {
+  var p = F.PRIO[t.priority];
+  var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
+  var m = [];
+  if (setores[t.queue_id]) m.push('<span>' + F.esc(setores[t.queue_id]) + '</span>');
+  if (atendimento()) m.push(t.assignee_user_id ? '<span>' + F.esc(pessoas[t.assignee_user_id] || 'Com responsável') + '</span>' : '<span style="color:var(--laranja);font-weight:700">Sem responsável</span>');
+  if (sla === 'BREACHED' || sla === 'AT_RISK') m.push('<span style="font-weight:700;color:' + (sla === 'BREACHED' ? 'var(--vermelho)' : 'var(--laranja)') + '">' + F.SLA[sla] + '</span>');
+  m.push('<span>' + F.quando(t.updated_at) + '</span>');
+  return '<div class="kc" draggable="true" data-id="' + t.id + '" data-st="' + F.esc(t.status) + '" title="' + (p ? 'Prioridade ' + p[0] : '') + '">' +
+    '<div class="p1"><b>' + F.esc(t.protocol || ('#' + t.id)) + '</b>' + (p ? '<i style="background:' + p[1] + '"></i>' : '') + '</div>' +
+    '<p>' + F.esc(t.title || '') + '</p><div class="m">' + m.join('') + '</div></div>';
+}
+
+function desenharKanban() {
+  if (!kbDados) return;
+  var tot = 0;
+  var h = '<div class="kanban" id="kanban">' + COLS.map(function (c) {
+    var d = kbDados[c[0]] || { itens: [], total: 0 }, s = F.STATUS[c[0]] || [c[1], 'var(--tx3)'];
+    tot += d.total;
+    var resto = d.total - d.itens.length;
+    return '<div class="col" data-col="' + c[0] + '"><h4 title="' + c[1] + '"><i style="background:' + s[1] + '"></i><span>' + c[1] + '</span><em>' + d.total + '</em></h4><div class="cards">' +
+      (d.itens.length ? d.itens.map(cartao).join('') : '<div class="vz">Nenhum chamado</div>') +
+      (resto > 0 ? '<div class="maisCol">+ ' + resto + ' (use a Lista para ver todos)</div>' : '') + '</div></div>';
+  }).join('') + '</div>';
+  document.getElementById('sub').textContent = tot + (tot === 1 ? ' chamado' : ' chamados');
+  var antes = document.getElementById('kanban'), rolagem = antes ? antes.scrollLeft : 0;     // mantém a posição ao redesenhar
+  document.getElementById('lista').innerHTML = h;
+  if (rolagem) document.getElementById('kanban').scrollLeft = rolagem;
+}
+
+/** Regras do chamado (status permitidos e versão) — vem da mesma tela do chamado do site. */
+function lerRegras(id) {
+  if (regras[id] && Date.now() - regras[id].hora < 20000) return Promise.resolve(regras[id]);
+  return F.api('GET', '/helpdesk/tickets/' + id + '/timeline').then(function (r) {
+    if (r.status !== 200 || !r.json || !r.json.ticket) throw new Error(F.erroApi(r, 'Não consegui abrir o chamado'));
+    if (r.offline) throw new Error('Sem internet: mudar o status precisa de conexão.');
+    var cap = r.json.capabilities || {};
+    return (regras[id] = { hora: Date.now(), versao: Number(r.json.ticket.version) || 0, status: r.json.ticket.status,
+      pode: !!cap.can_change_status, validos: cap.valid_statuses || [], solucao: !!cap.can_propose_solution });
+  });
+}
+
+/** O cartão pode ir para esta coluna? */
+function permitido(rg, col) {
+  if (col === rg.status) return false;
+  if (rg.pode && rg.validos.indexOf(col) >= 0) return true;
+  return col === 'PENDING_APPROVAL' && rg.solucao;      // vira "Solicitar conclusão" (pede a solução)
+}
+
+function marcarColunas(rg) {
+  document.querySelectorAll('.col').forEach(function (c) {
+    var col = c.getAttribute('data-col');
+    c.classList.toggle('pode', !!rg && permitido(rg, col));
+    c.classList.toggle('nao', !!rg && !permitido(rg, col) && col !== rg.status);
+  });
+}
+
+function pedirSolucao() {
+  return new Promise(function (ok) {
+    document.body.insertAdjacentHTML('beforeend', '<div class="fundoSol" id="fundoSol"><div class="caixaSol"><h3>Solicitar conclusão</h3>' +
+      '<p>Escreva a solução. O solicitante recebe para aprovar ou rejeitar.</p><textarea id="txSol" placeholder="O que foi feito para resolver…"></textarea>' +
+      '<div class="bts"><button class="b3" id="solNao">Cancelar</button><button class="b1" id="solSim">Enviar</button></div></div></div>');
+    var fim = function (v) { var el = document.getElementById('fundoSol'); if (el) el.remove(); ok(v); };
+    document.getElementById('txSol').focus();
+    document.getElementById('solNao').onclick = function () { fim(null); };
+    document.getElementById('solSim').onclick = function () { var v = document.getElementById('txSol').value.trim(); if (!v) { F.toast('Escreva a solução'); return; } fim(v); };
+  });
+}
+
+function mover(id, col, cartaoEl) {
+  movendo = true; if (cartaoEl) cartaoEl.classList.add('movendo');
+  var nome = (COLS.filter(function (c) { return c[0] === col; })[0] || [col, col])[1];
+  var tentar = function (tentativa) {
+    delete regras[id];
+    return lerRegras(id).then(function (rg) {
+      if (!permitido(rg, col)) {
+        throw new Error(!rg.pode && !(col === 'PENDING_APPROVAL' && rg.solucao) ? 'Você não pode mudar o status deste chamado.' :
+          'Este chamado não pode ir para “' + nome + '” agora.');
+      }
+      var usarSolucao = col === 'PENDING_APPROVAL' && !(rg.pode && rg.validos.indexOf(col) >= 0);
+      var pronto = usarSolucao ? pedirSolucao() : Promise.resolve('');
+      return pronto.then(function (sol) {
+        if (usarSolucao && sol == null) return 'cancelado';
+        var req = usarSolucao ? F.api('POST', '/helpdesk/tickets/' + id + '/solution', { version: rg.versao, solution: sol })
+                              : F.api('PATCH', '/helpdesk/tickets/' + id + '/status', { version: rg.versao, status: col });
+        return req.then(function (r) {
+          if (r.status >= 200 && r.status < 300) return usarSolucao ? 'Solução enviada para aprovação' : 'Status alterado para ' + nome;
+          if (r.status === 409 && tentativa === 0 && String(r.texto || '').indexOf('stale') >= 0) return tentar(1);
+          throw new Error(F.erroApi(r, 'Não consegui mudar o status'));
+        });
+      });
+    });
+  };
+  tentar(0).then(function (msg) {
+    movendo = false;
+    if (msg !== 'cancelado') F.toast(msg);
+    buscarKanban(true);
+    try { App.verificarHelpdesk(); } catch (e) { }
+  }, function (e) {
+    movendo = false;
+    F.toast(e.message || 'Não consegui mudar o status');
+    desenharKanban();
+  });
+}
+
+// arrastar e soltar
+document.getElementById('lista').addEventListener('dragstart', function (ev) {
+  var c = ev.target.closest && ev.target.closest('.kc'); if (!c || movendo) { ev.preventDefault(); return; }
+  arrastando = { id: c.getAttribute('data-id'), el: c };
+  c.classList.add('arrastando');
+  try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', arrastando.id); } catch (e) { }
+  var meu = arrastando;
+  lerRegras(meu.id).then(function (rg) { if (arrastando === meu) { meu.rg = rg; marcarColunas(rg); } }, function () { });
+});
+document.getElementById('lista').addEventListener('dragend', function () {
+  if (arrastando && arrastando.el) arrastando.el.classList.remove('arrastando');
+  arrastando = null; marcarColunas(null);
+  document.querySelectorAll('.col.sobre').forEach(function (c) { c.classList.remove('sobre'); });
+});
+document.getElementById('lista').addEventListener('dragover', function (ev) {
+  var col = ev.target.closest && ev.target.closest('.col'); if (!col || !arrastando) return;
+  var st = col.getAttribute('data-col');
+  if (arrastando.rg && !permitido(arrastando.rg, st)) return;      // não deixa soltar onde não pode
+  if (arrastando.el.getAttribute('data-st') === st) return;
+  ev.preventDefault();
+  document.querySelectorAll('.col.sobre').forEach(function (c) { if (c !== col) c.classList.remove('sobre'); });
+  col.classList.add('sobre');
+});
+document.getElementById('lista').addEventListener('dragleave', function (ev) {
+  var col = ev.target.closest && ev.target.closest('.col'); if (col && !col.contains(ev.relatedTarget)) col.classList.remove('sobre');
+});
+document.getElementById('lista').addEventListener('drop', function (ev) {
+  var col = ev.target.closest && ev.target.closest('.col'); if (!col || !arrastando) return;
+  ev.preventDefault();
+  var st = col.getAttribute('data-col'), a = arrastando;
+  col.classList.remove('sobre');
+  if (a.el.getAttribute('data-st') === st) return;
+  // já mostra o cartão na coluna nova enquanto o site confirma
+  var cards = col.querySelector('.cards'), vz = cards.querySelector('.vz'); if (vz) vz.remove();
+  cards.insertBefore(a.el, cards.firstChild);
+  a.el.classList.remove('arrastando');
+  mover(a.id, st, a.el);
 });
 F.topoSombra();
+document.body.classList.toggle('kb', kanban);
 cabeca();
-buscar();
+recarregar();
 </script>
 </body></html>
