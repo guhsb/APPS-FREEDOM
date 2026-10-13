@@ -410,6 +410,13 @@ const ponte = {
     id = Number(id);
     Chamado.anexos(id).then(r => js(wc, 'window.chamadoAnexos && chamadoAnexos(' + id + ',' + r.ok + ',' + Q(r.mensagem) + ',' + JSON.stringify(r.dados ? r.dados.items : []) + ')'));
   },
+  enviarAnexoNovo: (wc, seq, id, nome, tipo, base64) => {
+    seq = Number(seq); id = Number(id);
+    let dados; try { dados = Buffer.from(String(base64 || ''), 'base64'); } catch (e) { dados = null; }
+    const fim = r => js(wc, 'window.novoAnexo && novoAnexo(' + seq + ',' + r.ok + ',' + Q(r.mensagem) + ')');
+    if (!dados) { fim({ ok: false, mensagem: 'Não consegui ler o arquivo' }); return; }
+    Chamado.anexarDados(id, String(nome || 'arquivo'), dados).then(fim, () => fim({ ok: false, mensagem: 'Não consegui anexar' }));
+  },
   anexarChamado: (wc, id) => {
     id = Number(id);
     dialog.showOpenDialog(janela, { title: 'Escolher arquivo para anexar', properties: ['openFile'],

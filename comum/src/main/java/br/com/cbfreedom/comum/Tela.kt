@@ -629,8 +629,27 @@ class Tela : Activity() {
         s.domStorageEnabled = true
         s.textZoom = 100              // não deixa a letra grande do celular desmontar a tela
         s.allowFileAccess = false
-        s.allowContentAccess = false
+        s.allowContentAccess = true       // anexos escolhidos na tela "Abrir chamado" (só as telas do app abrem aqui)
         w.addJavascriptInterface(Ponte(), "App")
+        // <input type="file"> das telas do app (anexos ao abrir o chamado): arquivos ou câmera
+        w.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(v: WebView, cb: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+                arquivoCallback?.onReceiveValue(null)
+                arquivoCallback = cb
+                val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                    .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "image/png", "image/jpeg", "text/plain",
+                        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                if (params.mode == FileChooserParams.MODE_OPEN_MULTIPLE) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                val escolha = Intent.createChooser(i, "Anexar arquivo ou tirar foto")
+                intentCamera()?.let { escolha.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(it)) }
+                return try {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(escolha, REQ_ARQUIVO)
+                    true
+                } catch (_: ActivityNotFoundException) { arquivoCallback = null; fotoPendente = null; false }
+            }
+        }
         w.webViewClient = object : WebViewClient() {
             override fun onPageStarted(v: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                 // qual tela do app está aberta (o voltar do celular depende disso)
@@ -974,10 +993,17 @@ class Tela : Activity() {
         }
         if (requestCode == REQ_ARQUIVO) {
             var res: Array<Uri>? = null
+            val foto = fotoPendente; fotoPendente = null
             if (resultCode == RESULT_OK && data != null) {
                 val clip = data.clipData
                 res = if (clip != null && clip.itemCount > 0) Array(clip.itemCount) { clip.getItemAt(it).uri }
                 else data.data?.let { arrayOf(it) }
+            }
+            // foto tirada pela câmera (oferecida junto na escolha): reduz e entrega para a tela
+            if ((res == null || res.all { it == foto?.second }) && resultCode == RESULT_OK && foto != null && foto.first.length() > 0) {
+                val cb = arquivoCallback; arquivoCallback = null
+                Thread { Imagens.reduzirFoto(foto.first); runOnUiThread { cb?.onReceiveValue(arrayOf(foto.second)) } }.start()
+                return
             }
             arquivoCallback?.onReceiveValue(res)
             arquivoCallback = null
@@ -1312,6 +1338,18 @@ class Tela : Activity() {
 
         @JavascriptInterface
         fun tema(): String = Tema.nome(this@Tela)
+
+        /** Anexo escolhido na tela "Abrir chamado": enviado depois que o chamado é criado. Responde em novoAnexo(seq, ok, msg). */
+        @JavascriptInterface
+        fun enviarAnexoNovo(seq: Int, id: Int, nome: String, tipo: String, base64: String) {
+            val app = applicationContext
+            Thread {
+                val r = try {
+                    Chamado.anexar(app, id, nome, tipo.ifBlank { "application/octet-stream" }, android.util.Base64.decode(base64, android.util.Base64.DEFAULT))
+                } catch (e: Exception) { Chamado.Resultado(false, "Não consegui ler o arquivo") }
+                js(webApp, "window.novoAnexo && novoAnexo($seq," + r.ok + "," + JSONObject.quote(r.mensagem) + ")")
+            }.start()
+        }
 
         /** Troca claro/escuro: salva e remonta a tela inteira (abas, painéis e telas) com as cores novas. */
         @JavascriptInterface

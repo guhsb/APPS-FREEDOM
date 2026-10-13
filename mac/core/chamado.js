@@ -252,11 +252,18 @@ const Chamado = {
   },
 
   async anexar(id, arquivo) {
-    const nome = path.basename(arquivo), ext = path.extname(arquivo).replace('.', '').toLowerCase();
-    if (!EXTENSOES[ext]) return R(false, 'Tipo de arquivo não aceito. Use PDF, imagem (PNG/JPG), texto, Excel ou Word.');
     try {
       if (fs.statSync(arquivo).size > 10 * 1024 * 1024) return R(false, 'O arquivo passa de 10 MB.');
-      const dados = fs.readFileSync(arquivo);
+      return await this.anexarDados(id, path.basename(arquivo), fs.readFileSync(arquivo));
+    } catch (e) { return R(false, 'Não consegui anexar: ' + Api.mensagem(e)); }
+  },
+
+  /** Anexa um arquivo já lido (ex.: escolhido na tela "Abrir chamado"). */
+  async anexarDados(id, nome, dados) {
+    const ext = path.extname(nome).replace('.', '').toLowerCase();
+    if (!EXTENSOES[ext]) return R(false, 'Tipo de arquivo não aceito. Use PDF, imagem (PNG/JPG), texto, Excel ou Word.');
+    try {
+      if (dados.length > 10 * 1024 * 1024) return R(false, 'O arquivo passa de 10 MB.');
       let { api, login, hp } = await api0();
       let r = await api.enviarArquivo('/helpdesk/tickets/' + id + '/attachments', nome, EXTENSOES[ext], dados);
       if (r.status === 401) { api = new Api(login[0], login[1]); await api.entrar(); hp.editar().put('cookie', api.cookie).commit(); r = await api.enviarArquivo('/helpdesk/tickets/' + id + '/attachments', nome, EXTENSOES[ext], dados); }

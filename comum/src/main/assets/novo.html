@@ -22,6 +22,20 @@
   font:inherit;font-size:16px;font-weight:700;box-shadow:0 8px 22px rgba(232,75,138,.28)}
 .enviar:disabled{opacity:.6}
 .cont{float:right;font-weight:500;color:var(--tx3)}
+/* anexos */
+.btAnexo{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:1.5px dashed var(--ln2);background:var(--sf2);color:var(--tx2);
+  border-radius:12px;padding:13px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.btAnexo:active,.btAnexo.sobre{border-color:var(--rosa);color:var(--rosa);background:var(--rosa-s)}
+.btAnexo svg.ic{width:19px;height:19px}
+.anexos{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.anx{display:flex;align-items:center;gap:10px;background:var(--sf2);border:1px solid var(--ln);border-radius:10px;padding:8px 10px}
+.anx .ic2{width:32px;height:32px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--azul-s);color:var(--azul);font:800 9.5px/1 Roboto,sans-serif;text-transform:uppercase;overflow:hidden}
+.anx .ic2 img{width:100%;height:100%;object-fit:cover}
+.anx .nm{flex:1;min-width:0}.anx .nm b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.anx .nm span{font-size:11.5px;color:var(--tx3)}
+.anx .st{font-size:11.5px;font-weight:700;color:var(--tx3);flex:none}
+.anx .st.ok{color:var(--verde)}.anx .st.erro{color:var(--vermelho)}
+.anx button{flex:none;border:0;background:transparent;color:var(--tx3);font-size:20px;line-height:1;padding:4px 6px;cursor:pointer}
 </style></head><body>
 <div class="topo">
   <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
@@ -31,7 +45,13 @@
 <div id="conteudo"><div class="carregando"><i></i>Carregando setores…</div></div>
 <script src="base.js"></script>
 <script>
-var setores = [], prio = 'MEDIUM', enviando = false;
+var setores = [], prio = 'MEDIUM', enviando = false, anexos = [], seqAnexo = 0, esperaAnexo = {};
+var TIPOS = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', txt: 'text/plain', xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+var MAX = 10 * 1024 * 1024, MAX_ARQ = 10;
+function podeAnexar() { try { return typeof App.enviarAnexoNovo === 'function' || (window.App && 'enviarAnexoNovo' in App); } catch (e) { return false; } }
+function tamanho(n) { return n >= 1048576 ? F.um(n / 1048576) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
 document.getElementById('btVoltar').innerHTML = F.ic('seta');
 document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
 
@@ -43,9 +63,13 @@ function montar() {
     '<div class="campo"><label>Prioridade</label><div class="prios" id="prios">' + Object.keys(F.PRIO).map(function (k) {
       return '<button type="button" data-p="' + k + '" class="' + (k === prio ? 'on' : '') + '"><i style="background:' + F.PRIO[k][1] + '"></i>' + F.PRIO[k][0] + '</button>'; }).join('') + '</div></div>' +
     '<div class="campo"><label for="desc">Descrição <em>*</em></label><textarea id="desc" maxlength="10000" placeholder="Explique o que aconteceu, números de pedido, nota, cliente…"></textarea></div>' +
+    (podeAnexar() ? '<div class="campo"><label>Anexos <span class="cont" id="cAnx"></span></label><div class="anexos" id="anexos"></div>' +
+      '<button type="button" class="btAnexo" id="btAnexo">' + F.ic('clipe') + 'Anexar arquivo ou foto</button>' +
+      '<input type="file" id="arq" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,text/plain" style="display:none">' +
+      '<div class="dica">PDF, imagem, texto, Excel ou Word · até 10 MB cada' + (temArrastar() ? ' · dá para arrastar os arquivos para cá' : '') + '</div></div>' : '') +
     '<div class="campo" id="campoResp" style="display:none"><label for="resp">Responsável (opcional)</label><select id="resp"><option value="">Deixar para o setor</option></select></div>' +
     '</div><button class="enviar" id="btEnviar">' + F.ic('mais2') + 'Abrir chamado</button>' +
-    '<div class="rod">Depois de abrir, dá para anexar arquivos na tela do chamado</div>';
+    (podeAnexar() ? '' : '<div class="rod">Depois de abrir, dá para anexar arquivos na tela do chamado</div>');
   document.getElementById('conteudo').innerHTML = h;
   var sel = document.getElementById('setor');
   sel.onchange = function () {
@@ -61,6 +85,76 @@ function montar() {
   var tit = document.getElementById('titulo');
   tit.oninput = function () { document.getElementById('cTit').textContent = tit.value.length ? tit.value.length + '/200' : ''; };
   document.getElementById('btEnviar').onclick = enviar;
+  var arq = document.getElementById('arq');
+  if (arq) {
+    document.getElementById('btAnexo').onclick = function () { if (!enviando) arq.click(); };
+    arq.onchange = function () { adicionar(arq.files); arq.value = ''; };
+    // computador: arrastar arquivos para a tela
+    document.addEventListener('dragover', function (ev) { if (enviando) return; ev.preventDefault(); document.getElementById('btAnexo').classList.add('sobre'); });
+    document.addEventListener('dragleave', function (ev) { if (!ev.relatedTarget) document.getElementById('btAnexo').classList.remove('sobre'); });
+    document.addEventListener('drop', function (ev) { ev.preventDefault(); document.getElementById('btAnexo').classList.remove('sobre'); if (!enviando && ev.dataTransfer) adicionar(ev.dataTransfer.files); });
+  }
+}
+function temArrastar() { try { return App.plataforma() !== 'android'; } catch (e) { return false; } }
+
+function adicionar(lista) {
+  var ruins = [];
+  Array.prototype.forEach.call(lista || [], function (f) {
+    var ext = String(f.name || '').split('.').pop().toLowerCase();
+    if (!TIPOS[ext]) { ruins.push(f.name + ' (tipo não aceito)'); return; }
+    if (f.size > MAX) { ruins.push(f.name + ' (passa de 10 MB)'); return; }
+    if (anexos.length >= MAX_ARQ) { ruins.push(f.name + ' (máximo ' + MAX_ARQ + ' arquivos)'); return; }
+    if (anexos.some(function (a) { return a.f.name === f.name && a.f.size === f.size; })) return;
+    anexos.push({ f: f, ext: ext, prev: /^image\//.test(f.type) ? URL.createObjectURL(f) : '', st: '' });
+  });
+  if (ruins.length) F.toast('Não deu para anexar: ' + ruins.join(', '));
+  desenharAnexos();
+}
+
+function desenharAnexos() {
+  var el = document.getElementById('anexos'); if (!el) return;
+  el.innerHTML = anexos.map(function (a, i) {
+    return '<div class="anx"><span class="ic2">' + (a.prev ? '<img src="' + a.prev + '">' : F.esc(a.ext)) + '</span>' +
+      '<span class="nm"><b>' + F.esc(a.f.name) + '</b><span>' + tamanho(a.f.size) + '</span></span>' +
+      (a.st ? '<span class="st ' + (a.st === 'Enviado' ? 'ok' : a.st === 'Falhou' ? 'erro' : '') + '">' + a.st + '</span>' :
+        '<button type="button" data-i="' + i + '" aria-label="Tirar">×</button>') + '</div>';
+  }).join('');
+  document.getElementById('cAnx').textContent = anexos.length ? anexos.length + (anexos.length === 1 ? ' arquivo' : ' arquivos') : '';
+  el.onclick = function (ev) { var b = ev.target.closest('[data-i]'); if (!b || enviando) return; var a = anexos.splice(Number(b.getAttribute('data-i')), 1)[0]; if (a && a.prev) URL.revokeObjectURL(a.prev); desenharAnexos(); };
+}
+
+function base64(f) {
+  return new Promise(function (ok, erro) {
+    var r = new FileReader();
+    r.onload = function () { var s = String(r.result); ok(s.slice(s.indexOf(',') + 1)); };
+    r.onerror = function () { erro(new Error('não consegui ler o arquivo')); };
+    r.readAsDataURL(f);
+  });
+}
+window.novoAnexo = function (seq, ok, msg) { var f = esperaAnexo[seq]; delete esperaAnexo[seq]; if (f) f({ ok: ok, msg: msg }); };
+
+/** Depois do chamado criado: manda os anexos um por um. */
+function enviarAnexos(id) {
+  var falhas = [], i = 0, b = document.getElementById('btEnviar');
+  return new Promise(function (fim) {
+    var prox = function () {
+      if (i >= anexos.length) { fim(falhas); return; }
+      var a = anexos[i++];
+      a.st = 'Enviando…'; desenharAnexos();
+      b.lastChild.textContent = 'Enviando anexo ' + i + ' de ' + anexos.length + '…';
+      base64(a.f).then(function (b64) {
+        return new Promise(function (ok) {
+          var seq = ++seqAnexo; esperaAnexo[seq] = ok;
+          try { App.enviarAnexoNovo(seq, id, a.f.name, a.f.type || TIPOS[a.ext], b64); } catch (e) { delete esperaAnexo[seq]; ok({ ok: false, msg: 'O app não respondeu' }); }
+        });
+      }, function (e) { return { ok: false, msg: e.message }; }).then(function (r) {
+        a.st = r.ok ? 'Enviado' : 'Falhou'; desenharAnexos();
+        if (!r.ok) falhas.push(a.f.name + ': ' + (r.msg || 'não foi'));
+        prox();
+      });
+    };
+    prox();
+  });
 }
 
 function carregarResponsaveis(q) {
@@ -89,10 +183,31 @@ function enviar() {
   var corpo = { queue_id: Number(q), title: t, priority: prio, description: d };
   if (resp) corpo.assignee_user_id = Number(resp);
   F.api('POST', '/helpdesk/tickets', corpo).then(function (r) {
+    if (r.status >= 200 && r.status < 300 && !r.fila && r.json && r.json.id && anexos.length) {
+      // chamado criado: agora os anexos (o botão continua travado)
+      var id = r.json.id, prot = r.json.protocol || '';
+      enviarAnexos(id).then(function (falhas) {
+        enviando = false;
+        if (falhas.length) {
+          var ba = document.getElementById('btAnexo'); if (ba) ba.style.display = 'none';
+          b.disabled = false; b.lastChild.textContent = 'Ver o chamado';
+          b.onclick = function () { location.replace('chamado.html#' + id); };
+          document.getElementById('aviso').innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>Chamado ' + F.esc(prot) + ' aberto, mas ' +
+            (falhas.length === 1 ? '1 anexo não foi' : falhas.length + ' anexos não foram') + ': ' + F.esc(falhas.join(' · ')) +
+            '. Dá para anexar de novo na tela do chamado.</span></div>';
+          window.scrollTo(0, 0);
+          return;
+        }
+        F.toast('Chamado ' + prot + ' aberto com ' + anexos.length + (anexos.length === 1 ? ' anexo' : ' anexos'));
+        location.replace('chamado.html#' + id);
+      });
+      return;
+    }
     enviando = false; b.disabled = false; b.lastChild.textContent = 'Abrir chamado';
     if (r.fila) {
       document.getElementById('conteudo').innerHTML = '<div class="card" style="text-align:center;padding:26px 16px">' + F.ic('nuvem') +
-        '<h3 style="margin:10px 0 6px">Chamado guardado</h3><p class="cinza" style="margin:0 0 16px">Você está sem internet. O chamado vai ser aberto sozinho assim que a conexão voltar, e você recebe um aviso.</p>' +
+        '<h3 style="margin:10px 0 6px">Chamado guardado</h3><p class="cinza" style="margin:0 0 16px">Você está sem internet. O chamado vai ser aberto sozinho assim que a conexão voltar, e você recebe um aviso.' +
+        (anexos.length ? ' <b>Os anexos não foram guardados</b>: anexe na tela do chamado depois que ele abrir.' : '') + '</p>' +
         '<button class="enviar" onclick="try{App.voltar()}catch(e){history.back()}">Voltar</button></div>';
       return;
     }

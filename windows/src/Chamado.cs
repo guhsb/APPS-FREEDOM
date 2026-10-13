@@ -238,13 +238,22 @@ namespace Freedom
 
         public static Resultado Anexar(int id, string arquivo)
         {
-            var nome = Path.GetFileName(arquivo);
-            var ext = Path.GetExtension(arquivo).TrimStart('.').ToLowerInvariant();
-            if (!EXTENSOES.Contains(ext)) return new Resultado(false, "Tipo de arquivo não aceito. Use PDF, imagem (PNG/JPG), texto, Excel ou Word.");
             try
             {
                 if (new FileInfo(arquivo).Length > 10 * 1024 * 1024) return new Resultado(false, "O arquivo passa de 10 MB.");
-                var dados = File.ReadAllBytes(arquivo);
+                return Anexar(id, Path.GetFileName(arquivo), File.ReadAllBytes(arquivo));
+            }
+            catch (Exception e) { return new Resultado(false, "Não consegui anexar: " + Api.Mensagem(e)); }
+        }
+
+        /// <summary>Anexa um arquivo já lido (ex.: escolhido na tela "Abrir chamado").</summary>
+        public static Resultado Anexar(int id, string nome, byte[] dados)
+        {
+            var ext = Path.GetExtension(nome).TrimStart('.').ToLowerInvariant();
+            if (!EXTENSOES.Contains(ext)) return new Resultado(false, "Tipo de arquivo não aceito. Use PDF, imagem (PNG/JPG), texto, Excel ou Word.");
+            try
+            {
+                if (dados.Length > 10 * 1024 * 1024) return new Resultado(false, "O arquivo passa de 10 MB.");
                 var login = Store.Login();
                 if (login == null) return new Resultado(false, "Faça o login no app.");
                 var hp = Helpdesk.P;

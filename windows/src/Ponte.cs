@@ -200,6 +200,19 @@ namespace Freedom
             });
         }
 
+        /// <summary>Anexo escolhido na tela "Abrir chamado": enviado depois que o chamado é criado.</summary>
+        public void enviarAnexoNovo(object seqO, object idO, string nome, string tipo, string base64)
+        {
+            int seq = N(seqO), id = N(idO);
+            Fundo(() =>
+            {
+                Chamado.Resultado r;
+                try { r = Chamado.Anexar(id, nome ?? "arquivo", Convert.FromBase64String(base64 ?? "")); }
+                catch (Exception) { r = new Chamado.Resultado(false, "Não consegui ler o arquivo"); }
+                j.JsApp("window.novoAnexo && novoAnexo(" + seq + "," + (r.Ok ? "true" : "false") + "," + Q(r.Mensagem) + ")");
+            });
+        }
+
         public void anexarChamado(object idO)
         {
             int id = N(idO);
