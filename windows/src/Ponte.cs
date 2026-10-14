@@ -263,7 +263,7 @@ namespace Freedom
         {
             Fundo(() =>
             {
-                if (Atualizacao.Nova() == null)
+                // sempre confere o GitHub na hora: se saíram várias versões, baixa direto a última (não uma por vez)
                 {
                     int r = Atualizacao.Conferir(true);
                     if (r <= 0)

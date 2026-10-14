@@ -401,15 +401,18 @@ class Tela : Activity() {
         get() = System.currentTimeMillis() - getSharedPreferences("atualizacao", MODE_PRIVATE).getLong("pediu_permissao", 0L) < 10 * 60_000L
         set(v) { getSharedPreferences("atualizacao", MODE_PRIVATE).edit().putLong("pediu_permissao", if (v) System.currentTimeMillis() else 0L).apply() }
 
+    private var conferiuAgora = false
+
     private fun iniciarAtualizacao() {
-        if (isFinishing || isDestroyed) return
-        if (Atualizacao.nova(this) == null) {
+        if (isFinishing || isDestroyed || Atualizacao.baixando) return
+        // sempre confere o GitHub na hora: se saíram várias versões, baixa direto a última (não uma por vez)
+        if (!conferiuAgora) {
             Thread {
                 val r = Atualizacao.conferir(applicationContext, true)
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     when (r) {
-                        Atualizacao.Conferencia.NOVA -> iniciarAtualizacao()
+                        Atualizacao.Conferencia.NOVA -> { conferiuAgora = true; iniciarAtualizacao(); conferiuAgora = false }
                         Atualizacao.Conferencia.EM_DIA -> toast("O app já está na versão mais nova")
                         Atualizacao.Conferencia.FALHOU -> toast("Não consegui verificar agora. Confira a internet e tente de novo.")
                     }

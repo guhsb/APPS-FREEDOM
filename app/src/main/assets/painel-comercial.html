@@ -294,15 +294,19 @@ function vendedor(d) {
   }
   var nota = ac >= 0.01 ? 'A meta da semana inclui ' + F.brlK(ac) + ' que faltaram nas semanas anteriores.' :
              ac <= -0.01 ? 'Você vendeu ' + F.brlK(-ac) + ' a mais nas semanas anteriores: a meta desta semana ficou menor.' : '';
-  var h = '<div class="card">' + hero(s, F.esc(s.titulo || 'SEMANA') + (d.nome ? ' · ' + F.esc(d.nome).toUpperCase() : ''), '', '#4f7cff', '#e84b8a') +
-    destaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, rest: s.restam, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje') +
-    '<div class="tiles">' + F.tile('Dias restantes', F.int(s.restam)) +
-    posTiles(s) +
-    '</div>' + (nota ? '<div class="nota">' + nota + '</div>' : '') + '</div>';
-  h += '<div class="card">' + hero(m, 'MÊS', 'dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T), '#e84b8a', '#e84b8a') +
+  var quem = d.nome ? ' · ' + F.esc(d.nome).toUpperCase() : '';
+  if (vista === 'sem') {
+    // "Esta semana": só a semana (zerada se ainda não tem venda)
+    document.getElementById('conteudo').innerHTML = '<div class="card">' + hero(s, F.esc(s.titulo || 'SEMANA') + quem, '', '#4f7cff', '#e84b8a') +
+      destaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, rest: s.restam, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje') +
+      '<div class="tiles">' + F.tile('Dias restantes', F.int(s.restam)) + posTiles(s) +
+      '</div>' + (nota ? '<div class="nota">' + nota + '</div>' : '') + '</div>';
+    return;
+  }
+  // "Este mês": só o mês
+  document.getElementById('conteudo').innerHTML = '<div class="card">' + hero(m, 'FATURAMENTO DO MÊS' + quem, 'dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T), '#4f7cff', '#e84b8a') +
     cmpAnterior(m) + destaque(m, 'Meta do mês', 'Ideal até hoje') + '<div class="tiles">' + posTiles(m) +
     F.tile('Dias úteis', F.int(m.dec) + '/' + F.int(m.T)) + '</div></div>' + grafico(m, 'EVOLUÇÃO DO MÊS');
-  document.getElementById('conteudo').innerHTML = h;
   ligarGraficos(m);
 }
 
@@ -354,18 +358,20 @@ Base.paraImagem = function () {
   var nome = d.nome ? String(d.nome).toUpperCase() : '';
   if (d.tipo === 'vendedor') {
     var s = d.semana || {}, m = d.mes || {}, bl = [];
-    if (!d.periodo) {
+    if (!d.periodo && vista === 'sem') {
       var ac = F.n(s.acumulado);
       bl.push({ tipo: 'card', blocos: [imgHero(s, s.titulo || 'SEMANA', '', '#4f7cff', '#e84b8a'),
         imgDestaque({ meta: s.meta, falta: s.falta, porDia: s.porDia, ideal: s.ideal }, 'Meta da semana', 'Ideal até hoje', s.restam),
         { tipo: 'tiles', cols: 3, itens: [{ r: 'Dias restantes', v: F.int(s.restam) }, ...posItens(s)] }]
         .concat(ac >= 0.01 ? [{ tipo: 'nota', t: 'A meta da semana inclui ' + F.brlK(ac) + ' que faltaram nas semanas anteriores.' }] : []) });
+      return { titulo: 'Comercial · ' + (d.nome || 'Vendedor'), sub: s.titulo ? s.titulo.charAt(0) + s.titulo.slice(1).toLowerCase() : 'Esta semana', quando: quando,
+               arquivo: 'Comercial-semana-' + (d.nome || 'vendedor'), blocos: bl };
     }
     bl.push({ tipo: 'card', blocos: [imgHero(m, d.periodo ? (m.titulo || 'PERÍODO') : 'MÊS', imgAnterior(m) || ('dia útil ' + F.int(m.dec) + ' de ' + F.int(m.T)), '#4f7cff', '#e84b8a'),
       imgDestaque(m, d.periodo ? 'Meta' : 'Meta do mês', d.periodo ? 'Ideal no período' : 'Ideal até hoje'),
       { tipo: 'tiles', cols: 3, itens: [...posItens(m), { r: 'Dias úteis', v: F.int(m.dec) + '/' + F.int(m.T) }] }] });
     var gm = imgGrafico(m, d.periodo ? 'Evolução no período' : 'Evolução do mês'); if (gm) bl.push(gm);
-    return { titulo: 'Comercial · ' + (d.nome || 'Vendedor'), sub: d.periodo ? 'Período ' + d.periodo : 'Semana e mês', quando: quando, arquivo: 'Comercial-' + (d.nome || 'vendedor'), blocos: bl };
+    return { titulo: 'Comercial · ' + (d.nome || 'Vendedor'), sub: d.periodo ? 'Período ' + d.periodo : 'Mês atual', quando: quando, arquivo: 'Comercial-' + (d.nome || 'vendedor'), blocos: bl };
   }
   var outros = posItens(d).concat([{ r: 'Dias úteis', v: F.int(d.dec) + '/' + F.int(d.T) }]);
   if (F.n(d.pedidos)) outros.push({ r: 'Pedidos', v: F.int(d.pedidos) });
@@ -393,6 +399,7 @@ Base.paraImagem = function () {
 
 // ---- período escolhido (não muda o widget) ----
 var periodoAtivo = false;
+var vista = 'mes';          // vendedor: 'mes' (só o mês) ou 'sem' (só a semana, dos números já guardados)
 function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 function pedirPeriodo(ini, fim) {
   periodoAtivo = true;
@@ -401,7 +408,7 @@ function pedirPeriodo(ini, fim) {
   try { App.buscarPainel(PAINEL_ID, ini, fim); } catch (e) { voltarMes(); }
 }
 function voltarMes() {
-  periodoAtivo = false;
+  periodoAtivo = false; vista = 'mes';
   document.getElementById('perSel').value = 'mes';
   document.getElementById('perDatas').style.display = 'none';
   document.getElementById('faixaPer').innerHTML = '';
@@ -415,7 +422,7 @@ window.painelPeriodo = function (d, erro) {
     return;
   }
   document.getElementById('faixaPer').innerHTML = '<div class="faixaPer"><span>Mostrando ' + F.esc(d.periodo || 'o período escolhido') + '</span><button onclick="voltarMes()">Voltar para este mês</button></div>';
-  if (d.semVendas) {
+  if (d.semVendas && document.getElementById('perSel').value !== 'sem') {
     // igual ao site: avisa que não tem vendas no período (em vez de números zerados)
     mostrado = null;
     document.getElementById('conteudo').innerHTML = '<div class="card vazioPer"><div class="ico">' + F.ic('grafico') + '</div>' +
@@ -429,6 +436,14 @@ document.getElementById('perSel').onchange = function () {
   var v = this.value, h = new Date();
   document.getElementById('perDatas').style.display = v === 'dt' ? 'flex' : 'none';
   if (v === 'mes') return voltarMes();
+  if (v === 'sem' && (Base.estado().dados || {}).tipo === 'vendedor') {
+    // vendedor: a semana já vem com o mês (meta da semana, ideal, quanto falta); mostra só ela, zerada se não tiver venda
+    periodoAtivo = false; vista = 'sem';
+    document.getElementById('faixaPer').innerHTML = '<div class="faixaPer"><span>Mostrando esta semana</span><button onclick="voltarMes()">Voltar para este mês</button></div>';
+    Base.ultimo = ''; Base.atualizarTela();
+    return;
+  }
+  vista = 'mes';
   if (v === 'sem') { var dom = new Date(h); dom.setDate(h.getDate() - h.getDay()); var sab = new Date(dom); sab.setDate(dom.getDate() + 6); pedirPeriodo(iso(dom), iso(sab)); }   // domingo a sábado, como no site
   if (v === 'ant') { var i = new Date(h.getFullYear(), h.getMonth() - 1, 1), f = new Date(h.getFullYear(), h.getMonth(), 0); pedirPeriodo(iso(i), iso(f)); }
   if (v === 'dt') {

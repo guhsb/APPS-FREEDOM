@@ -437,7 +437,7 @@ const ponte = {
   },
   atualizarApp: (wc) => {
     (async () => {
-      if (!Atualizacao.nova()) {
+      {   // sempre confere o GitHub na hora: se saíram várias versões, baixa direto a última (não uma por vez)
         const r = await Atualizacao.conferir(true);
         if (r <= 0) { js(wc, 'window.F && F.toast && F.toast(' + Q(r === 0 ? 'O app já está na versão mais nova' : 'Não consegui verificar agora') + ')'); avisarTodas(); return; }
       }
