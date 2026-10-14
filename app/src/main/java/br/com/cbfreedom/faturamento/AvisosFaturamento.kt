@@ -10,7 +10,7 @@ import java.time.ZoneId
 
 /**
  * Aviso do painel Faturamento: "Faturamento de hoje" às 11:30 e 15:00 e depois de 30 em 30 minutos
- * das 17:30 às 20:00 (dias úteis), com quanto entrou desde o aviso anterior.
+ * das 17:30 às 20:00 (dias úteis). Só o valor faturado, para caber na notificação.
  */
 object AvisosFaturamento {
     private val ZONA = ZoneId.of("America/Sao_Paulo")
@@ -34,9 +34,7 @@ object AvisosFaturamento {
         val out = ArrayList<Pair<String, String>>()
         if (r.marcar("fat_${dia}_$faixa")) {
             val v = n(dd, "valor")
-            val antes = r.valor("fatv_$dia")
-            val desde = if (antes != null && v > antes) " (+${Fmt.brlK(v - antes)} desde o último aviso)" else ""
-            out += Pair("Faturamento de hoje: ${Fmt.brlK(v)}", "${Fmt.int(n(dd, "pedidos"))} pedidos faturados até $faixa$desde. No mês: ${Fmt.brlK(n(d.optJSONObject("mes"), "valor"))}.")
+            out += Pair("Faturamento hoje: ${Fmt.brlK(v)}", "")
             r.guardar("fatv_$dia", v)
         }
         r.fechar()

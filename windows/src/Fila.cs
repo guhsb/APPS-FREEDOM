@@ -195,9 +195,12 @@ namespace Freedom
             long qtd = P.GetLong(k);
             if (qtd >= 8) return vazio;
             P.Edit().Put(k, qtd + 1).Commit();
-            if (avisos.Count == 1) return avisos;
-            return new List<string[]> { new[] { avisos.Count + " novidades do painel",
-                string.Join("\n", avisos.Select(a => "• " + a[0] + (a[1].Length > 0 ? ": " + a[1] : ""))) } };
+            // "solo" (acima / abaixo do ritmo) sai como aviso próprio; o resto vira um aviso só, com os títulos
+            var solo = avisos.Where(a => a.Length > 2 && a[2] == "solo").Select(a => new[] { a[0], a[1] }).ToList();
+            var resto = avisos.Where(a => !(a.Length > 2 && a[2] == "solo")).ToList();
+            if (resto.Count > 1) solo.Add(new[] { resto.Count + " novidades do painel", string.Join("\n", resto.Select(a => "• " + a[0])) });
+            else solo.AddRange(resto);
+            return solo;
         }
 
         /// <summary>Registro dos avisos de um mês (igual ao Metas.Registro do Android).</summary>
@@ -239,8 +242,7 @@ namespace Freedom
             if (r.Marcar("fat_" + dia + "_" + faixa))
             {
                 double v = N(dd, "valor"); var antes = r.Valor("fatv_" + dia);
-                var desde = antes != null && v > antes.Value ? " (+" + BrlK(v - antes.Value) + " desde o último aviso)" : "";
-                out_.Add(new[] { "Faturamento de hoje: " + BrlK(v), Math.Round(N(dd, "pedidos")) + " pedidos faturados até " + faixa + desde + ". No mês: " + BrlK(N(d.OptJSONObject("mes"), "valor")) + "." });
+                out_.Add(new[] { "Faturamento hoje: " + BrlK(v), "" });
                 r.Guardar("fatv_" + dia, v);
             }
             r.Fechar();
@@ -271,64 +273,63 @@ namespace Freedom
             return "R$ " + v.ToString("N2", br);
         }
 
-        /// <summary>Avisos do gestor sobre cada vendedor (juntando num aviso só quando são vários): acima da média hoje,
-        /// sem venda hoje (15 h+, se a equipe já vendeu hoje), abaixo do ritmo (14 h+, uma vez por dia), positivação batida (uma vez no mês).</summary>
-        static void Equipe(JSONObject d, JSONArray vs, DateTime agora, Func<string, bool> marcar, List<string[]> out_)
+        static string P0(double v) { return Math.Round(v * 100) + "%"; }
+        static string Hh(string fx) { return fx.EndsWith(":00") ? int.Parse(fx.Substring(0, 2)) + "h" : fx.Replace(":", "h"); }
+        static string Dias(double rest) { return Math.Round(rest) + (rest == 1 ? " dia útil" : " dias úteis"); }
+        static readonly string[] RITMO = { "10:00", "12:00", "14:00", "16:00" };
+        static bool Util(DateTime t) { return t.DayOfWeek != DayOfWeek.Saturday && t.DayOfWeek != DayOfWeek.Sunday; }
+
+        /// <summary>Avisos do gestor sobre cada vendedor (juntando num aviso só quando são vários), só com os nomes.</summary>
+        static void Equipe(JSONObject d, JSONArray vs, DateTime agora, string mes, Func<string, bool> marcar, Prefs p, Prefs.Editor ed, bool primeira, List<string[]> out_)
         {
-            var dia = agora.ToString("yyyy-MM-dd"); var mes = dia.Substring(0, 7);
-            bool util = agora.DayOfWeek != DayOfWeek.Saturday && agora.DayOfWeek != DayOfWeek.Sunday;
+            var dia = agora.ToString("yyyy-MM-dd");
+            bool util = Util(agora);
             double dec = N(d, "dec"), idealP = N(d, "idealP");
             var lista = new List<JSONObject>();
             for (int i = 0; i < vs.Length; i++) { var v = vs.OptJSONObject(i); if (v != null) lista.Add(v); }
-            Action<string, string, List<string[]>> junta = (um, varios, itens) =>
+            Action<string, string, List<string>> junta = (um, varios, nomes) =>
             {
-                if (itens.Count == 1) out_.Add(new[] { itens[0][0] + " " + um, itens[0][1] });
-                else if (itens.Count > 1) out_.Add(new[] { itens.Count + " vendedores " + varios,
-                    string.Join(" · ", itens.Select(x => x[0] + (x[1].Length > 0 ? " (" + x[1].Split(new[] { " · " }, StringSplitOptions.None)[0] + ")" : ""))) });
+                if (nomes.Count == 1) out_.Add(new[] { nomes[0] + " " + um, "" });
+                else if (nomes.Count > 1) out_.Add(new[] { nomes.Count + " vendedores " + varios, string.Join(", ", nomes) });
             };
-            var acima = new List<string[]>(); var sem = new List<string[]>(); var ritmo = new List<string[]>(); var pos = new List<string[]>();
+            var acima = new List<string>(); var sem = new List<string>(); var pos = new List<string>(); var voltou = new List<string>();
+            var marcos = new List<string[]>();
             foreach (var v in lista)
             {
-                var nome = v.OptString("nome");
+                var nome = v.OptString("nome"); double pp = N(v, "p");
                 if (d.OptBoolean("temHoje") && util)
                 {
                     double h = N(v, "hoje"), media = dec > 0 ? N(v, "valor") / dec : 0;
-                    if (h > 0 && media > 0 && h >= media * 1.5 && marcar("acima_" + dia + "_" + nome))
-                        acima.Add(new[] { nome, BrlK(h) + " hoje · média de " + BrlK(media) + " por dia" });
-                    if (agora.Hour >= 15 && N(d, "hojeEquipe") > 0 && N(v, "meta") > 0 && h <= 0 && marcar("semvenda_" + dia + "_" + nome))
-                        sem.Add(new[] { nome, "" });
+                    if (h > 0 && media > 0 && h >= media * 1.5 && marcar("acima_" + dia + "_" + nome)) acima.Add(nome);
+                    if (agora.Hour >= 15 && N(d, "hojeEquipe") > 0 && N(v, "meta") > 0 && h <= 0 && marcar("semvenda_" + dia + "_" + nome)) sem.Add(nome);
                 }
-                if (util && agora.Hour >= 14 && N(v, "meta") > 0 && N(v, "valor") < N(v, "meta") && N(v, "p") < idealP - 0.10 && marcar("ritmo_" + dia + "_" + nome))
-                    ritmo.Add(new[] { nome, Pct(N(v, "p") * 100) + " da meta · ideal " + Pct(idealP * 100) });
-                if (N(v, "metaPos") > 0 && N(v, "pos") >= N(v, "metaPos") && marcar("pos_" + mes + "_" + nome))
-                    pos.Add(new[] { nome, Math.Round(N(v, "pos")) + " de " + Math.Round(N(v, "metaPos")) + " clientes positivados" });
+                if (N(v, "meta") > 0)
+                {
+                    int novo = 0;
+                    foreach (var m in new[] { 50, 75, 90 }) if (pp >= m / 100.0 && marcar("marco_" + mes + "_" + m + "_" + nome)) novo = m;
+                    if (novo > 0 && pp < 1) marcos.Add(new[] { nome, novo.ToString() });
+                    var k = "baixo_" + mes + "_" + nome;
+                    if (pp < idealP - 0.10) ed.Put(k, true);
+                    else if (pp >= idealP && p.GetBool(k, false)) { ed.Remove(k); if (!primeira) voltou.Add(nome); }
+                }
+                if (N(v, "metaPos") > 0 && N(v, "pos") >= N(v, "metaPos") && marcar("pos_" + mes + "_" + nome)) pos.Add(nome);
             }
             junta("vendeu acima da média hoje", "acima da média hoje", acima);
             junta("está sem venda hoje", "sem venda hoje", sem);
-            junta("está abaixo do ritmo", "abaixo do ritmo", ritmo);
-            junta("bateu a meta de positivação", "bateram a positivação", pos);
-        }
-
-        /// <summary>Marcos da meta (50/75/90%) e "voltou ao ritmo" — precisam ler e guardar estado.</summary>
-        static void MarcosERitmo(JSONObject d, JSONArray vs, string mes, Func<string, bool> marcar, Prefs p, Prefs.Editor ed, bool primeira, List<string[]> out_)
-        {
-            double idealP = N(d, "idealP");
-            var marcos = new List<string>(); var voltou = new List<string[]>();
-            for (int i = 0; i < vs.Length; i++)
+            if (marcos.Count == 1) out_.Add(new[] { marcos[0][0] + " passou de " + marcos[0][1] + "% da meta", "" });
+            else if (marcos.Count > 1) out_.Add(new[] { marcos.Count + " vendedores passaram de marcos da meta", string.Join(", ", marcos.Select(x => x[0] + " " + x[1] + "%")) });
+            junta("voltou ao ritmo", "voltaram ao ritmo", voltou);
+            junta("bateu a positivação", "bateram a positivação", pos);
+            // às 10, 12, 14 e 16 h: quem está acima e quem está abaixo do ritmo (dois avisos, só nomes)
+            var fx = util ? Faixa(RITMO, "17:59", agora.Hour, agora.Minute) : null;
+            if (fx != null && marcar("ritmoeq_" + dia + "_" + fx))
             {
-                var v = vs.OptJSONObject(i); if (v == null || N(v, "meta") <= 0) continue;
-                var nome = v.OptString("nome"); double pp = N(v, "p");
-                int novo = 0;
-                foreach (var m in new[] { 50, 75, 90 }) if (pp >= m / 100.0 && marcar("marco_" + mes + "_" + m + "_" + nome)) novo = m;
-                if (novo > 0 && pp < 1) marcos.Add(nome + " passou de " + novo + "% (" + Pct(pp * 100) + ")");
-                var k = "baixo_" + mes + "_" + nome;
-                if (pp < idealP - 0.10) ed.Put(k, true);
-                else if (pp >= idealP && p.GetBool(k, false)) { ed.Remove(k); if (!primeira) voltou.Add(new[] { nome, Pct(pp * 100) + " da meta · ideal " + Pct(idealP * 100) }); }
+                var com = idealP > 0 ? lista.Where(v => N(v, "meta") > 0).ToList() : new List<JSONObject>();
+                var cima = com.Where(v => N(v, "p") >= idealP).OrderByDescending(v => N(v, "p")).Select(v => v.OptString("nome")).ToList();
+                var baixo = com.Where(v => N(v, "p") < idealP).OrderBy(v => N(v, "p")).Select(v => v.OptString("nome")).ToList();
+                if (cima.Count > 0) out_.Add(new[] { "Acima do ritmo (" + Hh(fx) + ")", string.Join(", ", cima), "solo" });
+                if (baixo.Count > 0) out_.Add(new[] { "Abaixo do ritmo (" + Hh(fx) + ")", string.Join(", ", baixo), "solo" });
             }
-            if (marcos.Count == 1) out_.Add(new[] { marcos[0].Split('(')[0].Trim() + " da meta", marcos[0] });
-            else if (marcos.Count > 1) out_.Add(new[] { marcos.Count + " vendedores passaram de marcos da meta", string.Join(" · ", marcos) });
-            if (voltou.Count == 1) out_.Add(new[] { voltou[0][0] + " voltou ao ritmo", voltou[0][1] });
-            else if (voltou.Count > 1) out_.Add(new[] { voltou.Count + " vendedores voltaram ao ritmo", string.Join(" · ", voltou.Select(x => x[0])) });
         }
 
         static double? VendaDoDia(JSONObject m, string dia)
@@ -338,94 +339,61 @@ namespace Freedom
             return null;
         }
 
-        /// <summary>Os mesmos avisos do gestor, mas só com os números do próprio vendedor.</summary>
-        static void Pessoal(JSONObject m, JSONObject s, DateTime agora, Func<string, bool> marcar, Prefs p, Prefs.Editor ed, bool primeira, List<string[]> out_)
+        /// <summary>"Bom dia!" curto: % da meta no título; ontem e quanto por dia no texto.</summary>
+        static string[] BomDia(JSONObject o, string dia, string quem)
         {
-            var dia = agora.ToString("yyyy-MM-dd"); var mes = dia.Substring(0, 7);
-            bool util = agora.DayOfWeek != DayOfWeek.Saturday && agora.DayOfWeek != DayOfWeek.Sunday;
-            double meta = N(m, "meta"), pp = N(m, "p"), idealP = N(m, "idealP"), rest = N(m, "rest"), dec = N(m, "dec");
-            var hojeV = VendaDoDia(m, dia);
-            if (util && agora.Hour >= 8 && agora.Hour <= 11 && marcar("eu_manha_" + dia))
+            JSONObject ontem = null; var dd = o.OptJSONArray("diario");
+            if (dd != null) for (int i = 0; i < dd.Length; i++)
             {
-                JSONObject ontem = null; var dd = m.OptJSONArray("diario");
-                if (dd != null) for (int i = 0; i < dd.Length; i++)
-                {
-                    var x = dd.OptJSONObject(i); if (x == null) continue; var dt = x.OptString("d");
-                    if (dt.Length != 10 || string.CompareOrdinal(dt, dia) >= 0) continue;
-                    var dw = DateTime.ParseExact(dt, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture).DayOfWeek;
-                    if (dw != DayOfWeek.Saturday && dw != DayOfWeek.Sunday) ontem = x;
-                }
-                var t = "";
-                if (ontem != null) { var od = ontem.OptString("d"); t += "Ontem (" + od.Substring(8, 2) + "/" + od.Substring(5, 2) + ") você vendeu " + BrlK(N(ontem, "v")) + ". "; }
-                t += "No mês: " + BrlK(N(m, "valor"));
-                if (meta > 0) { t += " (" + Pct(pp * 100) + " da meta; ideal " + Pct(idealP * 100) + ")."; if (N(m, "falta") > 0 && rest > 0) t += " Para bater: " + BrlK(N(m, "porDia")) + " por dia útil."; }
-                else t += ".";
-                if (s != null && N(s, "meta") > 0) t += " Semana: " + BrlK(N(s, "valor")) + " de " + BrlK(N(s, "meta")) + ".";
-                out_.Add(new[] { "Bom dia! Seu resumo", t });
+                var x = dd.OptJSONObject(i); if (x == null) continue; var dt = x.OptString("d");
+                if (dt.Length != 10 || string.CompareOrdinal(dt, dia) >= 0) continue;
+                if (Util(DateTime.ParseExact(dt, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))) ontem = x;
             }
-            if (meta <= 0) return;
-            var fx = util ? Faixa(new[] { "10:00", "12:00", "14:00", "16:00" }, "17:59", agora.Hour, agora.Minute) : null;
-            if (fx != null && marcar("eu_ritmo_" + dia + "_" + fx))
-            {
-                double dif = N(m, "valor") - N(m, "ideal");
-                var t = Pct(pp * 100) + " da meta (ideal " + Pct(idealP * 100) + ") · " + (dif >= 0 ? BrlK(dif) + " acima do ideal" : BrlK(-dif) + " abaixo do ideal");
-                if (hojeV != null) t += " · hoje: " + BrlK(hojeV.Value);
-                if (N(m, "falta") > 0 && rest > 0) t += " · para bater: " + BrlK(N(m, "porDia")) + " por dia útil";
-                out_.Add(new[] { "Seu ritmo às " + fx, t });
-            }
-            if (util && pp < 1 && rest >= 1 && rest <= 3 && marcar("eu_reta_" + dia))
-                out_.Add(new[] { "Reta final: " + Math.Round(rest) + (rest == 1 ? " dia útil" : " dias úteis"), "Faltam " + BrlK(N(m, "falta")) + " para a sua meta de " + BrlK(meta) + ": " + BrlK(N(m, "porDia")) + " por dia útil." });
-            int novo = 0;
-            foreach (var k in new[] { 50, 75, 90 }) if (pp >= k / 100.0 && marcar("eu_marco_" + mes + "_" + k)) novo = k;
-            if (novo > 0 && pp < 1) out_.Add(new[] { "Você passou de " + novo + "% da meta!", "Já são " + BrlK(N(m, "valor")) + " (" + Pct(pp * 100) + " da meta de " + BrlK(meta) + ")." });
-            var kb = "eu_baixo_" + mes;
-            if (pp < idealP - 0.10) ed.Put(kb, true);
-            else if (pp >= idealP && p.GetBool(kb, false)) { ed.Remove(kb); if (!primeira) out_.Add(new[] { "Você voltou ao ritmo!", Pct(pp * 100) + " da meta; o ideal hoje é " + Pct(idealP * 100) + ". Continue assim." }); }
-            if (util && hojeV != null && dec > 0 && N(m, "valor") > 0 && hojeV.Value >= 1.5 * N(m, "valor") / dec && marcar("eu_acima_" + dia))
-                out_.Add(new[] { "Hoje você vendeu acima da sua média!", BrlK(hojeV.Value) + " hoje · sua média é " + BrlK(N(m, "valor") / dec) + " por dia." });
-            if (N(m, "metaPos") > 0 && N(m, "pos") >= N(m, "metaPos") && marcar("eu_pos_" + mes))
-                out_.Add(new[] { "Você bateu a meta de positivação!", Math.Round(N(m, "pos")) + " de " + Math.Round(N(m, "metaPos")) + " clientes positivados no mês." });
+            var b = new List<string>();
+            if (ontem != null) b.Add("Ontem " + BrlK(N(ontem, "v")));
+            if (N(o, "meta") > 0 && N(o, "falta") > 0 && N(o, "rest") > 0) b.Add(BrlK(N(o, "porDia")) + "/dia p/ bater");
+            else if (N(o, "meta") <= 0) b.Add("Mês " + BrlK(N(o, "valor")));
+            return new[] { N(o, "meta") > 0 ? "Bom dia! " + quem + " em " + P0(N(o, "p")) + " da meta" : "Bom dia!", string.Join(" · ", b) };
         }
 
-        /// <summary>Resumo da manhã (8–11 h) e reta final do mês (últimos 3 dias úteis), para gestor/diretor.</summary>
+        /// <summary>Os mesmos avisos do gestor, mas só com os números do próprio vendedor.</summary>
+        static void Pessoal(JSONObject m, DateTime agora, Func<string, bool> marcar, Prefs p, Prefs.Editor ed, bool primeira, List<string[]> out_)
+        {
+            var dia = agora.ToString("yyyy-MM-dd"); var mes = dia.Substring(0, 7);
+            bool util = Util(agora);
+            double meta = N(m, "meta"), pp = N(m, "p"), idealP = N(m, "idealP"), rest = N(m, "rest"), dec = N(m, "dec");
+            var hojeV = VendaDoDia(m, dia);
+            if (util && agora.Hour >= 8 && agora.Hour <= 11 && marcar("eu_manha_" + dia)) out_.Add(BomDia(m, dia, "Você está"));
+            if (meta <= 0) return;
+            var fx = util ? Faixa(RITMO, "17:59", agora.Hour, agora.Minute) : null;
+            if (fx != null && marcar("eu_ritmo_" + dia + "_" + fx))
+                out_.Add(new[] { "Seu ritmo " + Hh(fx) + ": " + P0(pp) + " da meta", N(m, "valor") >= N(m, "ideal") ? "Acima do ideal" : "Abaixo do ideal" });
+            if (util && pp < 1 && rest >= 1 && rest <= 3 && marcar("eu_reta_" + dia))
+                out_.Add(new[] { "Reta final: " + Dias(rest), "Faltam " + BrlK(N(m, "falta")) + " · " + BrlK(N(m, "porDia")) + "/dia" });
+            int novo = 0;
+            foreach (var k in new[] { 50, 75, 90 }) if (pp >= k / 100.0 && marcar("eu_marco_" + mes + "_" + k)) novo = k;
+            if (novo > 0 && pp < 1) out_.Add(new[] { "Você passou de " + novo + "% da meta!", BrlK(N(m, "valor")) + " de " + BrlK(meta) });
+            var kb = "eu_baixo_" + mes;
+            if (pp < idealP - 0.10) ed.Put(kb, true);
+            else if (pp >= idealP && p.GetBool(kb, false)) { ed.Remove(kb); if (!primeira) out_.Add(new[] { "Você voltou ao ritmo!", P0(pp) + " da meta" }); }
+            if (util && hojeV != null && dec > 0 && N(m, "valor") > 0 && hojeV.Value >= 1.5 * N(m, "valor") / dec && marcar("eu_acima_" + dia))
+                out_.Add(new[] { "Hoje acima da sua média!", BrlK(hojeV.Value) + " hoje" });
+            if (N(m, "metaPos") > 0 && N(m, "pos") >= N(m, "metaPos") && marcar("eu_pos_" + mes))
+                out_.Add(new[] { "Positivação batida!", Math.Round(N(m, "pos")) + " de " + Math.Round(N(m, "metaPos")) + " clientes" });
+        }
+
+        /// <summary>Bom dia (8–11 h) e reta final do mês (últimos 3 dias úteis), para gestor/diretor.</summary>
         static void Resumos(JSONObject d, DateTime agora, Func<string, bool> marcar, List<string[]> out_)
         {
-            if (agora.DayOfWeek == DayOfWeek.Saturday || agora.DayOfWeek == DayOfWeek.Sunday) return;
+            if (!Util(agora)) return;
             var dia = agora.ToString("yyyy-MM-dd"); double meta = N(d, "meta"), rest = N(d, "rest");
-            if (agora.Hour >= 8 && agora.Hour <= 11 && marcar("manha_" + dia))
-            {
-                JSONObject ontem = null; var dd = d.OptJSONArray("diario");
-                if (dd != null) for (int i = 0; i < dd.Length; i++)
-                {
-                    var x = dd.OptJSONObject(i); if (x == null) continue; var dt = x.OptString("d");
-                    if (dt.Length != 10 || string.CompareOrdinal(dt, dia) >= 0) continue;
-                    var dw = DateTime.ParseExact(dt, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture).DayOfWeek;
-                    if (dw != DayOfWeek.Saturday && dw != DayOfWeek.Sunday) ontem = x;
-                }
-                var t = "";
-                if (ontem != null) { var od = ontem.OptString("d"); t += "Ontem (" + od.Substring(8, 2) + "/" + od.Substring(5, 2) + ") a equipe vendeu " + BrlK(N(ontem, "v")) + ". "; }
-                t += "No mês: " + BrlK(N(d, "valor"));
-                if (meta > 0) { t += " (" + Pct(N(d, "p") * 100) + " da meta; ideal " + Pct(N(d, "idealP") * 100) + ")."; if (N(d, "falta") > 0 && rest > 0) t += " Para bater: " + BrlK(N(d, "porDia")) + " por dia útil."; }
-                else t += ".";
-                out_.Add(new[] { "Bom dia! Resumo da equipe", t });
-            }
-            // ritmo da equipe 4x por dia (10 h, 12 h, 14 h, 16 h)
-            var fx = Faixa(new[] { "10:00", "12:00", "14:00", "16:00" }, "17:59", agora.Hour, agora.Minute);
-            if (fx != null && meta > 0 && marcar("ritmoeq_" + dia + "_" + fx))
-            {
-                double dif = N(d, "valor") - N(d, "ideal");
-                var t = Pct(N(d, "p") * 100) + " da meta (ideal " + Pct(N(d, "idealP") * 100) + ") · " + (dif >= 0 ? BrlK(dif) + " acima do ideal" : BrlK(-dif) + " abaixo do ideal");
-                if (d.OptBoolean("temHoje")) t += " · hoje: " + BrlK(N(d, "hojeEquipe"));
-                if (N(d, "falta") > 0 && rest > 0) t += " · para bater: " + BrlK(N(d, "porDia")) + " por dia útil";
-                out_.Add(new[] { "Ritmo da equipe às " + fx, t });
-            }
+            if (agora.Hour >= 8 && agora.Hour <= 11 && marcar("manha_" + dia)) out_.Add(BomDia(d, dia, "Equipe"));
             if (meta > 0 && N(d, "p") < 1 && rest >= 1 && rest <= 3 && marcar("reta_" + dia))
             {
                 var vs = d.OptJSONArray("vendedores"); var perto = new List<JSONObject>();
                 if (vs != null) for (int i = 0; i < vs.Length; i++) { var v = vs.OptJSONObject(i); if (v != null && N(v, "meta") > 0 && N(v, "p") >= 0.8 && N(v, "p") < 1) perto.Add(v); }
-                var ps = string.Join(", ", perto.OrderByDescending(v => N(v, "p")).Take(4).Select(v => v.OptString("nome") + " (" + Pct(N(v, "p") * 100) + ")"));
-                out_.Add(new[] { "Reta final: " + Math.Round(rest) + (rest == 1 ? " dia útil" : " dias úteis"),
-                    "Faltam " + BrlK(N(d, "falta")) + " para a meta de " + BrlK(meta) + ": " + BrlK(N(d, "porDia")) + " por dia útil." + (ps.Length > 0 ? " Perto de bater: " + ps + "." : "") });
+                var ps = string.Join(", ", perto.OrderByDescending(v => N(v, "p")).Take(3).Select(v => v.OptString("nome")));
+                out_.Add(new[] { "Reta final: " + Dias(rest), "Faltam " + BrlK(N(d, "falta")) + " · " + BrlK(N(d, "porDia")) + "/dia" + (ps.Length > 0 ? " · perto: " + ps : "") });
             }
         }
 
@@ -434,9 +402,7 @@ namespace Freedom
             var out_ = new List<string[]>();
             if (d.Has("periodo")) return out_;
             var agora = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Zona());
-            var hoje = agora.Date;
-            var mes = hoje.ToString("yyyy-MM");
-            bool tarde = agora.Hour >= 14 && hoje.DayOfWeek != DayOfWeek.Saturday && hoje.DayOfWeek != DayOfWeek.Sunday;
+            var mes = agora.ToString("yyyy-MM");
             var p = P;
             bool primeira = !p.GetBool("base_" + mes, false);
             var ed = p.Edit();
@@ -447,40 +413,29 @@ namespace Freedom
                 marcadas.Add(k); ed.Put(k, true);
                 return !primeira;
             };
-            Action<JSONObject, string> abaixo = (o, quem) =>
-            {
-                double pp = N(o, "p"), ideal = N(o, "idealP");
-                if (!tarde || N(o, "meta") <= 0 || pp >= ideal - 0.10 || N(o, "rest") <= 0) return;
-                if (!marcar("abaixo_" + hoje.ToString("yyyy-MM-dd"))) return;
-                out_.Add(new[] { quem + " abaixo do ideal do mês",
-                    "Vendido " + Pct(pp * 100) + " da meta; o ideal hoje é " + Pct(ideal * 100) + ". Para bater a meta de " + BrlK(N(o, "meta")) +
-                    ", faltam " + BrlK(N(o, "falta")) + ": " + BrlK(N(o, "porDia")) + " por dia útil (" + Math.Round(N(o, "rest")) + " dias)." });
-            };
             if (d.OptString("tipo") == "vendedor")
             {
                 var s = d.OptJSONObject("semana"); var m = d.OptJSONObject("mes");
                 if (s != null && N(s, "meta") > 0 && N(s, "p") >= 1 && marcar("sem_" + mes + "_" + s.OptString("titulo")))
-                    out_.Add(new[] { "Meta da semana batida!", "Você vendeu " + BrlK(N(s, "valor")) + " na semana (" + Pct(N(s, "p") * 100) + " da meta de " + BrlK(N(s, "meta")) + ")." });
+                    out_.Add(new[] { "Meta da semana batida!", BrlK(N(s, "valor")) + " (" + P0(N(s, "p")) + ")" });
                 if (m != null)
                 {
-                    if (N(m, "meta") > 0 && N(m, "p") >= 1) { if (marcar("mes_" + mes)) out_.Add(new[] { "Meta do mês batida!", "Você vendeu " + BrlK(N(m, "valor")) + " no mês (" + Pct(N(m, "p") * 100) + " da meta de " + BrlK(N(m, "meta")) + ")." }); }
-                    Pessoal(m, s, agora, marcar, p, ed, primeira, out_);
+                    if (N(m, "meta") > 0 && N(m, "p") >= 1 && marcar("mes_" + mes)) out_.Add(new[] { "Meta do mês batida!", BrlK(N(m, "valor")) + " (" + P0(N(m, "p")) + ")" });
+                    Pessoal(m, agora, marcar, p, ed, primeira, out_);
                 }
             }
             else
             {
-                if (N(d, "meta") > 0 && N(d, "p") >= 1) { if (marcar("mes_" + mes)) out_.Add(new[] { "Meta do mês batida!", "A equipe faturou " + BrlK(N(d, "valor")) + " (" + Pct(N(d, "p") * 100) + " da meta de " + BrlK(N(d, "meta")) + ")." }); }
-                else abaixo(d, "Equipe");
+                if (N(d, "meta") > 0 && N(d, "p") >= 1 && marcar("mes_" + mes)) out_.Add(new[] { "Meta do mês batida!", "Equipe: " + BrlK(N(d, "valor")) + " (" + P0(N(d, "p")) + ")" });
                 var vs = d.OptJSONArray("vendedores"); var bateram = new List<string>();
                 if (vs != null) for (int i = 0; i < vs.Length; i++)
                 {
                     var v = vs.OptJSONObject(i); if (v == null) continue;
                     if (N(v, "meta") > 0 && N(v, "valor") >= N(v, "meta") && marcar("vend_" + mes + "_" + v.OptString("nome"))) bateram.Add(v.OptString("nome"));
                 }
-                if (bateram.Count == 1) out_.Add(new[] { bateram[0] + " bateu a meta do mês", "Parabéns! Veja o ranking no painel Comercial." });
+                if (bateram.Count == 1) out_.Add(new[] { bateram[0] + " bateu a meta do mês!", "Parabéns!" });
                 else if (bateram.Count > 1) out_.Add(new[] { bateram.Count + " vendedores bateram a meta", string.Join(", ", bateram) });
-                if (vs != null) Equipe(d, vs, agora, marcar, out_);
-                if (vs != null) MarcosERitmo(d, vs, mes, marcar, p, ed, primeira, out_);
+                if (vs != null) Equipe(d, vs, agora, mes, marcar, p, ed, primeira, out_);
                 Resumos(d, agora, marcar, out_);
             }
             ed.Put("base_" + mes, true).Commit();

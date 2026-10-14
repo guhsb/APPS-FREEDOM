@@ -77,9 +77,15 @@ object Metas {
         val qtd = p.getInt(k, 0)
         if (qtd >= 8) return emptyList()
         p.edit().putInt(k, qtd + 1).apply()
-        if (avisos.size == 1) return avisos
-        return listOf(Pair("${avisos.size} novidades do painel", avisos.joinToString("\n") { "• " + it.first + (if (it.second.isNotEmpty()) ": " + it.second else "") }))
+        // SOLO (acima / abaixo do ritmo) sai como aviso próprio; o resto vira um aviso só, com os títulos
+        val solo = avisos.filter { it.first.startsWith(SOLO) }.map { Pair(it.first.removePrefix(SOLO), it.second) }
+        val resto = avisos.filter { !it.first.startsWith(SOLO) }
+        return if (resto.size > 1) solo + Pair("${resto.size} novidades do painel", resto.joinToString("\n") { "• " + it.first })
+        else solo + resto
     }
+
+    /** Marca no começo do título: o aviso não é juntado com os outros. */
+    const val SOLO = "\u0001"
 
     fun notificar(c: Context, painel: Painel, avisos0: List<Pair<String, String>>) {
         val avisos = regular(c, avisos0, painel.id)
