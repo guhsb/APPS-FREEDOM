@@ -25,12 +25,20 @@ object Metas {
         private val p = prefs(c)
         private val ed = p.edit()
         private val base = "base_$mes"
-        private val primeira = !p.getBoolean(base, false)
+        val primeira = !p.getBoolean(base, false)
+        private val marcadas = HashSet<String>()
         fun marcar(chave: String): Boolean {
-            if (p.getBoolean(chave, false)) return false
+            if (p.getBoolean(chave, false) || chave in marcadas) return false
+            marcadas += chave
             ed.putBoolean(chave, true)
             return !primeira
         }
+        /** Estados que mudam (ex.: vendedor ficou abaixo do ritmo) e números guardados (ex.: Standby de manhã). */
+        fun tem(chave: String) = p.getBoolean(chave, false)
+        fun por(chave: String) { ed.putBoolean(chave, true) }
+        fun tirar(chave: String) { ed.remove(chave) }
+        fun valor(chave: String): Double? = p.getString(chave, null)?.toDoubleOrNull()
+        fun guardar(chave: String, v: Double) { ed.putString(chave, v.toString()) }
         fun fechar() {
             ed.putBoolean(base, true)
             // apaga chaves de meses antigos (guarda só o atual e o anterior)
@@ -47,7 +55,34 @@ object Metas {
         }
     }
 
-    fun notificar(c: Context, painel: Painel, avisos: List<Pair<String, String>>) {
+    /**
+     * Para não virar spam: tudo o que saiu numa atualização vira UM aviso só; nada entre 19 h e 8 h
+     * (o que acontecer nesse horário é descartado, não acumula); no máximo 8 avisos de painel por dia.
+     */
+    /** Horário agendado (ex.: "10:00") em que estamos: o último já passado, até "fim"; null fora disso. */
+    fun faixa(horarios: List<String>, fim: String, h: Int, m: Int): String? {
+        fun min(s: String) = s.take(2).toInt() * 60 + s.drop(3).toInt()
+        val agora = h * 60 + m
+        if (agora > min(fim)) return null
+        return horarios.lastOrNull { min(it) <= agora }
+    }
+
+    fun regular(c: Context, avisos: List<Pair<String, String>>, painel: String = ""): List<Pair<String, String>> {
+        if (avisos.isEmpty()) return avisos
+        val agora = java.time.ZonedDateTime.now(java.time.ZoneId.of("America/Sao_Paulo"))
+        // Faturamento de hoje: tem horário próprio (17:30 a 20:00, de 30 em 30 min) e não conta no limite do dia
+        if (painel == "faturamento") return avisos
+        if (agora.hour < 8 || agora.hour >= 19) return emptyList()
+        val p = prefs(c); val k = "qtd_" + agora.toLocalDate()
+        val qtd = p.getInt(k, 0)
+        if (qtd >= 8) return emptyList()
+        p.edit().putInt(k, qtd + 1).apply()
+        if (avisos.size == 1) return avisos
+        return listOf(Pair("${avisos.size} novidades do painel", avisos.joinToString("\n") { "• " + it.first + (if (it.second.isNotEmpty()) ": " + it.second else "") }))
+    }
+
+    fun notificar(c: Context, painel: Painel, avisos0: List<Pair<String, String>>) {
+        val avisos = regular(c, avisos0, painel.id)
         if (avisos.isEmpty()) return
         val nm = c.getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(CANAL) == null) {

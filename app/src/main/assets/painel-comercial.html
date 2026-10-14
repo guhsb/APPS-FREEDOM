@@ -182,7 +182,8 @@ function tilesVend(x, vf, ped, cli, d) {
   if (temMeta) t.push(posTiles(x)); else if (cli) t.push(F.tile('Positivação', F.int(cli), 'verde'));
   if (part) t.push(part);
   if (ped) t.push(F.tile('Pedidos', F.int(ped)));
-  if (temMeta && cli) t.push(F.tile('Clientes', F.int(cli)));
+  if (d.temHoje && !d.periodo) t.push(F.tile('Vendido hoje', F.n(x.hoje) > 0 ? F.brlK(x.hoje) : 'R$ 0', F.n(x.hoje) > 0 ? '' : 'cinza'));
+  else if (temMeta && cli) t.push(F.tile('Clientes', F.int(cli)));
   if (ped) t.push(F.tile('Ticket médio', F.brlK(vf / ped)));
   var h = t.join(''), n = (h.match(/class="tile"/g) || []).length;
   if (!n) return '';

@@ -45,6 +45,7 @@ object Dados {
             val sv = getOuVazio(api, "/dashboard/sellers?$qMes")
             val g = gestor(nome, o, sv, iniMes, fimMes, hoje)
             positivacaoVendedores(api, qMes, g)
+            vendaHoje(api, hoje, filtro(me), g)
             graficoDe(api, qMes, iniMes, fimMes, hoje)?.let { g.put("diario", it) }
             anterior(api, iniMes, g.optDouble("dec", 0.0), filtro(me))?.let { g.put("anterior", it) }
             g
@@ -126,6 +127,18 @@ object Dados {
             if (o.has("positive_customer_count")) v.put("pos", n(o, "positive_customer_count"))
             if (o.has("positive_customer_target")) v.put("metaPos", n(o, "positive_customer_target"))
         }
+    }
+
+    /** Quanto cada vendedor vendeu hoje (para os avisos do gestor: sem venda hoje, acima da média). Se falhar, não marca nada. */
+    private fun vendaHoje(api: Api, hoje: LocalDate, fx: String, g: JSONObject) {
+        val sv = opcional(api, "/dashboard/sellers?start_date=${iso(hoje)}&end_date=${iso(hoje)}$fx")
+        val lista = sv.optJSONArray("sellers")?.takeIf { it.length() > 0 } ?: sv.optJSONArray("ranking") ?: if (sv.length() == 0) return else JSONArray()
+        val m = HashMap<String, Double>()
+        for (i in 0 until lista.length()) lista.optJSONObject(i)?.let { m[it.optString("seller_name")] = n(it, "revenue") }
+        val vs = g.optJSONArray("vendedores") ?: return
+        var tot = 0.0
+        for (i in 0 until vs.length()) { val v = vs.getJSONObject(i); val h = m[v.optString("chave")] ?: 0.0; v.put("hoje", h); tot += h }
+        g.put("temHoje", true).put("hojeEquipe", tot)
     }
 
     // ---- quem é quem: o mesmo que o site faz com as permissões do login ----

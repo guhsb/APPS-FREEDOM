@@ -20,7 +20,7 @@ namespace Freedom
         public static readonly List<Painel> Todos = new List<Painel>
         {
             new Painel { Id = "comercial", NomeModulo = "Comercial", Modulo = "commercial", Tela = "painel-comercial.html", Buscar = Comercial, BuscarPeriodo = Periodo, Avisos = Metas.Calcular },
-            new Painel { Id = "faturamento", NomeModulo = "Faturamento", Modulo = "logistics", Tela = "painel-faturamento.html", Buscar = Faturamento },
+            new Painel { Id = "faturamento", NomeModulo = "Faturamento", Modulo = "logistics", Tela = "painel-faturamento.html", Buscar = Faturamento, Avisos = Metas.Faturamento },
         };
 
         public static Painel PorId(string id) { return Todos.FirstOrDefault(p => p.Id == id); }
@@ -78,6 +78,7 @@ namespace Freedom
             var sv = GetOuVazio(api, "/dashboard/sellers?" + qMes);
             var g = Gestor(nome, o, sv, iniMes, fimMes, hoje);
             PositivacaoVendedores(api, qMes, g);
+            VendaHoje(api, hoje, Filtro(me), g);
             var gg = GraficoDe(api, qMes, iniMes, fimMes, hoje);
             if (gg != null) g.Put("diario", gg);
             var ag = Anterior(api, iniMes, g.OptDouble("dec", 0), Filtro(me));
@@ -157,6 +158,21 @@ namespace Freedom
                 if (o.Has("positive_customer_count")) v.Put("pos", N(o, "positive_customer_count"));
                 if (o.Has("positive_customer_target")) v.Put("metaPos", N(o, "positive_customer_target"));
             }
+        }
+
+        /// <summary>Quanto cada vendedor vendeu hoje (avisos do gestor: sem venda hoje, acima da média). Se falhar, não marca nada.</summary>
+        static void VendaHoje(Api api, DateTime hoje, string fx, JSONObject g)
+        {
+            var sv = Opcional(api, "/dashboard/sellers?start_date=" + Iso(hoje) + "&end_date=" + Iso(hoje) + fx);
+            var lista = sv.OptJSONArray("sellers");
+            if (lista == null || lista.Length == 0) lista = sv.OptJSONArray("ranking");
+            if (lista == null) { if (!sv.Has("sellers") && !sv.Has("ranking")) return; lista = new JSONArray(); }
+            var m = new Dictionary<string, double>();
+            for (int i = 0; i < lista.Length; i++) { var x = lista.OptJSONObject(i); if (x != null) m[x.OptString("seller_name")] = N(x, "revenue"); }
+            var vs = g.OptJSONArray("vendedores"); if (vs == null) return;
+            double tot = 0;
+            for (int i = 0; i < vs.Length; i++) { var v = vs.OptJSONObject(i); if (v == null) continue; double h; if (!m.TryGetValue(v.OptString("chave"), out h)) h = 0; v.Put("hoje", h); tot += h; }
+            g.Put("temHoje", true).Put("hojeEquipe", tot);
         }
 
         // ---- quem é quem: o mesmo que o site faz com as permissões do login ----
@@ -474,7 +490,7 @@ namespace Freedom
                                 var d = p.Buscar(api);
                                 ed.Put("dados_" + p.Id, d.ToString()).Put("hora_" + p.Id, Relogio.Agora()).Remove("erro_" + p.Id);
                                 if (p.Avisos != null && Metas.Ligado())
-                                    try { foreach (var a in p.Avisos(d)) Freedom.Avisos.Enviar(a[0], a[1], "painel:" + p.Id); } catch (Exception) { }
+                                    try { foreach (var a in Metas.Regular(p.Avisos(d), p.Id)) Freedom.Avisos.Enviar(a[0], a[1], "painel:" + p.Id); } catch (Exception) { }
                             }
                             catch (Exception e)
                             {

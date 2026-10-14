@@ -29,6 +29,8 @@ object PainelFaturamento : Painel {
     override val tela = "painel-faturamento.html"
     override val classeWidget = WidgetFaturamento::class.java
     override val fundoRosado = true
+    override val temAvisos = true
+    override fun avisos(c: android.content.Context, agora: JSONObject): List<Pair<String, String>> = AvisosFaturamento.calcular(c, agora)
 
     private val MESES = listOf("JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO",
         "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO")

@@ -218,7 +218,7 @@ var Base = {
     var mm = document.getElementById('mMeta');
     if (mm) {
       mm.style.display = e.avisoMeta === undefined ? 'none' : '';
-      mm.querySelector('span').innerHTML = 'Avisos de meta: <b>' + (e.avisoMeta ? 'ligados' : 'desligados') + '</b>';
+      mm.querySelector('span').innerHTML = 'Avisos de meta e da equipe: <b>' + (e.avisoMeta ? 'ligados' : 'desligados') + '</b>';
     }
     var ap = e.app || {};
     document.getElementById('aviso').innerHTML =

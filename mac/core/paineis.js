@@ -137,6 +137,7 @@ async function comercial(api) {
   const o = await getOuVazio(api, '/dashboard/overview?' + qMes), sv = await getOuVazio(api, '/dashboard/sellers?' + qMes);
   const g = gestor(nome, o, sv, iniMes, fimMes, hoje);
   await positivacaoVendedores(api, qMes, g);
+  await vendaHoje(api, hoje, filtro(me), g);
   const gg = await graficoDe(api, qMes, iniMes, fimMes, hoje); if (gg) g.diario = gg;
   const ag = await anterior(api, iniMes, g.dec, filtro(me)); if (ag) g.anterior = ag;
   return g;
@@ -161,6 +162,17 @@ async function positivacaoVendedores(api, q, g) {
     if (o.positive_customer_count != null) v.pos = N(o, 'positive_customer_count');
     if (o.positive_customer_target != null) v.metaPos = N(o, 'positive_customer_target');
   }
+}
+
+/** Quanto cada vendedor vendeu hoje (avisos do gestor: sem venda hoje, acima da média). Se falhar, não marca nada. */
+async function vendaHoje(api, hoje, fx, g) {
+  const sv = await opcional(api, '/dashboard/sellers?start_date=' + D.iso(hoje) + '&end_date=' + D.iso(hoje) + fx);
+  const lista = Array.isArray(sv.sellers) && sv.sellers.length ? sv.sellers : Array.isArray(sv.ranking) ? sv.ranking : (Object.keys(sv).length ? [] : null);
+  if (!lista) return;
+  const m = new Map(lista.filter(Boolean).map(x => [String(x.seller_name || ''), N(x, 'revenue')]));
+  let tot = 0;
+  for (const v of (g.vendedores || [])) { v.hoje = m.get(v.chave) || 0; tot += v.hoje; }
+  g.temHoje = true; g.hojeEquipe = tot;
 }
 
 // ---- quem é quem: o mesmo que o site faz com as permissões do login ----
@@ -240,6 +252,80 @@ const Metas = {
   get P() { return Prefs.de('metas'); },
   ligado() { return this.P.getBool('ligado', true); },
   ligar(sim) { this.P.editar().put('ligado', !!sim).commit(); },
+  /** Os mesmos avisos do gestor, mas só com os números do próprio vendedor. */
+  pessoal(m, s, c) {
+    const { hoje, hojeIso: dia, mes, agoraSP, marcar, p, ed, primeira, pct, brlK, out } = c;
+    const util = D.util(hoje), hora = agoraSP.getHours();
+    const meta = N(m, 'meta'), pp = N(m, 'p'), idealP = N(m, 'idealP'), rest = N(m, 'rest'), dec = N(m, 'dec');
+    const hojeX = (m.diario || []).find(x => x && x.d === dia), hojeV = hojeX ? N(hojeX, 'v') : null;
+    if (util && hora >= 8 && hora <= 11 && marcar('eu_manha_' + dia)) {
+      const ontem = (m.diario || []).filter(x => x && String(x.d).length === 10 && x.d < dia && D.util(D.de(x.d))).pop();
+      let t = ontem ? 'Ontem (' + ontem.d.slice(8, 10) + '/' + ontem.d.slice(5, 7) + ') você vendeu ' + brlK(N(ontem, 'v')) + '. ' : '';
+      t += 'No mês: ' + brlK(N(m, 'valor'));
+      if (meta > 0) { t += ' (' + pct(pp * 100) + ' da meta; ideal ' + pct(idealP * 100) + ').'; if (N(m, 'falta') > 0 && rest > 0) t += ' Para bater: ' + brlK(N(m, 'porDia')) + ' por dia útil.'; }
+      else t += '.';
+      if (s && N(s, 'meta') > 0) t += ' Semana: ' + brlK(N(s, 'valor')) + ' de ' + brlK(N(s, 'meta')) + '.';
+      out.push(['Bom dia! Seu resumo', t]);
+    }
+    if (meta <= 0) return;
+    const fx = util ? this.faixa(['10:00', '12:00', '14:00', '16:00'], '17:59', hora, agoraSP.getMinutes()) : null;
+    if (fx && marcar('eu_ritmo_' + dia + '_' + fx)) {
+      const dif = N(m, 'valor') - N(m, 'ideal');
+      let t = pct(pp * 100) + ' da meta (ideal ' + pct(idealP * 100) + ') · ' + (dif >= 0 ? brlK(dif) + ' acima do ideal' : brlK(-dif) + ' abaixo do ideal');
+      if (hojeV != null) t += ' · hoje: ' + brlK(hojeV);
+      if (N(m, 'falta') > 0 && rest > 0) t += ' · para bater: ' + brlK(N(m, 'porDia')) + ' por dia útil';
+      out.push(['Seu ritmo às ' + fx, t]);
+    }
+    if (util && pp < 1 && rest >= 1 && rest <= 3 && marcar('eu_reta_' + dia))
+      out.push(['Reta final: ' + Math.round(rest) + (rest === 1 ? ' dia útil' : ' dias úteis'), 'Faltam ' + brlK(N(m, 'falta')) + ' para a sua meta de ' + brlK(meta) + ': ' + brlK(N(m, 'porDia')) + ' por dia útil.']);
+    let novo = 0; for (const k of [50, 75, 90]) if (pp >= k / 100 && marcar('eu_marco_' + mes + '_' + k)) novo = k;
+    if (novo > 0 && pp < 1) out.push(['Você passou de ' + novo + '% da meta!', 'Já são ' + brlK(N(m, 'valor')) + ' (' + pct(pp * 100) + ' da meta de ' + brlK(meta) + ').']);
+    const kb = 'eu_baixo_' + mes;
+    if (pp < idealP - 0.10) ed.put(kb, true);
+    else if (pp >= idealP && p.getBool(kb, false)) { ed.remove(kb); if (!primeira) out.push(['Você voltou ao ritmo!', pct(pp * 100) + ' da meta; o ideal hoje é ' + pct(idealP * 100) + '. Continue assim.']); }
+    if (util && hojeV != null && dec > 0 && N(m, 'valor') > 0 && hojeV >= 1.5 * N(m, 'valor') / dec && marcar('eu_acima_' + dia))
+      out.push(['Hoje você vendeu acima da sua média!', brlK(hojeV) + ' hoje · sua média é ' + brlK(N(m, 'valor') / dec) + ' por dia.']);
+    if (N(m, 'metaPos') > 0 && N(m, 'pos') >= N(m, 'metaPos') && marcar('eu_pos_' + mes))
+      out.push(['Você bateu a meta de positivação!', Math.round(N(m, 'pos')) + ' de ' + Math.round(N(m, 'metaPos')) + ' clientes positivados no mês.']);
+  },
+  agoraSP() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })); },
+  /** Para não virar spam: tudo de uma atualização vira UM aviso; nada entre 19 h e 8 h; no máximo 8 por dia. */
+  regular(avisos, painel = '') {
+    if (!avisos || !avisos.length) return [];
+    if (painel === 'faturamento') return avisos;     // Faturamento de hoje: horário próprio (17:30–20:00), fora do limite do dia
+    const a = this.agoraSP(); if (a.getHours() < 8 || a.getHours() >= 19) return [];
+    const k = 'qtd_' + D.iso(D.hoje()), q = this.P.getNum(k, 0);
+    if (q >= 8) return [];
+    this.P.editar().put(k, q + 1).commit();
+    if (avisos.length === 1) return avisos;
+    return [[avisos.length + ' novidades do painel', avisos.map(x => '• ' + x[0] + (x[1] ? ': ' + x[1] : '')).join('\n')]];
+  },
+  /** Horário agendado (ex.: "10:00") em que estamos: o último já passado, até "fim"; null fora disso. */
+  faixa(horarios, fim, h, m) {
+    const min = x => Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5)), agora = h * 60 + m;
+    if (agora > min(fim)) return null;
+    return horarios.filter(x => min(x) <= agora).pop() || null;
+  },
+  faixaFaturamento(h, m) { return this.faixa(['11:30', '15:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'], '20:14', h, m); },
+  /** "Faturamento de hoje" às 11:30 e 15:00 e de 30 em 30 minutos das 17:30 às 20:00 (dias úteis), com quanto entrou desde o aviso anterior. */
+  faturamento(d) {
+    const out = [], hoje = D.hoje(); if (!D.util(hoje)) return out;
+    const a = this.agoraSP(), faixa = this.faixaFaturamento(a.getHours(), a.getMinutes()); if (!faixa) return out;
+    const dia = D.iso(hoje), dd = d.dia;
+    if (!dd || dd.data !== dia || N(dd, 'valor') <= 0) return out;
+    const mes = dia.slice(0, 7), p = this.P, ed = p.editar(), primeira = !p.getBool('base_' + mes, false);
+    const brlK = v => v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(2).replace('.', ',') + ' mi' : v >= 1e3 ? 'R$ ' + (v / 1e3).toFixed(1).replace(/\.0$/, '').replace('.', ',') + ' mil' : 'R$ ' + v.toFixed(2).replace('.', ',');
+    const k = 'fat_' + dia + '_' + faixa;
+    if (!p.getBool(k, false)) {
+      ed.put(k, true);
+      const v = N(dd, 'valor'), antes = p.get('fatv_' + dia);
+      if (!primeira) out.push(['Faturamento de hoje: ' + brlK(v), Math.round(N(dd, 'pedidos')) + ' pedidos faturados até ' + faixa +
+        (antes != null && v > antes ? ' (+' + brlK(v - antes) + ' desde o último aviso)' : '') + '. No mês: ' + brlK(N(d.mes, 'valor')) + '.']);
+      ed.put('fatv_' + dia, v);
+    }
+    ed.put('base_' + mes, true).commit();
+    return out;
+  },
   calcular(d) {
     const out = [];
     if (d.periodo) return out;
@@ -264,7 +350,7 @@ const Metas = {
         out.push(['Meta da semana batida!', 'Você vendeu ' + brlK(N(s, 'valor')) + ' na semana (' + pct(N(s, 'p') * 100) + ' da meta de ' + brlK(N(s, 'meta')) + ').']);
       if (m) {
         if (N(m, 'meta') > 0 && N(m, 'p') >= 1) { if (marcar('mes_' + mes)) out.push(['Meta do mês batida!', 'Você vendeu ' + brlK(N(m, 'valor')) + ' no mês (' + pct(N(m, 'p') * 100) + ' da meta de ' + brlK(N(m, 'meta')) + ').']); }
-        else abaixo(m, 'Você está');
+        this.pessoal(m, s, { hoje, hojeIso, mes, agoraSP, marcar, p, ed, primeira, pct, brlK, out });
       }
     } else {
       if (N(d, 'meta') > 0 && N(d, 'p') >= 1) { if (marcar('mes_' + mes)) out.push(['Meta do mês batida!', 'A equipe faturou ' + brlK(N(d, 'valor')) + ' (' + pct(N(d, 'p') * 100) + ' da meta de ' + brlK(N(d, 'meta')) + ').']); }
@@ -272,6 +358,57 @@ const Metas = {
       const bateram = (d.vendedores || []).filter(v => N(v, 'meta') > 0 && N(v, 'valor') >= N(v, 'meta') && marcar('vend_' + mes + '_' + v.nome)).map(v => v.nome);
       if (bateram.length === 1) out.push([bateram[0] + ' bateu a meta do mês', 'Parabéns! Veja o ranking no painel Comercial.']);
       else if (bateram.length > 1) out.push([bateram.length + ' vendedores bateram a meta', bateram.join(', ')]);
+      // avisos sobre cada vendedor (juntando num aviso só quando são vários)
+      const lista = d.vendedores || [], dec = N(d, 'dec'), idealP = N(d, 'idealP'), hora = agoraSP.getHours(), util = D.util(hoje);
+      const junta = (um, varios, itens) => {
+        if (itens.length === 1) out.push([itens[0][0] + ' ' + um, itens[0][1]]);
+        else if (itens.length > 1) out.push([itens.length + ' vendedores ' + varios, itens.map(x => x[0] + (x[1] ? ' (' + x[1].split(' · ')[0] + ')' : '')).join(' · ')]);
+      };
+      if (d.temHoje && util) {
+        junta('vendeu acima da média hoje', 'acima da média hoje', lista.filter(v => { const h = N(v, 'hoje'), media = dec > 0 ? N(v, 'valor') / dec : 0;
+          return h > 0 && media > 0 && h >= media * 1.5 && marcar('acima_' + hojeIso + '_' + v.nome); })
+          .map(v => [v.nome, brlK(N(v, 'hoje')) + ' hoje · média de ' + brlK(N(v, 'valor') / dec) + ' por dia']));
+        if (hora >= 15 && N(d, 'hojeEquipe') > 0)
+          junta('está sem venda hoje', 'sem venda hoje', lista.filter(v => N(v, 'meta') > 0 && N(v, 'hoje') <= 0 && marcar('semvenda_' + hojeIso + '_' + v.nome)).map(v => [v.nome, '']));
+      }
+      if (util && hora >= 14)
+        junta('está abaixo do ritmo', 'abaixo do ritmo', lista.filter(v => N(v, 'meta') > 0 && N(v, 'valor') < N(v, 'meta') && N(v, 'p') < idealP - 0.10 && marcar('ritmo_' + hojeIso + '_' + v.nome))
+          .map(v => [v.nome, pct(N(v, 'p') * 100) + ' da meta · ideal ' + pct(idealP * 100)]));
+      // marcos da meta (50/75/90%): só o maior que acabou de passar
+      junta('passou de um marco da meta', 'passaram de marcos da meta', lista.filter(v => N(v, 'meta') > 0).map(v => {
+        let novo = 0; for (const m of [50, 75, 90]) if (N(v, 'p') >= m / 100 && marcar('marco_' + mes + '_' + m + '_' + v.nome)) novo = m;
+        return novo > 0 && N(v, 'p') < 1 ? [v.nome, 'passou de ' + novo + '% da meta · ' + pct(N(v, 'p') * 100)] : null; }).filter(Boolean));
+      // voltou ao ritmo: estava 10 pontos abaixo do ideal e agora está no ideal ou acima
+      junta('voltou ao ritmo', 'voltaram ao ritmo', lista.filter(v => N(v, 'meta') > 0).map(v => {
+        const k = 'baixo_' + mes + '_' + v.nome;
+        if (N(v, 'p') < idealP - 0.10) { ed.put(k, true); return null; }
+        if (N(v, 'p') >= idealP && p.getBool(k, false)) { ed.remove(k); return primeira ? null : [v.nome, pct(N(v, 'p') * 100) + ' da meta · ideal ' + pct(idealP * 100)]; }
+        return null; }).filter(Boolean));
+      // resumo da manhã (8–11 h) e reta final (últimos 3 dias úteis)
+      if (util && hora >= 8 && hora <= 11 && marcar('manha_' + hojeIso)) {
+        const ontem = (d.diario || []).filter(x => x && String(x.d).length === 10 && x.d < hojeIso && D.util(D.de(x.d))).pop();
+        let t = ontem ? 'Ontem (' + ontem.d.slice(8, 10) + '/' + ontem.d.slice(5, 7) + ') a equipe vendeu ' + brlK(N(ontem, 'v')) + '. ' : '';
+        t += 'No mês: ' + brlK(N(d, 'valor'));
+        if (N(d, 'meta') > 0) { t += ' (' + pct(N(d, 'p') * 100) + ' da meta; ideal ' + pct(idealP * 100) + ').'; if (N(d, 'falta') > 0 && N(d, 'rest') > 0) t += ' Para bater: ' + brlK(N(d, 'porDia')) + ' por dia útil.'; }
+        else t += '.';
+        out.push(['Bom dia! Resumo da equipe', t]);
+      }
+      // ritmo da equipe 4x por dia (10 h, 12 h, 14 h, 16 h)
+      const fx = util ? this.faixa(['10:00', '12:00', '14:00', '16:00'], '17:59', hora, agoraSP.getMinutes()) : null;
+      if (fx && N(d, 'meta') > 0 && marcar('ritmoeq_' + hojeIso + '_' + fx)) {
+        const dif = N(d, 'valor') - N(d, 'ideal');
+        let t = pct(N(d, 'p') * 100) + ' da meta (ideal ' + pct(idealP * 100) + ') · ' + (dif >= 0 ? brlK(dif) + ' acima do ideal' : brlK(-dif) + ' abaixo do ideal');
+        if (d.temHoje) t += ' · hoje: ' + brlK(N(d, 'hojeEquipe'));
+        if (N(d, 'falta') > 0 && N(d, 'rest') > 0) t += ' · para bater: ' + brlK(N(d, 'porDia')) + ' por dia útil';
+        out.push(['Ritmo da equipe às ' + fx, t]);
+      }
+      if (util && N(d, 'meta') > 0 && N(d, 'p') < 1 && N(d, 'rest') >= 1 && N(d, 'rest') <= 3 && marcar('reta_' + hojeIso)) {
+        const perto = lista.filter(v => N(v, 'meta') > 0 && N(v, 'p') >= 0.8 && N(v, 'p') < 1).sort((a, b) => N(b, 'p') - N(a, 'p')).slice(0, 4).map(v => v.nome + ' (' + pct(N(v, 'p') * 100) + ')').join(', ');
+        out.push(['Reta final: ' + Math.round(N(d, 'rest')) + (N(d, 'rest') === 1 ? ' dia útil' : ' dias úteis'),
+          'Faltam ' + brlK(N(d, 'falta')) + ' para a meta de ' + brlK(N(d, 'meta')) + ': ' + brlK(N(d, 'porDia')) + ' por dia útil.' + (perto ? ' Perto de bater: ' + perto + '.' : '')]);
+      }
+      junta('bateu a meta de positivação', 'bateram a positivação', lista.filter(v => N(v, 'metaPos') > 0 && N(v, 'pos') >= N(v, 'metaPos') && marcar('pos_' + mes + '_' + v.nome))
+        .map(v => [v.nome, Math.round(N(v, 'pos')) + ' de ' + Math.round(N(v, 'metaPos')) + ' clientes positivados']));
     }
     ed.put('base_' + mes, true).commit();
     return out;
@@ -280,7 +417,7 @@ const Metas = {
 
 const TODOS = [
   { id: 'comercial', nomeModulo: 'Comercial', modulo: 'commercial', tela: 'painel-comercial.html', buscar: comercial, buscarPeriodo: periodo, avisos: d => Metas.calcular(d) },
-  { id: 'faturamento', nomeModulo: 'Faturamento', modulo: 'logistics', tela: 'painel-faturamento.html', buscar: faturamento }
+  { id: 'faturamento', nomeModulo: 'Faturamento', modulo: 'logistics', tela: 'painel-faturamento.html', buscar: faturamento, avisos: d => Metas.faturamento(d) }
 ];
 
 // ---------------- atualizador ----------------
@@ -308,7 +445,7 @@ const Paineis = {
           try {
             const d = await p.buscar(api);
             ed.put('dados_' + p.id, JSON.stringify(d)).put('hora_' + p.id, agora()).remove('erro_' + p.id);
-            if (p.avisos && Metas.ligado()) try { for (const a of p.avisos(d)) ev.emit('meta', a[0], a[1], p.id); } catch (e) { }
+            if (p.avisos && Metas.ligado()) try { for (const a of Metas.regular(p.avisos(d), p.id)) ev.emit('meta', a[0], a[1], p.id); } catch (e) { }
           } catch (e) {
             const m = Api.mensagem(e); ed.put('erro_' + p.id, m);
             if (e instanceof SemAcesso) ed.remove('dados_' + p.id);
