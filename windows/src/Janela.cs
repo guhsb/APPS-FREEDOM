@@ -45,6 +45,7 @@ namespace Freedom
         readonly NotifyIcon bandeja = new NotifyIcon();
         readonly System.Windows.Forms.Timer monitor = new System.Windows.Forms.Timer();
         readonly System.Windows.Forms.Timer paineis = new System.Windows.Forms.Timer();
+        readonly System.Windows.Forms.Timer versao = new System.Windows.Forms.Timer();
         string caminhoPendente;
         string aba = "helpdesk", paginaApp = "", painelAtual, caminhoAviso, destinoSite;
         bool saindo, avisouBandeja, iniciou, criandoTelas;
@@ -85,6 +86,7 @@ namespace Freedom
             {
                 Mostrar();
                 if (caminhoAviso == null) return;
+                if (caminhoAviso == "atualizar") { ponte.atualizarApp(); return; }
                 if (caminhoAviso.StartsWith("painel:")) { painelAtual = caminhoAviso.Substring(7); MontarChips(); Selecionar("painel"); }
                 else AbrirCaminho(caminhoAviso);
             };
@@ -366,7 +368,11 @@ namespace Freedom
                 Helpdesk.EmSegundoPlano(() => Helpdesk.Verificar(false));
                 Helpdesk.EmSegundoPlano(() => Atualizador.Atualizar());
             }
-            Helpdesk.EmSegundoPlano(() => { Atualizacao.Conferir(false); try { BeginInvoke((Action)AvisarTodas); } catch (Exception) { } });
+            Helpdesk.EmSegundoPlano(ConferirVersao);
+            // continua conferindo com o programa aberto (o Freedom fica o dia todo perto do relógio)
+            versao.Interval = 30 * 60 * 1000;
+            versao.Tick += (s, e) => Helpdesk.EmSegundoPlano(ConferirVersao);
+            versao.Start();
         }
 
         async void CriarTelas()
@@ -709,5 +715,26 @@ namespace Freedom
         }
 
         public void EncerrarParaAtualizar() { saindo = true; Close(); }
+
+        /// <summary>Confere se saiu versão nova; na primeira vez de cada versão, mostra a notificação (clicar já atualiza).</summary>
+        void ConferirVersao()
+        {
+            Atualizacao.Conferir(false);
+            try { BeginInvoke((Action)AvisarTodas); } catch (Exception) { }
+            var n = Atualizacao.Nova();
+            if (n == null) return;
+            var P = Prefs.De("atualizacao");
+            if (P.GetLong("avisada") == n.OptLong("versao")) return;
+            P.Edit().Put("avisada", n.OptLong("versao")).Commit();
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    caminhoAviso = "atualizar";
+                    bandeja.ShowBalloonTip(10000, "Nova versão do Freedom", "A versão " + n.OptLong("versao") + " está disponível. Clique aqui para atualizar.", ToolTipIcon.None);
+                }));
+            }
+            catch (Exception) { }
+        }
     }
 }

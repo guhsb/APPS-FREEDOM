@@ -150,7 +150,9 @@ class Api {
   }
 
   async get(caminho) {
-    const r = await this.bruto(caminho);
+    let r = await this.bruto(caminho);
+    // site instável por um instante (500/502/503/504): espera um pouco e tenta de novo uma vez
+    if ([500, 502, 503, 504].indexOf(r.status) >= 0) { await new Promise(ok => setTimeout(ok, 1500)); r = await this.bruto(caminho); }
     if (r.status === 401 || r.status === 403) throw new SemAcesso('este login não tem acesso');
     if (r.status === 204) return {};      // sem dados para esse filtro (ex.: semana sem vendas): vazio, não erro
     if (r.status !== 200) throw new Error('erro ao buscar dados (HTTP ' + r.status + ')');

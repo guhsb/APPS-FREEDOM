@@ -23,22 +23,22 @@ object Dados {
         val hoje = LocalDate.now(ZONA)
         val iniMes = hoje.withDayOfMonth(1)
         val fimMes = hoje.withDayOfMonth(hoje.lengthOfMonth())
-        val qMes = "start_date=${iso(iniMes)}&end_date=${iso(fimMes)}"
         val me = api.get("/auth/me")
+        val qMes = "start_date=${iso(iniMes)}&end_date=${iso(fimMes)}" + filtro(me)
         val nome = me.optString("display_name", me.optString("seller_name", ""))
-        return if (me.optString("role") == "seller") {
+        return if (ehVendedor(me)) {
             val seg = hoje.with(DayOfWeek.MONDAY)
             val dom = seg.plusDays(6)
             val iniSem = if (seg.isBefore(iniMes)) iniMes else seg
             val fimSem = if (dom.isAfter(fimMes)) fimMes else dom
-            val qSem = "start_date=${iso(iniSem)}&end_date=${iso(fimSem)}"
+            val qSem = "start_date=${iso(iniSem)}&end_date=${iso(fimSem)}" + filtro(me)
             // o mês é o principal (igual a escolher as datas do mês); a semana é extra: se falhar, fica zerada e o mês aparece igual
             val oMes = getOuVazio(api, "/dashboard/overview?$qMes")
             val oSem = opcional(api, "/dashboard/overview?$qSem")
             val cSem = opcional(api, "/dashboard/overview/charts?$qSem")
             val v = vendedor(nome, oMes, oSem, cSem.optJSONArray("daily") ?: JSONArray(), iniSem, fimSem, hoje)
             graficoDe(api, qMes, iniMes, fimMes, hoje)?.let { v.optJSONObject("mes")?.put("diario", it) }
-            v.optJSONObject("mes")?.let { m -> anterior(api, iniMes, m.optDouble("dec", 0.0))?.let { m.put("anterior", it) } }
+            v.optJSONObject("mes")?.let { m -> anterior(api, iniMes, m.optDouble("dec", 0.0), filtro(me))?.let { m.put("anterior", it) } }
             v
         } else {
             val o = getOuVazio(api, "/dashboard/overview?$qMes")
@@ -46,7 +46,7 @@ object Dados {
             val g = gestor(nome, o, sv, iniMes, fimMes, hoje)
             positivacaoVendedores(api, qMes, g)
             graficoDe(api, qMes, iniMes, fimMes, hoje)?.let { g.put("diario", it) }
-            anterior(api, iniMes, g.optDouble("dec", 0.0))?.let { g.put("anterior", it) }
+            anterior(api, iniMes, g.optDouble("dec", 0.0), filtro(me))?.let { g.put("anterior", it) }
             g
         }
     }
@@ -71,15 +71,15 @@ object Dados {
         val ini = LocalDate.parse(iniTxt); val fim = LocalDate.parse(fimTxt)
         if (fim.isBefore(ini)) throw IllegalArgumentException("a data final é antes da inicial")
         val hoje = LocalDate.now(ZONA)
-        val q = "start_date=${iso(ini)}&end_date=${iso(fim)}"
         val me = api.get("/auth/me")
+        val q = "start_date=${iso(ini)}&end_date=${iso(fim)}" + filtro(me)
         val nome = me.optString("display_name", me.optString("seller_name", ""))
         fun dm(d: LocalDate) = "%02d/%02d/%d".format(d.dayOfMonth, d.monthValue, d.year)
         val titulo = "${dm(ini)} a ${dm(fim)}"
         // período sem vendas: o site pode responder "sem dados" (4xx) em vez de zeros — vira painel vazio, não erro
         val o = getOuVazio(api, "/dashboard/overview?$q")
         val graf = graficoDe(api, q, ini, fim, hoje)
-        return if (me.optString("role") == "seller") {
+        return if (ehVendedor(me)) {
             val g = gestor(nome, o, JSONObject(), ini, fim, hoje)
             g.put("titulo", "PERÍODO $titulo")
             if (graf != null) g.put("diario", graf)
@@ -99,23 +99,55 @@ object Dados {
      * A lista de vendedores do site não traz a positivação; ela vem do overview filtrado por vendedor
      * (o mesmo que o site faz ao escolher um vendedor no filtro). Busca 4 de cada vez; se falhar, fica o que tinha.
      */
+    // positivação de cada vendedor guardada por 1 h (não pede de novo a cada atualização de 15 min)
+    private val posCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, JSONObject>>()
+
+    /**
+     * A lista de vendedores do site não traz a positivação; ela vem do overview filtrado por vendedor
+     * (o mesmo que o site faz ao escolher um vendedor no filtro). Pede um de cada vez, guarda por 1 h e,
+     * se o site responder com erro, para na hora (para não sobrecarregar o site).
+     */
     private fun positivacaoVendedores(api: Api, q: String, g: JSONObject) {
         val vs = g.optJSONArray("vendedores") ?: return
-        val itens = (0 until minOf(vs.length(), 60)).map { vs.getJSONObject(it) }.filter { it.optString("chave").isNotEmpty() }
-        if (itens.isEmpty()) return
-        val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
-        try {
-            val fut = itens.map { v ->
-                pool.submit(java.util.concurrent.Callable {
-                    try { api.get("/dashboard/overview?$q&seller=" + java.net.URLEncoder.encode(v.optString("chave"), "UTF-8").replace("+", "%20")) } catch (_: Exception) { null }
-                })
+        val agora = System.currentTimeMillis()
+        var pedidos = 0
+        for (k in 0 until vs.length()) {
+            val v = vs.getJSONObject(k)
+            val chave = v.optString("chave"); if (chave.isEmpty()) continue
+            val id = "$q|$chave"
+            var o = posCache[id]?.takeIf { agora - it.first < 3600_000L }?.second
+            if (o == null) {
+                if (pedidos >= 40) continue
+                pedidos++
+                o = try { api.get("/dashboard/overview?$q&seller=" + java.net.URLEncoder.encode(chave, "UTF-8").replace("+", "%20")) } catch (_: Exception) { null }
+                    ?: break                      // o site deu erro: não insiste
+                posCache[id] = Pair(agora, o)
             }
-            for ((v, f) in itens.zip(fut)) {
-                val o = try { f.get(30, java.util.concurrent.TimeUnit.SECONDS) } catch (_: Exception) { null } ?: continue
-                if (o.has("positive_customer_count")) v.put("pos", n(o, "positive_customer_count"))
-                if (o.has("positive_customer_target")) v.put("metaPos", n(o, "positive_customer_target"))
-            }
-        } finally { pool.shutdownNow() }
+            if (o.has("positive_customer_count")) v.put("pos", n(o, "positive_customer_count"))
+            if (o.has("positive_customer_target")) v.put("metaPos", n(o, "positive_customer_target"))
+        }
+    }
+
+    // ---- quem é quem: o mesmo que o site faz com as permissões do login ----
+    private fun perms(me: JSONObject): List<String> = me.optJSONArray("permissions")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: emptyList()
+
+    /** Vê só os próprios números (vendedor)? Pelo papel ou, se vier, pelas permissões do site. */
+    fun ehVendedor(me: JSONObject): Boolean {
+        val p = perms(me)
+        if (p.isNotEmpty()) return "analytics:view_all" !in p && "analytics:view_team" !in p
+        return me.optString("role") == "seller"
+    }
+
+    /** Filtro igual ao do site: diretor (view_all) vê tudo; gestor (view_team) a equipe dele; vendedor só ele. */
+    fun filtro(me: JSONObject): String {
+        val p = perms(me)
+        fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+        return when {
+            "analytics:view_all" in p -> ""
+            "analytics:view_team" in p -> me.optString("manager_name").takeIf { it.isNotBlank() }?.let { "&manager=" + enc(it) } ?: ""
+            p.isNotEmpty() || me.optString("role") == "seller" -> me.optString("seller_name").takeIf { it.isNotBlank() }?.let { "&seller=" + enc(it) } ?: ""
+            else -> ""
+        }
     }
 
     /** Busca que não pode derrubar a tela: qualquer falha (menos login/acesso) vira objeto vazio. */
@@ -134,7 +166,7 @@ object Dados {
      * Mês passado até o mesmo dia útil (ex.: hoje é o 15º dia útil -> mês passado até o 15º dia útil).
      * valor = vendido nesse trecho; ate = dd/mm. Se falhar, o painel continua sem a comparação.
      */
-    private fun anterior(api: Api, iniMes: LocalDate, dec: Double): JSONObject? = try {
+    private fun anterior(api: Api, iniMes: LocalDate, dec: Double, fx: String = ""): JSONObject? = try {
         if (dec <= 0) null else {
             val pIni = iniMes.minusMonths(1).withDayOfMonth(1)
             val pUlt = pIni.withDayOfMonth(pIni.lengthOfMonth())
@@ -143,7 +175,7 @@ object Dados {
                 if (d.dayOfWeek.value in 1..5) { cont++; if (cont >= dec) { fim = d; break } }
                 d = d.plusDays(1)
             }
-            val o = api.get("/dashboard/overview?start_date=${iso(pIni)}&end_date=${iso(fim)}")
+            val o = api.get("/dashboard/overview?start_date=${iso(pIni)}&end_date=${iso(fim)}$fx")
             JSONObject().put("valor", n(o, "sales_revenue")).put("ate", "%02d/%02d".format(fim.dayOfMonth, fim.monthValue))
         }
     } catch (_: Exception) { null }

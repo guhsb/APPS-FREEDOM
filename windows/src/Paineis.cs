@@ -52,17 +52,17 @@ namespace Freedom
             var hoje = Hoje();
             var iniMes = new DateTime(hoje.Year, hoje.Month, 1);
             var fimMes = iniMes.AddMonths(1).AddDays(-1);
-            var qMes = "start_date=" + Iso(iniMes) + "&end_date=" + Iso(fimMes);
             var me = api.Get("/auth/me");
+            var qMes = "start_date=" + Iso(iniMes) + "&end_date=" + Iso(fimMes) + Filtro(me);
             var nome = me.OptString("display_name", me.OptString("seller_name", ""));
-            if (me.OptString("role") == "seller")
+            if (EhVendedor(me))
             {
                 int dow = ((int)hoje.DayOfWeek + 6) % 7;      // segunda = 0
                 var seg = hoje.AddDays(-dow);
                 var dom = seg.AddDays(6);
                 var iniSem = seg < iniMes ? iniMes : seg;
                 var fimSem = dom > fimMes ? fimMes : dom;
-                var qSem = "start_date=" + Iso(iniSem) + "&end_date=" + Iso(fimSem);
+                var qSem = "start_date=" + Iso(iniSem) + "&end_date=" + Iso(fimSem) + Filtro(me);
                 // o mês é o principal (igual a escolher as datas do mês); a semana é extra: se falhar, fica zerada e o mês aparece igual
                 var oMes = GetOuVazio(api, "/dashboard/overview?" + qMes);
                 var oSem = Opcional(api, "/dashboard/overview?" + qSem);
@@ -71,7 +71,7 @@ namespace Freedom
                 var gv = GraficoDe(api, qMes, iniMes, fimMes, hoje);
                 var mv = v.OptJSONObject("mes");
                 if (gv != null && mv != null) mv.Put("diario", gv);
-                if (mv != null) { var av = Anterior(api, iniMes, mv.OptDouble("dec", 0)); if (av != null) mv.Put("anterior", av); }
+                if (mv != null) { var av = Anterior(api, iniMes, mv.OptDouble("dec", 0), Filtro(me)); if (av != null) mv.Put("anterior", av); }
                 return v;
             }
             var o = GetOuVazio(api, "/dashboard/overview?" + qMes);
@@ -80,7 +80,7 @@ namespace Freedom
             PositivacaoVendedores(api, qMes, g);
             var gg = GraficoDe(api, qMes, iniMes, fimMes, hoje);
             if (gg != null) g.Put("diario", gg);
-            var ag = Anterior(api, iniMes, g.OptDouble("dec", 0));
+            var ag = Anterior(api, iniMes, g.OptDouble("dec", 0), Filtro(me));
             if (ag != null) g.Put("anterior", ag);
             return g;
         }
@@ -103,14 +103,14 @@ namespace Freedom
             var fim = DateTime.ParseExact(fimTxt, "yyyy-MM-dd", CultureInfo.InvariantCulture);
             if (fim < ini) throw new ArgumentException("a data final é antes da inicial");
             var hoje = Hoje();
-            var q = "start_date=" + Iso(ini) + "&end_date=" + Iso(fim);
             var me = api.Get("/auth/me");
+            var q = "start_date=" + Iso(ini) + "&end_date=" + Iso(fim) + Filtro(me);
             var nome = me.OptString("display_name", me.OptString("seller_name", ""));
             var titulo = ini.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + " a " + fim.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             // período sem vendas: o site pode responder "sem dados" (4xx) em vez de zeros — vira painel vazio, não erro
             var o = GetOuVazio(api, "/dashboard/overview?" + q);
             var graf = GraficoDe(api, q, ini, fim, hoje);
-            if (me.OptString("role") == "seller")
+            if (EhVendedor(me))
             {
                 var g = Gestor(nome, o, new JSONObject(), ini, fim, hoje).Put("titulo", "PERÍODO " + titulo);
                 if (graf != null) g.Put("diario", graf);
@@ -129,25 +129,58 @@ namespace Freedom
         /// <summary>Busca no site; "sem dados" (HTTP 400/404/422) vira objeto vazio. Login/acesso continuam dando erro.</summary>
         /// <summary>A lista de vendedores não traz a positivação: vem do overview filtrado por vendedor
         /// (igual ao filtro "Vendedor" do site). Busca 4 de cada vez; se falhar, fica o que tinha.</summary>
+        // positivação de cada vendedor guardada por 1 h (não pede de novo a cada atualização de 15 min)
+        static readonly Dictionary<string, KeyValuePair<long, JSONObject>> posCache = new Dictionary<string, KeyValuePair<long, JSONObject>>();
+
+        /// <summary>A lista de vendedores não traz a positivação: vem do overview filtrado por vendedor (igual ao filtro do site).
+        /// Pede um de cada vez, guarda por 1 h e, se o site der erro, para na hora (para não sobrecarregar o site).</summary>
         static void PositivacaoVendedores(Api api, string q, JSONObject g)
         {
             var vs = g.OptJSONArray("vendedores");
             if (vs == null) return;
-            var itens = new List<JSONObject>();
-            for (int i = 0; i < vs.Length && i < 60; i++) { var v = vs.OptJSONObject(i); if (v != null && v.OptString("chave").Length > 0) itens.Add(v); }
-            System.Threading.Tasks.Parallel.ForEach(itens, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 4 }, v =>
+            long agora = Relogio.Agora(); int pedidos = 0;
+            for (int i = 0; i < vs.Length; i++)
             {
-                try
+                var v = vs.OptJSONObject(i); if (v == null) continue;
+                var chave = v.OptString("chave"); if (chave.Length == 0) continue;
+                var id = q + "|" + chave;
+                JSONObject o = null;
+                lock (posCache) { KeyValuePair<long, JSONObject> c; if (posCache.TryGetValue(id, out c) && agora - c.Key < 3600000L) o = c.Value; }
+                if (o == null)
                 {
-                    var o = api.Get("/dashboard/overview?" + q + "&seller=" + Uri.EscapeDataString(v.OptString("chave")));
-                    lock (v)
-                    {
-                        if (o.Has("positive_customer_count")) v.Put("pos", N(o, "positive_customer_count"));
-                        if (o.Has("positive_customer_target")) v.Put("metaPos", N(o, "positive_customer_target"));
-                    }
+                    if (pedidos >= 40) continue;
+                    pedidos++;
+                    try { o = api.Get("/dashboard/overview?" + q + "&seller=" + Uri.EscapeDataString(chave)); }
+                    catch (Exception) { break; }       // o site deu erro: não insiste
+                    lock (posCache) posCache[id] = new KeyValuePair<long, JSONObject>(agora, o);
                 }
-                catch (Exception) { }
-            });
+                if (o.Has("positive_customer_count")) v.Put("pos", N(o, "positive_customer_count"));
+                if (o.Has("positive_customer_target")) v.Put("metaPos", N(o, "positive_customer_target"));
+            }
+        }
+
+        // ---- quem é quem: o mesmo que o site faz com as permissões do login ----
+        static List<string> Perms(JSONObject me)
+        {
+            var l = new List<string>(); var a = me.OptJSONArray("permissions");
+            if (a != null) for (int i = 0; i < a.Length; i++) l.Add(a.OptString(i));
+            return l;
+        }
+        /// <summary>Vê só os próprios números (vendedor)? Pelo papel ou, se vier, pelas permissões do site.</summary>
+        static bool EhVendedor(JSONObject me)
+        {
+            var p = Perms(me);
+            if (p.Count > 0) return !p.Contains("analytics:view_all") && !p.Contains("analytics:view_team");
+            return me.OptString("role") == "seller";
+        }
+        /// <summary>Filtro igual ao do site: diretor (view_all) vê tudo; gestor (view_team) a equipe dele; vendedor só ele.</summary>
+        static string Filtro(JSONObject me)
+        {
+            var p = Perms(me);
+            if (p.Contains("analytics:view_all")) return "";
+            if (p.Contains("analytics:view_team")) { var m = me.OptString("manager_name"); return m.Trim().Length > 0 ? "&manager=" + Uri.EscapeDataString(m) : ""; }
+            if (p.Count > 0 || me.OptString("role") == "seller") { var s = me.OptString("seller_name"); return s.Trim().Length > 0 ? "&seller=" + Uri.EscapeDataString(s) : ""; }
+            return "";
         }
 
         /// <summary>Busca que não pode derrubar a tela: qualquer falha (menos login/acesso) vira objeto vazio.</summary>
@@ -172,7 +205,7 @@ namespace Freedom
         }
 
         /// <summary>Mês passado até o mesmo dia útil (igual ao Android). null se falhar.</summary>
-        static JSONObject Anterior(Api api, DateTime iniMes, double dec)
+        static JSONObject Anterior(Api api, DateTime iniMes, double dec, string fx = "")
         {
             try
             {
@@ -182,7 +215,7 @@ namespace Freedom
                 var fim = pUlt; int cont = 0;
                 for (var d = pIni; d <= pUlt; d = d.AddDays(1))
                     if (d.DayOfWeek != DayOfWeek.Saturday && d.DayOfWeek != DayOfWeek.Sunday) { cont++; if (cont >= dec) { fim = d; break; } }
-                var o = api.Get("/dashboard/overview?start_date=" + Iso(pIni) + "&end_date=" + Iso(fim));
+                var o = api.Get("/dashboard/overview?start_date=" + Iso(pIni) + "&end_date=" + Iso(fim) + fx);
                 return new JSONObject().Put("valor", N(o, "sales_revenue")).Put("ate", fim.ToString("dd/MM", CultureInfo.InvariantCulture));
             }
             catch (Exception) { return null; }

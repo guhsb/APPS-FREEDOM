@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Linq;
 using Microsoft.Win32;
 
 namespace Freedom
@@ -51,11 +52,42 @@ namespace Freedom
             return r;
         }
 
+        /// <summary>Número da última versão publicada, lido do endereço "releases/latest" (redireciona para .../tag/vN). 0 se não deu.</summary>
+        static long UltimaTag()
+        {
+            try
+            {
+                var r = Req("https://github.com/" + REPO + "/releases/latest");
+                r.AllowAutoRedirect = false; r.Method = "HEAD"; r.Timeout = 15000;
+                using (var resp = (HttpWebResponse)r.GetResponse())
+                {
+                    var loc = resp.Headers["Location"] ?? "";
+                    int i = loc.LastIndexOf("/tag/", StringComparison.Ordinal);
+                    if (i < 0) return 0;
+                    long v; long.TryParse(new string(loc.Substring(i + 5).Where(char.IsDigit).ToArray()), out v);
+                    return v;
+                }
+            }
+            catch (Exception) { return 0; }
+        }
+
         /// <summary>0 = em dia, 1 = tem nova, -1 = falhou.</summary>
         public static int Conferir(bool forcar)
         {
             long agora = Relogio.Agora();
-            if (!forcar && agora - P.GetLong("hora") < 6 * 3600000L) return Nova() != null ? 1 : 0;
+            if (!forcar && agora - P.GetLong("hora") < 30 * 60000L) return Nova() != null ? 1 : 0;      // confere sozinho a cada 30 min
+            // consulta leve primeiro (página do GitHub, sem o limite de 60 por hora da API): só usa a API quando saiu versão nova
+            long tag = UltimaTag();
+            if (tag > 0)
+            {
+                JSONObject cache = null;
+                try { var s = P.GetString("ultima"); if (s != null) cache = new JSONObject(s); } catch (Exception) { }
+                if (tag <= VersaoAtual() || (cache != null && cache.OptLong("versao") == tag && cache.OptString("url").Length > 0))
+                {
+                    P.Edit().Put("hora", agora).Commit();
+                    return Nova() != null ? 1 : 0;
+                }
+            }
             try
             {
                 var r = Req("https://api.github.com/repos/" + REPO + "/releases/latest");

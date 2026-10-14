@@ -29,7 +29,13 @@ const A = {
   /** 0 = em dia, 1 = tem nova, -1 = falhou. */
   async conferir(forcar) {
     const t = agora();
-    if (!forcar && t - this.P.getNum('hora') < 6 * 3600000) return this.nova() ? 1 : 0;
+    if (!forcar && t - this.P.getNum('hora') < 30 * 60000) return this.nova() ? 1 : 0;      // confere sozinho a cada 30 min
+    // consulta leve primeiro (página do GitHub, sem o limite de 60 por hora da API): só usa a API quando saiu versão nova
+    const tag = await this.ultimaTag();
+    if (tag > 0) {
+      let cache = null; try { cache = JSON.parse(this.P.getStr('ultima')); } catch (e) { }
+      if (tag <= versaoAtual || (cache && cache.versao === tag && cache.url)) { this.P.editar().put('hora', t).commit(); return this.nova() ? 1 : 0; }
+    }
     try {
       const r = await fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Freedom-Mac' }, signal: AbortSignal.timeout(20000) });
       const j = await r.json();
@@ -39,6 +45,15 @@ const A = {
       this.P.editar().put('ultima', JSON.stringify({ versao, url: a.browser_download_url || '', tamanho: a.size || -1, pagina: j.html_url || '', notas: notas.slice(0, 400) })).put('hora', t).commit();
       return this.nova() ? 1 : 0;
     } catch (e) { this.P.editar().put('hora', t).commit(); return this.nova() ? 1 : -1; }
+  },
+  /** Número da última versão publicada, lido do endereço "releases/latest" (redireciona para .../tag/vN). 0 se não deu. */
+  async ultimaTag() {
+    try {
+      const r = await fetch('https://github.com/' + REPO + '/releases/latest', { method: 'HEAD', redirect: 'manual', headers: { 'User-Agent': 'Freedom-Mac' }, signal: AbortSignal.timeout(15000) });
+      const loc = r.headers.get('location') || '';
+      const i = loc.lastIndexOf('/tag/');
+      return i < 0 ? 0 : (Number(loc.slice(i + 5).replace(/\D/g, '')) || 0);
+    } catch (e) { return 0; }
   },
   pagina() { const n = this.nova(); return n && n.pagina ? n.pagina : 'https://github.com/' + REPO + '/releases/latest'; },
 

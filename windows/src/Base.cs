@@ -251,6 +251,8 @@ namespace Freedom
         public JSONObject Get(string caminho)
         {
             var r = Bruto(caminho);
+            // site instável por um instante (500/502/503/504): espera um pouco e tenta de novo uma vez
+            if (r.Status == 500 || r.Status == 502 || r.Status == 503 || r.Status == 504) { System.Threading.Thread.Sleep(1500); r = Bruto(caminho); }
             if (r.Status == 401 || r.Status == 403) throw new SemAcesso("este login não tem acesso");
             if (r.Status == 204) return new JSONObject();      // sem dados para esse filtro (ex.: semana sem vendas): vazio, não erro
             if (r.Status != 200) throw new IOException("erro ao buscar dados (HTTP " + r.Status + ")");

@@ -221,6 +221,18 @@ function avisarHelpdesk() { if (paginaApp !== 'login') js(vApp && vApp.webConten
 function avisarPainel() { js(vPainel && vPainel.webContents, 'window.recebido && recebido()'); }
 function avisarTodas() { avisarHelpdesk(); avisarPainel(); }
 
+/** Notificação "versão nova" (uma vez por versão). Clicar abre o app e já atualiza. */
+function avisarVersaoNova() {
+  const n = Atualizacao.nova(); if (!n) return;
+  const P = Atualizacao.P; if (P.getNum('avisada') === n.versao) return;
+  P.editar().put('avisada', n.versao).commit();
+  if (!Notification.isSupported()) return;
+  const nt = new Notification({ title: 'Nova versão do Freedom', body: 'A versão ' + n.versao + ' está disponível. Clique para atualizar.', silent: false });
+  nt.on('click', () => { mostrar(); ponte.atualizarApp(vApp && vApp.webContents); });
+  nt.show();
+}
+const conferirVersao = forcar => Atualizacao.conferir(forcar).then(() => { avisarTodas(); avisarVersaoNova(); }).catch(() => null);
+
 function notificar(titulo, texto, caminho) {
   if (!Notification.isSupported()) return;
   const n = new Notification({ title: titulo, body: texto, silent: false });
@@ -335,8 +347,8 @@ function iniciarMonitor() {
   if (logado()) { Helpdesk.verificar(false).catch(() => null); Paineis.atualizar(); }
   monitor = setTimeout(ciclo, 5000);
   timerPaineis = setInterval(() => { if (logado()) Paineis.atualizar(); }, 15 * 60 * 1000);
-  Atualizacao.conferir(false).then(avisarTodas).catch(() => null);
-  setInterval(() => Atualizacao.conferir(false).then(avisarTodas).catch(() => null), 3 * 3600 * 1000);
+  conferirVersao(false);
+  setInterval(() => conferirVersao(false), 30 * 60 * 1000);
 }
 
 // ---------------- ponte (window.App das telas) ----------------

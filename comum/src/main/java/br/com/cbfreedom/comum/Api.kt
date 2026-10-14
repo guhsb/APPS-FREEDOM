@@ -71,8 +71,10 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
     }
 
     fun get(caminho: String): JSONObject {
-        val c = abrir(caminho)
-        val cod = c.responseCode
+        var c = abrir(caminho)
+        var cod = c.responseCode
+        // site instável por um instante (500/502/503/504): espera um pouco e tenta de novo uma vez
+        if (cod in setOf(500, 502, 503, 504)) { c.disconnect(); Thread.sleep(1500); c = abrir(caminho); cod = c.responseCode }
         if (cod == 401 || cod == 403) { c.disconnect(); throw SemAcesso("este login não tem acesso") }
         // 204 = o site não tem dados para esse filtro (ex.: semana ainda sem vendas): vira "vazio", não erro
         if (cod == 204) { c.disconnect(); return JSONObject() }

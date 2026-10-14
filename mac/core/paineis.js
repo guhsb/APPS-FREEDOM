@@ -106,57 +106,78 @@ async function graficoDe(api, q, ini, fim, hoje) {
 }
 
 /** Mês passado até o mesmo dia útil. */
-async function anterior(api, iniMes, dec) {
+async function anterior(api, iniMes, dec, fx = '') {
   try {
     if (!(dec > 0)) return null;
     const pIni = D.ini(D.mais(iniMes, -1)), pUlt = D.fim(pIni);
     let fim = pUlt, cont = 0;
     for (let d = pIni; d <= pUlt; d = D.mais(d, 1)) if (D.util(d)) { cont++; if (cont >= dec) { fim = d; break; } }
-    const o = await api.get('/dashboard/overview?start_date=' + D.iso(pIni) + '&end_date=' + D.iso(fim));
+    const o = await api.get('/dashboard/overview?start_date=' + D.iso(pIni) + '&end_date=' + D.iso(fim) + fx);
     return { valor: N(o, 'sales_revenue'), ate: D.dm(fim) };
   } catch (e) { return null; }
 }
 
 async function comercial(api) {
   const hoje = D.hoje(), iniMes = D.ini(hoje), fimMes = D.fim(hoje);
-  const qMes = 'start_date=' + D.iso(iniMes) + '&end_date=' + D.iso(fimMes);
   const me = await api.get('/auth/me');
+  const qMes = 'start_date=' + D.iso(iniMes) + '&end_date=' + D.iso(fimMes) + filtro(me);
   const nome = me.display_name || me.seller_name || '';
-  if (me.role === 'seller') {
+  if (ehVendedor(me)) {
     const dow = (hoje.getUTCDay() + 6) % 7, seg = D.mais(hoje, -dow), dom = D.mais(seg, 6);
     const iniSem = seg < iniMes ? iniMes : seg, fimSem = dom > fimMes ? fimMes : dom;
-    const qSem = 'start_date=' + D.iso(iniSem) + '&end_date=' + D.iso(fimSem);
+    const qSem = 'start_date=' + D.iso(iniSem) + '&end_date=' + D.iso(fimSem) + filtro(me);
     // o mês é o principal (igual a escolher as datas do mês); a semana é extra: se falhar, fica zerada e o mês aparece igual
     const oMes = await getOuVazio(api, '/dashboard/overview?' + qMes), oSem = await opcional(api, '/dashboard/overview?' + qSem);
     const cSem = await opcional(api, '/dashboard/overview/charts?' + qSem);
     const v = vendedor(nome, oMes, oSem, cSem.daily || [], iniSem, fimSem, hoje);
     const g = await graficoDe(api, qMes, iniMes, fimMes, hoje); if (g) v.mes.diario = g;
-    const a = await anterior(api, iniMes, v.mes.dec); if (a) v.mes.anterior = a;
+    const a = await anterior(api, iniMes, v.mes.dec, filtro(me)); if (a) v.mes.anterior = a;
     return v;
   }
   const o = await getOuVazio(api, '/dashboard/overview?' + qMes), sv = await getOuVazio(api, '/dashboard/sellers?' + qMes);
   const g = gestor(nome, o, sv, iniMes, fimMes, hoje);
   await positivacaoVendedores(api, qMes, g);
   const gg = await graficoDe(api, qMes, iniMes, fimMes, hoje); if (gg) g.diario = gg;
-  const ag = await anterior(api, iniMes, g.dec); if (ag) g.anterior = ag;
+  const ag = await anterior(api, iniMes, g.dec, filtro(me)); if (ag) g.anterior = ag;
   return g;
 }
 
-/** A lista de vendedores não traz a positivação: vem do overview filtrado por vendedor (igual ao filtro do site). 4 de cada vez. */
+// positivação de cada vendedor guardada por 1 h (não pede de novo a cada atualização de 15 min)
+const posCache = new Map();
+/** A lista de vendedores não traz a positivação: vem do overview filtrado por vendedor (igual ao filtro do site).
+ *  Pede um de cada vez, guarda por 1 h e, se o site der erro, para na hora (para não sobrecarregar o site). */
 async function positivacaoVendedores(api, q, g) {
-  const itens = (g.vendedores || []).slice(0, 60).filter(v => v.chave);
-  let i = 0;
-  const trabalhador = async () => {
-    while (i < itens.length) {
-      const v = itens[i++];
-      try {
-        const o = await api.get('/dashboard/overview?' + q + '&seller=' + encodeURIComponent(v.chave));
-        if (o.positive_customer_count != null) v.pos = N(o, 'positive_customer_count');
-        if (o.positive_customer_target != null) v.metaPos = N(o, 'positive_customer_target');
-      } catch (e) { }
+  const agora = Date.now(); let pedidos = 0;
+  for (const v of (g.vendedores || [])) {
+    if (!v.chave) continue;
+    const id = q + '|' + v.chave, c = posCache.get(id);
+    let o = c && agora - c[0] < 3600000 ? c[1] : null;
+    if (!o) {
+      if (pedidos >= 40) continue;
+      pedidos++;
+      try { o = await api.get('/dashboard/overview?' + q + '&seller=' + encodeURIComponent(v.chave)); } catch (e) { break; }
+      posCache.set(id, [agora, o]);
     }
-  };
-  await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
+    if (o.positive_customer_count != null) v.pos = N(o, 'positive_customer_count');
+    if (o.positive_customer_target != null) v.metaPos = N(o, 'positive_customer_target');
+  }
+}
+
+// ---- quem é quem: o mesmo que o site faz com as permissões do login ----
+const perms = me => Array.isArray(me.permissions) ? me.permissions.map(String) : [];
+/** Vê só os próprios números (vendedor)? Pelo papel ou, se vier, pelas permissões do site. */
+function ehVendedor(me) {
+  const p = perms(me);
+  if (p.length) return p.indexOf('analytics:view_all') < 0 && p.indexOf('analytics:view_team') < 0;
+  return me.role === 'seller';
+}
+/** Filtro igual ao do site: diretor (view_all) vê tudo; gestor (view_team) a equipe dele; vendedor só ele. */
+function filtro(me) {
+  const p = perms(me);
+  if (p.indexOf('analytics:view_all') >= 0) return '';
+  if (p.indexOf('analytics:view_team') >= 0) return me.manager_name ? '&manager=' + encodeURIComponent(me.manager_name) : '';
+  if (p.length || me.role === 'seller') return me.seller_name ? '&seller=' + encodeURIComponent(me.seller_name) : '';
+  return '';
 }
 
 /** Busca que não pode derrubar a tela: qualquer falha (menos login/acesso) vira objeto vazio. */
@@ -173,14 +194,14 @@ async function getOuVazio(api, caminho) {
 async function periodo(api, iniTxt, fimTxt) {
   const ini = D.de(iniTxt), fim = D.de(fimTxt);
   if (fim < ini) throw new Error('a data final é antes da inicial');
-  const hoje = D.hoje(), q = 'start_date=' + D.iso(ini) + '&end_date=' + D.iso(fim);
   const me = await api.get('/auth/me');
+  const hoje = D.hoje(), q = 'start_date=' + D.iso(ini) + '&end_date=' + D.iso(fim) + filtro(me);
   const nome = me.display_name || me.seller_name || '';
   const titulo = D.dmy(ini) + ' a ' + D.dmy(fim);
   // período sem vendas: o site pode responder "sem dados" (4xx) em vez de zeros — vira painel vazio, não erro
   const o = await getOuVazio(api, '/dashboard/overview?' + q);
   const graf = await graficoDe(api, q, ini, fim, hoje);
-  if (me.role === 'seller') {
+  if (ehVendedor(me)) {
     const g = gestor(nome, o, {}, ini, fim, hoje); g.titulo = 'PERÍODO ' + titulo; if (graf) g.diario = graf;
     return { tipo: 'vendedor', nome, periodo: titulo, mes: g, semVendas: N(o, 'sales_revenue') <= 0 };
   }

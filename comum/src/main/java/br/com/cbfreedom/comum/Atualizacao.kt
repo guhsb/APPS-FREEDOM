@@ -25,7 +25,7 @@ object Atualizacao {
     private const val ARQUIVO = "Freedom.apk"
     private const val NOTIF = 45
     private const val NOTIF_INSTALAR = 46
-    private const val INTERVALO_MS = 6 * 3600_000L
+    private const val INTERVALO_MS = 30 * 60_000L      // confere sozinho a cada 30 min
     const val ACAO_STATUS = "br.com.cbfreedom.ATUALIZACAO_STATUS"
 
     enum class Conferencia { NOVA, EM_DIA, FALHOU }
@@ -72,6 +72,14 @@ object Atualizacao {
         val agora = System.currentTimeMillis()
         fun atual() = if (nova(c) != null) Conferencia.NOVA else Conferencia.EM_DIA
         if (!forcar && agora - pr.getLong("hora", 0L) < INTERVALO_MS) return atual()
+        // consulta leve primeiro (página do GitHub, sem o limite de 60 por hora da API): só usa a API quando saiu versão nova
+        ultimaTag()?.let { tag ->
+            val cache = pr.getString("ultima", null)?.let { try { JSONObject(it) } catch (_: Exception) { null } }
+            if (tag <= versaoAtual(c) || (cache != null && cache.optLong("versao") == tag && cache.optString("url").isNotEmpty())) {
+                pr.edit().putLong("hora", agora).apply()
+                return atual()
+            }
+        }
         try {
             val con = URL("https://api.github.com/repos/$REPO/releases/latest").openConnection() as HttpURLConnection
             con.connectTimeout = 15000; con.readTimeout = 20000
@@ -106,6 +114,18 @@ object Atualizacao {
         }
         return Conferencia.NOVA
     }
+
+    /** Número da última versão publicada, lido do endereço "releases/latest" do GitHub (que redireciona para .../tag/vN). */
+    private fun ultimaTag(): Long? = try {
+        val con = URL("https://github.com/$REPO/releases/latest").openConnection() as HttpURLConnection
+        con.instanceFollowRedirects = false
+        con.connectTimeout = 15000; con.readTimeout = 15000
+        con.setRequestProperty("User-Agent", "Freedom-Android")
+        con.requestMethod = "HEAD"
+        val loc = if (con.responseCode in 300..399) con.getHeaderField("Location") else null
+        con.disconnect()
+        loc?.substringAfterLast("/tag/", "")?.filter { it.isDigit() }?.toLongOrNull()
+    } catch (_: Exception) { null }
 
     fun conferirEmSegundoPlano(c: Context, forcar: Boolean, depois: (() -> Unit)? = null) {
         val app = c.applicationContext
