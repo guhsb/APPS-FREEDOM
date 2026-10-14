@@ -63,9 +63,10 @@ namespace Freedom
                 var iniSem = seg < iniMes ? iniMes : seg;
                 var fimSem = dom > fimMes ? fimMes : dom;
                 var qSem = "start_date=" + Iso(iniSem) + "&end_date=" + Iso(fimSem);
-                var oMes = api.Get("/dashboard/overview?" + qMes);
-                var oSem = api.Get("/dashboard/overview?" + qSem);
-                var cSem = api.Get("/dashboard/overview/charts?" + qSem);
+                // o mês é o principal (igual a escolher as datas do mês); a semana é extra: se falhar, fica zerada e o mês aparece igual
+                var oMes = GetOuVazio(api, "/dashboard/overview?" + qMes);
+                var oSem = Opcional(api, "/dashboard/overview?" + qSem);
+                var cSem = Opcional(api, "/dashboard/overview/charts?" + qSem);
                 var v = Vendedor(nome, oMes, oSem, cSem.OptJSONArray("daily") ?? new JSONArray(), iniSem, fimSem, hoje);
                 var gv = GraficoDe(api, qMes, iniMes, fimMes, hoje);
                 var mv = v.OptJSONObject("mes");
@@ -73,8 +74,8 @@ namespace Freedom
                 if (mv != null) { var av = Anterior(api, iniMes, mv.OptDouble("dec", 0)); if (av != null) mv.Put("anterior", av); }
                 return v;
             }
-            var o = api.Get("/dashboard/overview?" + qMes);
-            var sv = api.Get("/dashboard/sellers?" + qMes);
+            var o = GetOuVazio(api, "/dashboard/overview?" + qMes);
+            var sv = GetOuVazio(api, "/dashboard/sellers?" + qMes);
             var g = Gestor(nome, o, sv, iniMes, fimMes, hoje);
             PositivacaoVendedores(api, qMes, g);
             var gg = GraficoDe(api, qMes, iniMes, fimMes, hoje);
@@ -149,6 +150,15 @@ namespace Freedom
             });
         }
 
+        /// <summary>Busca que não pode derrubar a tela: qualquer falha (menos login/acesso) vira objeto vazio.</summary>
+        static JSONObject Opcional(Api api, string caminho)
+        {
+            try { return api.Get(caminho); }
+            catch (SemAcesso) { throw; }
+            catch (ErroLogin) { throw; }
+            catch (Exception) { return new JSONObject(); }
+        }
+
         static JSONObject GetOuVazio(Api api, string caminho)
         {
             try { return api.Get(caminho); }
@@ -156,7 +166,7 @@ namespace Freedom
             catch (ErroLogin) { throw; }
             catch (System.IO.IOException e)
             {
-                if (System.Text.RegularExpressions.Regex.IsMatch(e.Message ?? "", "HTTP (400|404|422)")) return new JSONObject();
+                if (System.Text.RegularExpressions.Regex.IsMatch(e.Message ?? "", "HTTP (204|400|404|422)")) return new JSONObject();
                 throw;
             }
         }

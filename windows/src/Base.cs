@@ -252,8 +252,9 @@ namespace Freedom
         {
             var r = Bruto(caminho);
             if (r.Status == 401 || r.Status == 403) throw new SemAcesso("este login não tem acesso");
+            if (r.Status == 204) return new JSONObject();      // sem dados para esse filtro (ex.: semana sem vendas): vazio, não erro
             if (r.Status != 200) throw new IOException("erro ao buscar dados (HTTP " + r.Status + ")");
-            return new JSONObject(r.Body);
+            return string.IsNullOrWhiteSpace(r.Body) ? new JSONObject() : new JSONObject(r.Body);
         }
 
         public Engine.Resp Bruto(string caminho) { return Executar(Abrir(BASE + caminho, "GET"), null, null); }

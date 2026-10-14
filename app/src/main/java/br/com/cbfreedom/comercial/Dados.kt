@@ -32,16 +32,17 @@ object Dados {
             val iniSem = if (seg.isBefore(iniMes)) iniMes else seg
             val fimSem = if (dom.isAfter(fimMes)) fimMes else dom
             val qSem = "start_date=${iso(iniSem)}&end_date=${iso(fimSem)}"
-            val oMes = api.get("/dashboard/overview?$qMes")
-            val oSem = api.get("/dashboard/overview?$qSem")
-            val cSem = api.get("/dashboard/overview/charts?$qSem")
+            // o mês é o principal (igual a escolher as datas do mês); a semana é extra: se falhar, fica zerada e o mês aparece igual
+            val oMes = getOuVazio(api, "/dashboard/overview?$qMes")
+            val oSem = opcional(api, "/dashboard/overview?$qSem")
+            val cSem = opcional(api, "/dashboard/overview/charts?$qSem")
             val v = vendedor(nome, oMes, oSem, cSem.optJSONArray("daily") ?: JSONArray(), iniSem, fimSem, hoje)
             graficoDe(api, qMes, iniMes, fimMes, hoje)?.let { v.optJSONObject("mes")?.put("diario", it) }
             v.optJSONObject("mes")?.let { m -> anterior(api, iniMes, m.optDouble("dec", 0.0))?.let { m.put("anterior", it) } }
             v
         } else {
-            val o = api.get("/dashboard/overview?$qMes")
-            val sv = api.get("/dashboard/sellers?$qMes")
+            val o = getOuVazio(api, "/dashboard/overview?$qMes")
+            val sv = getOuVazio(api, "/dashboard/sellers?$qMes")
             val g = gestor(nome, o, sv, iniMes, fimMes, hoje)
             positivacaoVendedores(api, qMes, g)
             graficoDe(api, qMes, iniMes, fimMes, hoje)?.let { g.put("diario", it) }
@@ -117,10 +118,16 @@ object Dados {
         } finally { pool.shutdownNow() }
     }
 
-    /** Busca no site; "sem dados" (HTTP 400/404/422) vira objeto vazio. Login/acesso continuam dando erro. */
+    /** Busca que não pode derrubar a tela: qualquer falha (menos login/acesso) vira objeto vazio. */
+    private fun opcional(api: Api, caminho: String): JSONObject = try { api.get(caminho) } catch (e: Exception) {
+        if (e is br.com.cbfreedom.comum.SemAcesso || e is br.com.cbfreedom.comum.ErroLogin) throw e
+        JSONObject()
+    }
+
+    /** Busca no site; "sem dados" (HTTP 204/400/404/422) vira objeto vazio. Login/acesso continuam dando erro. */
     private fun getOuVazio(api: Api, caminho: String): JSONObject = try { api.get(caminho) } catch (e: java.io.IOException) {
         if (e is br.com.cbfreedom.comum.SemAcesso || e is br.com.cbfreedom.comum.ErroLogin) throw e
-        if (Regex("HTTP (400|404|422)").containsMatchIn(e.message ?: "")) JSONObject() else throw e
+        if (Regex("HTTP (204|400|404|422)").containsMatchIn(e.message ?: "")) JSONObject() else throw e
     }
 
     /**

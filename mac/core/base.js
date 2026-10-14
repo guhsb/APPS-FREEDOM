@@ -152,8 +152,9 @@ class Api {
   async get(caminho) {
     const r = await this.bruto(caminho);
     if (r.status === 401 || r.status === 403) throw new SemAcesso('este login não tem acesso');
+    if (r.status === 204) return {};      // sem dados para esse filtro (ex.: semana sem vendas): vazio, não erro
     if (r.status !== 200) throw new Error('erro ao buscar dados (HTTP ' + r.status + ')');
-    return JSON.parse(r.body);
+    return String(r.body || '').trim() ? JSON.parse(r.body) : {};
   }
 
   async enviar(metodo, caminho, corpo) {

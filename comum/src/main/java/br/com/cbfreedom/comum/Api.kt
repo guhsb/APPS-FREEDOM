@@ -74,10 +74,12 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
         val c = abrir(caminho)
         val cod = c.responseCode
         if (cod == 401 || cod == 403) { c.disconnect(); throw SemAcesso("este login não tem acesso") }
+        // 204 = o site não tem dados para esse filtro (ex.: semana ainda sem vendas): vira "vazio", não erro
+        if (cod == 204) { c.disconnect(); return JSONObject() }
         if (cod != 200) { c.disconnect(); throw IOException("erro ao buscar dados (HTTP $cod)") }
         val txt = c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         c.disconnect()
-        return JSONObject(txt)
+        return if (txt.isBlank()) JSONObject() else JSONObject(txt)
     }
 
     /** GET que não lança erro por código HTTP: devolve (código, corpo). Usado pelo monitor do Helpdesk. */

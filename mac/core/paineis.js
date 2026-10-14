@@ -126,14 +126,15 @@ async function comercial(api) {
     const dow = (hoje.getUTCDay() + 6) % 7, seg = D.mais(hoje, -dow), dom = D.mais(seg, 6);
     const iniSem = seg < iniMes ? iniMes : seg, fimSem = dom > fimMes ? fimMes : dom;
     const qSem = 'start_date=' + D.iso(iniSem) + '&end_date=' + D.iso(fimSem);
-    const oMes = await api.get('/dashboard/overview?' + qMes), oSem = await api.get('/dashboard/overview?' + qSem);
-    const cSem = await api.get('/dashboard/overview/charts?' + qSem);
+    // o mês é o principal (igual a escolher as datas do mês); a semana é extra: se falhar, fica zerada e o mês aparece igual
+    const oMes = await getOuVazio(api, '/dashboard/overview?' + qMes), oSem = await opcional(api, '/dashboard/overview?' + qSem);
+    const cSem = await opcional(api, '/dashboard/overview/charts?' + qSem);
     const v = vendedor(nome, oMes, oSem, cSem.daily || [], iniSem, fimSem, hoje);
     const g = await graficoDe(api, qMes, iniMes, fimMes, hoje); if (g) v.mes.diario = g;
     const a = await anterior(api, iniMes, v.mes.dec); if (a) v.mes.anterior = a;
     return v;
   }
-  const o = await api.get('/dashboard/overview?' + qMes), sv = await api.get('/dashboard/sellers?' + qMes);
+  const o = await getOuVazio(api, '/dashboard/overview?' + qMes), sv = await getOuVazio(api, '/dashboard/sellers?' + qMes);
   const g = gestor(nome, o, sv, iniMes, fimMes, hoje);
   await positivacaoVendedores(api, qMes, g);
   const gg = await graficoDe(api, qMes, iniMes, fimMes, hoje); if (gg) g.diario = gg;
@@ -158,9 +159,15 @@ async function positivacaoVendedores(api, q, g) {
   await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
 }
 
+/** Busca que não pode derrubar a tela: qualquer falha (menos login/acesso) vira objeto vazio. */
+async function opcional(api, caminho) {
+  try { return await api.get(caminho); }
+  catch (e) { if (e instanceof SemAcesso || e instanceof ErroLogin) throw e; return {}; }
+}
+
 async function getOuVazio(api, caminho) {
   try { return await api.get(caminho); }
-  catch (e) { if (!(e instanceof SemAcesso) && !(e instanceof ErroLogin) && /HTTP (400|404|422)/.test(e.message || '')) return {}; throw e; }
+  catch (e) { if (!(e instanceof SemAcesso) && !(e instanceof ErroLogin) && /HTTP (204|400|404|422)/.test(e.message || '')) return {}; throw e; }
 }
 
 async function periodo(api, iniTxt, fimTxt) {
