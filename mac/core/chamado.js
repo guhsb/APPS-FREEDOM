@@ -220,6 +220,13 @@ const Chamado = {
             if (!cap.can_transfer) return R(false, 'Você não pode transferir este chamado.');
             if (!/^\d+$/.test(v)) return R(false, 'Escolha o setor de destino.');
             corpo.queue_id = Number(v); metodo = 'PATCH'; caminho = 'queue'; ok = 'Chamado transferido'; break;
+          case 'transferirResp': {   // valor: "id\nmotivo" — o setor do chamado não muda, a pessoa ganha acesso só a ele
+            if (!cap.can_transfer_assignee) return R(false, 'Você não pode transferir o responsável.');
+            const i = v.indexOf('\n'), pid = i > 0 ? v.slice(0, i) : '', mot = i > 0 ? v.slice(i + 1).trim() : '';
+            if (!/^\d+$/.test(pid)) return R(false, 'Escolha o novo responsável.');
+            if (mot.length < 3) return R(false, 'Escreva o motivo do encaminhamento.');
+            corpo.assignee_user_id = Number(pid); corpo.reason = mot; metodo = 'PATCH'; caminho = 'assignee-transfer'; ok = 'Responsável transferido'; break;
+          }
           case 'solucao':
             if (!cap.can_propose_solution) return R(false, 'Você não pode pedir a conclusão deste chamado.');
             if (!v) return R(false, 'Escreva a solução antes de enviar.');

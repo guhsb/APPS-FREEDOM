@@ -182,6 +182,15 @@ namespace Freedom
                             int q;
                             if (!int.TryParse(v, out q)) return new Resultado(false, "Escolha o setor de destino.");
                             corpo.Put("queue_id", (long)q); metodo = "PATCH"; caminho = "queue"; ok = "Chamado transferido"; break;
+                        case "transferirResp":   // valor: "id\nmotivo" — o setor do chamado não muda, a pessoa ganha acesso só a ele
+                        {
+                            if (!cap.OptBoolean("can_transfer_assignee")) return new Resultado(false, "Você não pode transferir o responsável.");
+                            int nl = v.IndexOf('\n'), np;
+                            if (nl <= 0 || !int.TryParse(v.Substring(0, nl), out np)) return new Resultado(false, "Escolha o novo responsável.");
+                            var mot = v.Substring(nl + 1).Trim();
+                            if (mot.Length < 3) return new Resultado(false, "Escreva o motivo do encaminhamento.");
+                            corpo.Put("assignee_user_id", (long)np).Put("reason", mot); metodo = "PATCH"; caminho = "assignee-transfer"; ok = "Responsável transferido"; break;
+                        }
                         case "solucao":
                             if (!cap.OptBoolean("can_propose_solution")) return new Resultado(false, "Você não pode pedir a conclusão deste chamado.");
                             if (v.Length == 0) return new Resultado(false, "Escreva a solução antes de enviar.");

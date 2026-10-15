@@ -31,6 +31,9 @@ body{padding-bottom:96px}
 .area{width:100%;min-height:90px;resize:vertical;background:var(--sf2);border:1px solid var(--ln2);border-radius:12px;color:var(--tx);font:inherit;font-size:14.5px;
   line-height:1.4;padding:10px 12px;outline:none}
 .area:focus{border-color:var(--rosa)}
+.linhaOp input.busca{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:11px 10px;font:inherit;font-size:14.5px;outline:0}
+.linhaOp input.busca:focus{border-color:var(--rosa)}
+.trBox{display:flex;flex-direction:column;gap:6px}.trTit{display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:800;color:var(--tx)}.trTit .ic{width:18px;height:18px;color:var(--rosa)}.trBox label{margin-top:6px}
 .aprov{border-color:rgba(31,191,143,.35);background:linear-gradient(180deg,rgba(31,191,143,.08),transparent 70%),var(--sf)}
 .aprov h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:15px;color:var(--verde)}
 .aprov h3 svg.ic{width:18px;height:18px}
@@ -98,6 +101,7 @@ var ID = parseInt((location.hash || '').replace('#', ''), 10) || 0;
 var dados = null, ultimaChave = '', enviando = false, carregando = false, deNovo = false;
 var ocupado = '';                  // operação em andamento (trava os botões)
 var abertoSol = false, abertoRej = false, confirmaAceite = false;
+var abertoTR = false, tr = { setor: '', busca: '', resp: '', motivo: '' };   // transferir responsável (outro setor, só este chamado)
 var anexos = null, enviandoAnexo = '';
 // abriu outro chamado com esta tela aberta: recarrega para trocar de chamado
 window.addEventListener('hashchange', function () { location.reload(); });
@@ -155,6 +159,33 @@ function opcoes(lista, atual, vazio) {
   return (vazio ? '<option value="">' + vazio + '</option>' : '') + lista.map(function (o) {
     return '<option value="' + F.esc(String(o[0])) + '"' + (String(o[0]) === String(atual) ? ' selected' : '') + '>' + F.esc(o[1]) + '</option>';
   }).join('');
+}
+// transferir responsável: pessoas de outros setores (o setor vem em "context", separado por vírgula)
+function ctxTR(o) { return String(o.context || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
+function opcoesTR(d) { var a = (d.ticket || {}).assignee_user_id; return (d.transfer_assignee_options || []).filter(function (o) { return o && o.id !== a; }); }
+function setoresTR(op) {
+  var v = {}; op.forEach(function (o) { ctxTR(o).forEach(function (x) { v[x] = 1; }); });
+  return Object.keys(v).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
+}
+function preencherTR() {
+  var sel = document.getElementById('trResp'); if (!sel || !dados) return;
+  var b = tr.busca.trim().toLocaleLowerCase('pt-BR');
+  var lista = opcoesTR(dados).filter(function (o) { return ctxTR(o).indexOf(tr.setor) >= 0 && (!b || String(o.name || '').toLocaleLowerCase('pt-BR').indexOf(b) >= 0); });
+  if (!lista.some(function (o) { return String(o.id) === tr.resp; })) tr.resp = lista.length ? String(lista[0].id) : '';
+  sel.innerHTML = lista.length ? lista.map(function (o) { return '<option value="' + o.id + '"' + (String(o.id) === tr.resp ? ' selected' : '') + '>' + F.esc(o.name) + '</option>'; }).join('')
+    : '<option value="">Ninguém encontrado</option>';
+}
+function ligarTR() {
+  var s = document.getElementById('trSetor'); if (!s) return;
+  if (!tr.setor || ![].some.call(s.options, function (o) { return o.value === tr.setor; })) tr.setor = s.options.length ? s.options[0].value : '';
+  s.value = tr.setor;
+  var b = document.getElementById('trBusca'), m = document.getElementById('trMotivo'), r = document.getElementById('trResp');
+  b.value = tr.busca; m.value = tr.motivo;
+  s.onchange = function () { tr.setor = s.value; tr.resp = ''; preencherTR(); };
+  b.oninput = function () { tr.busca = b.value; preencherTR(); };
+  r.onchange = function () { tr.resp = r.value; };
+  m.oninput = function () { tr.motivo = m.value; };
+  preencherTR();
 }
 function bt(id, txt, cls, icone) {
   return '<button class="btn ' + (cls || '') + '" id="' + id + '"' + (ocupado ? ' disabled' : '') + '>' + (icone ? F.ic(icone) : '') +
@@ -220,6 +251,20 @@ function render(d) {
     linhas += '<div class="linhaOp"><label for="selResp">Responsável (transferir para outra pessoa)</label><div class="lado"><select id="selResp">' +
       opcoes((d.assignee_options || []).map(function (o) { return [o.id, o.name]; }), t.assignee_user_id == null ? '' : t.assignee_user_id, 'Não atribuído') +
       '</select><button id="btResp"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btResp' ? '…' : 'Salvar') + '</button></div></div>';
+  }
+  var trOpc = opcoesTR(d);
+  if (cap.can_transfer_assignee && trOpc.length) {
+    linhas += '<div class="linhaOp">';
+    if (!abertoTR) linhas += bt('btTRAbrir', 'Transferir responsável', 'linha', 'pessoa') +
+      '<div class="nota">Passa o chamado para alguém de outro setor, sem mudar a fila.</div>';
+    else linhas += '<div class="trBox"><div class="trTit">' + F.ic('pessoa') + 'Transferir responsável</div>' +
+      '<div class="nota" style="margin:0 0 4px">A fila permanece em ' + F.esc(d.queue_name || 'este setor') + '. O acesso será concedido somente a este chamado.</div>' +
+      '<label for="trSetor">Setor</label><select id="trSetor">' + setoresTR(trOpc).map(function (x) { return '<option>' + F.esc(x) + '</option>'; }).join('') + '</select>' +
+      '<label for="trBusca">Pesquisar responsável</label><input class="busca" id="trBusca" placeholder="Nome do responsável" autocomplete="off">' +
+      '<label for="trResp">Novo responsável</label><select id="trResp"></select>' +
+      '<label for="trMotivo">Motivo do encaminhamento</label><textarea class="area" id="trMotivo" maxlength="2000" placeholder="Explique por que está passando o chamado…"></textarea>' +
+      '<div class="duas" style="margin-top:6px">' + bt('btTRConfirmar', 'Confirmar transferência', 'rosa') + bt('btTRCancelar', 'Cancelar', 'linha') + '</div></div>';
+    linhas += '</div>';
   }
   if (cap.can_transfer && (d.transfer_options || []).length) {
     linhas += '<div class="linhaOp"><label for="selSetor">Transferir para outro setor</label><div class="lado"><select id="selSetor">' +
@@ -312,6 +357,14 @@ function ligar(d) {
   on('btPrio', function () { var v = val('selPrio'); if (v === t.priority) { mostrarToast('A prioridade já é ' + prLabel(v)); return; } operar('btPrio', 'prioridade', v); });
   on('btResp', function () { var v = val('selResp'), at = t.assignee_user_id == null ? '' : String(t.assignee_user_id); if (v === at) { mostrarToast('Esse já é o responsável'); return; } operar('btResp', 'responsavel', v); });
   on('btSetor', function () { var v = val('selSetor'); if (!v) { mostrarToast('Escolha o setor de destino'); return; } operar('btSetor', 'setor', v); });
+  on('btTRAbrir', function () { abertoTR = true; tr = { setor: '', busca: '', resp: '', motivo: '' }; render(dados); });
+  on('btTRCancelar', function () { abertoTR = false; render(dados); });
+  on('btTRConfirmar', function () {
+    if (!tr.resp) { mostrarToast('Escolha o novo responsável'); return; }
+    if (tr.motivo.trim().length < 3) { mostrarToast('Escreva o motivo do encaminhamento'); var el = document.getElementById('trMotivo'); if (el) el.focus(); return; }
+    operar('btTRConfirmar', 'transferirResp', tr.resp + '\n' + tr.motivo.trim());
+  });
+  ligarTR();
   on('btSolAbrir', function () { abertoSol = true; render(dados); var el = document.getElementById('txSolucao'); if (el) el.focus(); });
   on('btSolCancelar', function () { abertoSol = false; render(dados); });
   on('btSolEnviar', function () { var v = val('txSolucao').trim(); if (!v) { mostrarToast('Escreva a solução'); return; } operar('btSolEnviar', 'solucao', v); });
@@ -387,7 +440,7 @@ window.chamadoAcao = function (id, tipo, ok, msg) {
     if (dados) render(dados);
   } else {
     ocupado = '';
-    if (ok) { abertoSol = false; abertoRej = false; confirmaAceite = false; }
+    if (ok) { abertoSol = false; abertoRej = false; confirmaAceite = false; if (tipo === 'transferirResp') abertoTR = false; }
     mostrarToast(msg || (ok ? 'Feito' : 'Não deu certo'));
     if (dados) render(dados);              // destrava os botões
   }

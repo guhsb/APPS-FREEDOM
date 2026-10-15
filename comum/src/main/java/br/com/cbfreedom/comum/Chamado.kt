@@ -164,6 +164,13 @@ object Chamado {
                         val q = v.toIntOrNull() ?: return Resultado(false, "Escolha o setor de destino.")
                         corpo.put("queue_id", q); Triple("PATCH", "queue", "Chamado transferido")
                     }
+                    "transferirResp" -> {   // valor: "id\nmotivo" — o setor do chamado não muda, a pessoa ganha acesso só a ele
+                        if (!cap.optBoolean("can_transfer_assignee", false)) return Resultado(false, "Você não pode transferir o responsável.")
+                        val pid = v.substringBefore('\n').toIntOrNull() ?: return Resultado(false, "Escolha o novo responsável.")
+                        val mot = v.substringAfter('\n', "").trim()
+                        if (mot.length < 3) return Resultado(false, "Escreva o motivo do encaminhamento.")
+                        corpo.put("assignee_user_id", pid).put("reason", mot); Triple("PATCH", "assignee-transfer", "Responsável transferido")
+                    }
                     "solucao" -> {
                         if (!cap.optBoolean("can_propose_solution", false)) return Resultado(false, "Você não pode pedir a conclusão deste chamado.")
                         if (v.isEmpty()) return Resultado(false, "Escreva a solução antes de enviar.")
