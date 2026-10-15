@@ -67,7 +67,14 @@ object Metas {
         return horarios.lastOrNull { min(it) <= agora }
     }
 
+    /** Regula e garante que todo aviso tenha uma linha de texto embaixo do título. */
     fun regular(c: Context, avisos: List<Pair<String, String>>, painel: String = ""): List<Pair<String, String>> {
+        val hora = java.time.ZonedDateTime.now(java.time.ZoneId.of("America/Sao_Paulo")).let { "%02d:%02d".format(it.hour, it.minute) }
+        val padrao = if (painel == "faturamento") "Atualizado às $hora" else "Toque para abrir o painel"
+        return regularBruto(c, avisos, painel).map { if (it.second.isBlank()) Pair(it.first, padrao) else it }
+    }
+
+    private fun regularBruto(c: Context, avisos: List<Pair<String, String>>, painel: String): List<Pair<String, String>> {
         if (avisos.isEmpty()) return avisos
         val agora = java.time.ZonedDateTime.now(java.time.ZoneId.of("America/Sao_Paulo"))
         // Faturamento de hoje: tem horário próprio (17:30 a 20:00, de 30 em 30 min) e não conta no limite do dia

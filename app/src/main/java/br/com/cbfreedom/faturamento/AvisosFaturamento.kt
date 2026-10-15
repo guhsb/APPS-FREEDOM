@@ -34,7 +34,7 @@ object AvisosFaturamento {
         val out = ArrayList<Pair<String, String>>()
         if (r.marcar("fat_${dia}_$faixa")) {
             val v = n(dd, "valor")
-            out += Pair("Faturamento hoje: ${Fmt.brlK(v)}", "")
+            out += Pair("Faturamento hoje: ${Fmt.brlK(v)}", Fmt.brl(v) + " · até " + "%02d:%02d".format(agora.hour, agora.minute))
             r.guardar("fatv_$dia", v)
         }
         r.fechar()

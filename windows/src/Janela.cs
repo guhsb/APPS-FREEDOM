@@ -100,7 +100,7 @@ namespace Freedom
                         caminhoAviso = caminho;
                         var t = titulo.Length > 63 ? titulo.Substring(0, 62) + "…" : titulo;
                         var x = texto.Length > 250 ? texto.Substring(0, 249) + "…" : texto;
-                        bandeja.ShowBalloonTip(8000, t, x, ToolTipIcon.None);
+                        Balao(8000, t, x);
                         AvisarHelpdesk();
                     }));
                 }
@@ -559,7 +559,7 @@ namespace Freedom
             }
             if (titulo.Length > 63) titulo = titulo.Substring(0, 62) + "…";
             if (texto.Length > 250) texto = texto.Substring(0, 249) + "…";
-            bandeja.ShowBalloonTip(8000, titulo, texto, ToolTipIcon.None);
+            Balao(8000, titulo, texto);
             AtualizarSelo();
             AvisarHelpdesk();
         }
@@ -712,6 +712,15 @@ namespace Freedom
             aba = "helpdesk";
             paginaApp = "";
             Carregar(null);
+        }
+
+        /// <summary>Aviso perto do relógio. O Windows não aceita texto vazio (os avisos curtos só têm título): aí o título vira o texto.</summary>
+        void Balao(int ms, string titulo, string texto)
+        {
+            titulo = (titulo ?? "").Trim(); texto = (texto ?? "").Trim();
+            if (texto.Length == 0) { texto = titulo.Length > 0 ? titulo : "Freedom"; titulo = "Freedom"; }
+            if (titulo.Length == 0) titulo = "Freedom";
+            try { bandeja.ShowBalloonTip(ms, titulo, texto, ToolTipIcon.None); } catch (Exception) { }
         }
 
         public void EncerrarParaAtualizar() { saindo = true; Close(); }

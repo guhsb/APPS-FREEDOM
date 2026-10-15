@@ -80,6 +80,10 @@ namespace Freedom
             ExtrairTelas();
             ExtrairCarregador();
 
+            // erro inesperado numa tela não derruba o programa nem mostra a caixa de erro do .NET: anota e segue
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (s, e) => Anotar(e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => Anotar(e.ExceptionObject as Exception);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             var janela = new Janela(args.Contains("--oculto"));
@@ -112,6 +116,18 @@ namespace Freedom
             {
                 using (var ev = EventWaitHandle.OpenExisting("Local\\Freedom-Fechar")) ev.Set();
                 Thread.Sleep(2500);
+            }
+            catch (Exception) { }
+        }
+
+        /// <summary>Guarda o erro em %LOCALAPPDATA%\Freedom\erros.txt (só os últimos ~200 KB).</summary>
+        static void Anotar(Exception e)
+        {
+            try
+            {
+                var arq = Path.Combine(Pastas.Raiz, "erros.txt");
+                if (File.Exists(arq) && new FileInfo(arq).Length > 200000) File.Delete(arq);
+                File.AppendAllText(arq, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " · " + (e == null ? "erro desconhecido" : e.ToString()) + Environment.NewLine + Environment.NewLine);
             }
             catch (Exception) { }
         }

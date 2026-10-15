@@ -287,7 +287,13 @@ const Metas = {
   hh(fx) { return fx.endsWith(':00') ? String(Number(fx.slice(0, 2))) + 'h' : fx.replace(':', 'h'); },
   agoraSP() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })); },
   /** Para não virar spam: tudo de uma atualização vira UM aviso; nada entre 19 h e 8 h; no máximo 8 por dia. */
+  /** Regula e garante que todo aviso tenha uma linha de texto embaixo do título. */
   regular(avisos, painel = '') {
+    const a = this.agoraSP(), hora = ('0' + a.getHours()).slice(-2) + ':' + ('0' + a.getMinutes()).slice(-2);
+    const padrao = painel === 'faturamento' ? 'Atualizado às ' + hora : 'Toque para abrir o painel';
+    return this.regularBruto(avisos, painel).map(x => [x[0], String(x[1] || '').trim() ? x[1] : padrao]);
+  },
+  regularBruto(avisos, painel) {
     if (!avisos || !avisos.length) return [];
     if (painel === 'faturamento') return avisos;     // Faturamento de hoje: horário próprio (17:30–20:00), fora do limite do dia
     const a = this.agoraSP(); if (a.getHours() < 8 || a.getHours() >= 19) return [];
@@ -318,7 +324,7 @@ const Metas = {
     if (!p.getBool(k, false)) {
       ed.put(k, true);
       const v = N(dd, 'valor'), antes = p.get('fatv_' + dia);
-      if (!primeira) out.push(['Faturamento hoje: ' + brlK(v), '']);
+      if (!primeira) out.push(['Faturamento hoje: ' + brlK(v), 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · até ' + ('0' + a.getHours()).slice(-2) + ':' + ('0' + a.getMinutes()).slice(-2)]);
       ed.put('fatv_' + dia, v);
     }
     ed.put('base_' + mes, true).commit();

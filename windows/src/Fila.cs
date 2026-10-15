@@ -184,7 +184,15 @@ namespace Freedom
         public static void Ligar(bool sim) { P.Edit().Put("ligado", sim).Commit(); }
 
         /// <summary>Para não virar spam: tudo de uma atualização vira UM aviso; nada entre 19 h e 8 h; no máximo 8 por dia.</summary>
+        /// <summary>Regula e garante que todo aviso tenha uma linha de texto embaixo do título.</summary>
         public static List<string[]> Regular(List<string[]> avisos, string painel = "")
+        {
+            var hora = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Zona()).ToString("HH:mm");
+            var padrao = painel == "faturamento" ? "Atualizado às " + hora : "Toque para abrir o painel";
+            return RegularBruto(avisos, painel).Select(a => new[] { a[0], a.Length > 1 && !string.IsNullOrWhiteSpace(a[1]) ? a[1] : padrao }).ToList();
+        }
+
+        static List<string[]> RegularBruto(List<string[]> avisos, string painel)
         {
             var vazio = new List<string[]>();
             if (avisos == null || avisos.Count == 0) return vazio;
@@ -242,7 +250,7 @@ namespace Freedom
             if (r.Marcar("fat_" + dia + "_" + faixa))
             {
                 double v = N(dd, "valor"); var antes = r.Valor("fatv_" + dia);
-                out_.Add(new[] { "Faturamento hoje: " + BrlK(v), "" });
+                out_.Add(new[] { "Faturamento hoje: " + BrlK(v), "R$ " + v.ToString("N2", new System.Globalization.CultureInfo("pt-BR")) + " · até " + agora.ToString("HH:mm") });
                 r.Guardar("fatv_" + dia, v);
             }
             r.Fechar();
