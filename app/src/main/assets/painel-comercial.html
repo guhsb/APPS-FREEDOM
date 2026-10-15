@@ -52,11 +52,17 @@
 .faixaPer{display:flex;align-items:center;gap:8px;background:var(--azul-s);border:1px solid rgba(79,124,255,.3);color:var(--tx-azul);border-radius:12px;padding:9px 12px;font-size:13px;margin-bottom:12px}
 .faixaPer span{flex:1}.faixaPer button{border:0;background:transparent;color:var(--tx-azul);font:inherit;font-weight:700;text-decoration:underline}
 .vazio{text-align:center;color:var(--tx3);padding:30px 0}
+.dashbt{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:0 0 12px;border:1.5px solid var(--violeta);border-radius:16px;background:linear-gradient(90deg,var(--violeta-s),var(--sf));cursor:pointer;color:var(--tx);text-decoration:none;width:100%;font:inherit;text-align:left}
+.dashbt .q{width:40px;height:40px;border-radius:12px;background:var(--violeta);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.dashbt .q svg.ic{width:21px;height:21px}
+.dashbt .tx{flex:1;min-width:0}.dashbt .tx b{font-size:15px;display:block}.dashbt .tx span{font-size:12.5px;color:var(--tx2)}
+.dashbt .seta{color:var(--violeta);font-size:22px;line-height:1}
 </style></head><body>
 <div class="periodo"><select id="perSel"><option value="mes">Este mês</option><option value="sem">Esta semana</option>
 <option value="ant">Mês passado</option><option value="dt">Escolher datas…</option></select>
 <div class="datas" id="perDatas" style="display:none"><input type="date" id="perIni"><span class="cinza">até</span><input type="date" id="perFim"><button id="perVer">Ver</button></div></div>
 <div id="faixaPer"></div>
+<a class="dashbt" href="dash-comercial.html" id="btDash"><span class="q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="tx"><b>Dashboard comercial completo</b><span>Resumo, vendedores, clientes, produtos e redes</span></span><span class="seta">›</span></a>
 <div id="conteudo"></div>
 <script>var PAINEL_ID = 'comercial';</script>
 <script src="base.js"></script>

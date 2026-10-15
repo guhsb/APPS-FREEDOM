@@ -50,7 +50,8 @@ object Chamado {
     fun requisicao(c: Context, metodo: String, caminho: String, corpo: String): Pair<Int, String> {
         val m = metodo.uppercase()
         if (m !in setOf("GET", "POST", "PATCH")) return Pair(0, "método não permitido")
-        if (!(caminho.startsWith("/helpdesk/") || caminho == "/auth/me") || caminho.contains("..")) return Pair(0, "endereço não permitido")
+        val leitura = m == "GET" && (caminho.startsWith("/dashboard/") || caminho.startsWith("/logistics/"))   // dashboards: só consulta
+        if (!(caminho.startsWith("/helpdesk/") || caminho == "/auth/me" || leitura) || caminho.contains("..")) return Pair(0, "endereço não permitido")
         return try {
             val json = if (corpo.isBlank()) null else JSONObject(corpo)
             val r = chamar(c, m, caminho, json)

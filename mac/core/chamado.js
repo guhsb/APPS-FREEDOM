@@ -140,7 +140,8 @@ const Chamado = {
   async requisicao(metodo, caminho, corpo) {
     const m = String(metodo || '').toUpperCase();
     if (['GET', 'POST', 'PATCH'].indexOf(m) < 0) return { status: 0, body: 'método não permitido' };
-    if (!caminho || !(caminho.startsWith('/helpdesk/') || caminho === '/auth/me') || caminho.indexOf('..') >= 0) return { status: 0, body: 'endereço não permitido' };
+    const leitura = m === 'GET' && caminho && (caminho.startsWith('/dashboard/') || caminho.startsWith('/logistics/'));   // dashboards: só consulta
+    if (!caminho || !(caminho.startsWith('/helpdesk/') || caminho === '/auth/me' || leitura) || caminho.indexOf('..') >= 0) return { status: 0, body: 'endereço não permitido' };
     try {
       const r = await this.chamar(m, caminho, corpo && String(corpo).trim() ? JSON.parse(corpo) : null);
       if (m === 'GET' && r.status === 200) Fila.guardar('GET ' + caminho, r.body);

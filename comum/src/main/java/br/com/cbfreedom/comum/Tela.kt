@@ -53,7 +53,7 @@ class Tela : Activity() {
         const val EXTRA_ABA = "aba"
         const val EXTRA_PAINEL = "painel"
         const val EXTRA_ATUALIZAR = "atualizar"
-        private val TELAS = setOf("lista.html", "novo.html")
+        private val TELAS = setOf("lista.html", "novo.html", "dash-helpdesk.html")
         private val RE_CHAMADO = Regex("^(?:https://relatorios\\.cbfreedom\\.com\\.br)?/helpdesk/tickets/(\\d+)/?$")
         const val ABA_HELPDESK = "helpdesk"
         const val ABA_SITE = "site"
@@ -555,6 +555,7 @@ class Tela : Activity() {
     override fun onBackPressed() {
         val s = webSite
         if (aba == ABA_HELPDESK && paginaApp == "sub") { voltarApp(); return }
+        if (aba == ABA_PAINEL) painelAtual?.let { websPainel[it] }?.let { if (it.canGoBack()) { it.goBack(); return } }
         if (aba == ABA_SITE && s != null && avisoSite?.visibility == View.VISIBLE) {
             avisoSite?.visibility = View.GONE
             if (s.canGoBack()) { s.goBack(); return }

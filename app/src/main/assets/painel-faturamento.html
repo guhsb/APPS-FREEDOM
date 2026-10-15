@@ -39,7 +39,13 @@
 .hist i.on{background:var(--rosa)}
 .hist i.fds{background:rgba(163,171,189,.18)}
 .histLeg{display:flex;justify-content:space-between;font-size:11px;color:var(--tx3);margin-top:4px}
+.dashbt{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:0 0 12px;border:1.5px solid var(--violeta);border-radius:16px;background:linear-gradient(90deg,var(--violeta-s),var(--sf));cursor:pointer;color:var(--tx);text-decoration:none;width:100%;font:inherit;text-align:left}
+.dashbt .q{width:40px;height:40px;border-radius:12px;background:var(--violeta);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.dashbt .q svg.ic{width:21px;height:21px}
+.dashbt .tx{flex:1;min-width:0}.dashbt .tx b{font-size:15px;display:block}.dashbt .tx span{font-size:12.5px;color:var(--tx2)}
+.dashbt .seta{color:var(--violeta);font-size:22px;line-height:1}
 </style></head><body>
+<a class="dashbt" href="dash-logistica.html" id="btDash"><span class="q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="tx"><b>Dashboard da logística</b><span>Pendências, standby e faturamento</span></span><span class="seta">›</span></a>
 <div id="conteudo"></div>
 <script>var PAINEL_ID = 'faturamento';</script>
 <script src="base.js"></script>

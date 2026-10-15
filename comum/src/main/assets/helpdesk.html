@@ -39,6 +39,11 @@ select{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-
 .cfg .perigo b{color:var(--tx-vermelho)}
 .badge.voce{background:var(--sf3);color:var(--tx2);font-size:10px;padding:2px 7px}
 .item.meu{opacity:.78}
+.dashbt{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:0 0 12px;border:1.5px solid var(--violeta);border-radius:16px;background:linear-gradient(90deg,var(--violeta-s),var(--sf));cursor:pointer;color:var(--tx);text-decoration:none;width:100%;font:inherit;text-align:left}
+.dashbt .q{width:40px;height:40px;border-radius:12px;background:var(--violeta);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.dashbt .q svg.ic{width:21px;height:21px}
+.dashbt .tx{flex:1;min-width:0}.dashbt .tx b{font-size:15px;display:block}.dashbt .tx span{font-size:12.5px;color:var(--tx2)}
+.dashbt .seta{color:var(--violeta);font-size:22px;line-height:1}
 </style></head><body>
 <div class="topo"><img src="logo.png" alt="Freedom"><div class="tt"><h1>Helpdesk</h1><div class="st" id="sub"></div></div>
   <button class="bt" id="btAt" aria-label="Verificar agora"></button></div>
@@ -143,6 +148,9 @@ function render() {
   h += '<div class="acoes' + (ws ? '' : ' duas') + '"><button class="acao pri" data-t="novo.html">' + F.ic('mais2') + 'Abrir chamado</button>' +
     '<button class="acao" data-t="lista.html#meus">' + F.ic('lista') + 'Meus chamados</button>' +
     (ws ? '<button class="acao" data-t="lista.html#fila">' + F.ic('fone') + 'Atendimento</button>' : '') + '</div>';
+  // dashboard do atendimento: só para quem atende algum setor (mesmo critério do botão Atendimento)
+  if (ws) h += '<button class="dashbt" data-t="dash-helpdesk.html" style="margin-top:12px"><span class="q">' + F.ic('grafico') + '</span><span class="tx"><b>Dashboard do atendimento</b><span>' +
+    F.int(ws.open) + ' na fila · ' + F.int(ws.assigned_to_me_active) + ' com você' + (F.n(ws.sla_breached) ? ' · ' + F.int(ws.sla_breached) + ' vencido' + (F.n(ws.sla_breached) > 1 ? 's' : '') : '') + '</span></span><span class="seta">›</span></button>';
 
   // últimas atualizações
   var feed = e.feed || [];

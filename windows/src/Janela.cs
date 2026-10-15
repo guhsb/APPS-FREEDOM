@@ -20,7 +20,7 @@ namespace Freedom
         public const string HOST = "app.freedom.local";
         public const string ASSET = "https://" + HOST + "/";
         const string SITE_HOST = "relatorios.cbfreedom.com.br";
-        static readonly string[] TELAS = { "lista.html", "novo.html" };
+        static readonly string[] TELAS = { "lista.html", "novo.html", "dash-helpdesk.html" };
 
         // cores da parte nativa (barra lateral, seletor de painel): seguem o tema claro (padrão, igual ao site) ou escuro
         public static bool Claro = Prefs.De("aparencia").GetString("tema", "claro") != "escuro";
@@ -599,7 +599,7 @@ namespace Freedom
             chips.Visible = lista.Count > 1;
             if (lista.Count == 0) return;
             if (lista.All(p => p.Id != painelAtual)) { painelAtual = lista[0].Id; if (webPainel != null) webPainel.CoreWebView2.Navigate(ASSET + lista[0].Tela); }
-            else if (webPainel != null && webPainel.Source != null && !webPainel.Source.ToString().Contains(Paineis.PorId(painelAtual).Tela))
+            else if (webPainel != null && webPainel.Source != null && !webPainel.Source.ToString().Contains(Paineis.PorId(painelAtual).Tela) && !webPainel.Source.ToString().Contains(painelAtual == "comercial" ? "dash-comercial.html" : "dash-logistica.html"))
                 webPainel.CoreWebView2.Navigate(ASSET + Paineis.PorId(painelAtual).Tela);
             foreach (var p in lista)
             {

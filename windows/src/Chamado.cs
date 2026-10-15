@@ -49,7 +49,8 @@ namespace Freedom
         {
             var m = (metodo ?? "").ToUpperInvariant();
             if (m != "GET" && m != "POST" && m != "PATCH") return new Engine.Resp(0, "método não permitido");
-            if (caminho == null || !(caminho.StartsWith("/helpdesk/") || caminho == "/auth/me") || caminho.Contains("..")) return new Engine.Resp(0, "endereço não permitido");
+            bool leitura = m == "GET" && caminho != null && (caminho.StartsWith("/dashboard/") || caminho.StartsWith("/logistics/"));   // dashboards: só consulta
+            if (caminho == null || !(caminho.StartsWith("/helpdesk/") || caminho == "/auth/me" || leitura) || caminho.Contains("..")) return new Engine.Resp(0, "endereço não permitido");
             try
             {
                 var r = Chamar(m, caminho, string.IsNullOrWhiteSpace(corpo) ? null : new JSONObject(corpo));

@@ -17,7 +17,7 @@ const Atualizacao = require('./core/atualizacao');
 
 const SITE_HOST = 'relatorios.cbfreedom.com.br';
 const WWW = path.join(__dirname, 'www');
-const TELAS = ['lista.html', 'novo.html'];
+const TELAS = ['lista.html', 'novo.html', 'dash-helpdesk.html'];
 const NAV = 84;
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
@@ -262,6 +262,9 @@ function criarBandeja() {
 }
 
 // ---------------- painel ----------------
+/** Dashboard completo de cada painel (abre por dentro do painel; o painel e o PNG continuam iguais). */
+function dashDe(id) { return id === 'comercial' ? 'dash-comercial.html' : 'dash-logistica.html'; }
+
 function garantirPainel(forcarTela) {
   const lista = Paineis.paraAba();
   if (!lista.length) return;
@@ -274,7 +277,7 @@ function garantirPainel(forcarTela) {
     janela.contentView.addChildView(vPainel);
     protegerNavegacao(vPainel.webContents, true);
     vPainel.webContents.loadURL(url(tela));
-  } else if (forcarTela || !vPainel.webContents.getURL().includes(tela)) vPainel.webContents.loadURL(url(tela));
+  } else if (forcarTela || !(vPainel.webContents.getURL().includes(tela) || vPainel.webContents.getURL().includes(dashDe(painelAtual)))) vPainel.webContents.loadURL(url(tela));
   posicionar();
 }
 
