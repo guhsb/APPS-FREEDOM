@@ -719,6 +719,9 @@ namespace Freedom
         /// <summary>Confere se saiu versão nova; na primeira vez de cada versão, mostra a notificação (clicar já atualiza).</summary>
         void ConferirVersao()
         {
+            // interruptor remoto (controle.json no GitHub): bloqueado = sai da conta e apaga o que guardou
+            Controle.Conferir(false);
+            if (Controle.PrecisaSair()) try { BeginInvoke((Action)SairDoApp); } catch (Exception) { }
             Atualizacao.Conferir(false);
             try { BeginInvoke((Action)AvisarTodas); } catch (Exception) { }
             var n = Atualizacao.Nova();
@@ -731,7 +734,7 @@ namespace Freedom
                 BeginInvoke((Action)(() =>
                 {
                     caminhoAviso = "atualizar";
-                    bandeja.ShowBalloonTip(10000, "Nova versão do Freedom", "A versão " + n.OptLong("versao") + " está disponível. Clique aqui para atualizar.", ToolTipIcon.None);
+                    bandeja.ShowBalloonTip(10000, "Nova versão do Freedom", "A versão " + (n.OptString("nome").Length > 0 ? n.OptString("nome") : n.OptLong("versao").ToString()) + " está disponível. Clique aqui para atualizar.", ToolTipIcon.None);
                 }));
             }
             catch (Exception) { }

@@ -17,6 +17,9 @@ namespace Freedom
         [STAThread]
         static int Main(string[] args)
         {
+            // o .NET só abre 2 conexões por site de cada vez: os dashboards pedem várias consultas juntas
+            ServicePointManager.DefaultConnectionLimit = 16;
+            ServicePointManager.Expect100Continue = false;
             // as DLLs do WebView2 vão dentro do .exe (um arquivo só)
             AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
             {

@@ -107,6 +107,9 @@ namespace Freedom
             var e = (email ?? "").Trim();
             Fundo(() =>
             {
+                Controle.Conferir(true);
+                var b = Controle.Estado(e);
+                if (b != null) { j.JsApp("erroLogin(" + Q(b.OptString("mensagem")) + ")"); return; }
                 try
                 {
                     var api = new Api(e, senha);
@@ -124,6 +127,9 @@ namespace Freedom
         }
 
         public void sair() { Ui(j.SairDoApp); }
+
+        /// <summary>Interruptor remoto: {} = liberado; senão {tipo, mensagem} (a tela de login mostra o aviso).</summary>
+        public string controle() { var b = Controle.Estado(); return b == null ? "{}" : b.ToString(); }
 
         // ---- Helpdesk ----
         public string helpdesk() { return Helpdesk.ResumoTela().ToString(); }
@@ -254,7 +260,10 @@ namespace Freedom
             Fundo(() =>
             {
                 var r = Chamado.Requisicao(metodo, caminho, corpo);
-                j.JsApp("window.apiResposta && apiResposta(" + req + "," + r.Status + "," + Q(r.Body) + ")");
+                var cod = "window.apiResposta && apiResposta(" + req + "," + r.Status + "," + Q(r.Body) + ")";
+                // a tela que pediu pode ser o Helpdesk ou o painel (dashboards): entrega para as duas, cada uma só pega o próprio número
+                j.JsApp(cod);
+                j.JsPainel(cod);
             });
         }
 

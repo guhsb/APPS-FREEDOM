@@ -60,7 +60,7 @@ object Atualizacao {
         val o = JSONObject().put("atual", nomeVersao(c)).put("baixando", baixando).put("progresso", progresso)
             .put("conferido", p(c).getLong("hora", 0L))
         erro?.let { o.put("erro", it) }
-        nova(c)?.let { o.put("nova", it.optLong("versao")).put("notas", it.optString("notas")) }
+        nova(c)?.let { o.put("nova", it.optLong("versao")).put("novaNome", it.optString("nome")).put("notas", it.optString("notas")) }
         return o
     }
 
@@ -101,6 +101,7 @@ object Atualizacao {
             }
             val info = JSONObject().put("versao", versao).put("url", url).put("tamanho", tamanho)
                 .put("pagina", r.optString("html_url")).put("notas", r.optString("body").take(400))
+                .put("nome", r.optString("name").removePrefix("Freedom").trim())
             pr.edit().putString("ultima", info.toString()).putLong("hora", agora).apply()
         } catch (_: Exception) {
             return if (nova(c) != null) Conferencia.NOVA else Conferencia.FALHOU     // sem internet: tenta na próxima
@@ -109,7 +110,7 @@ object Atualizacao {
         // avisa uma vez por versão
         if (pr.getLong("avisada", 0L) != n.optLong("versao")) {
             pr.edit().putLong("avisada", n.optLong("versao")).apply()
-            notificar(c, "Nova versão do Freedom", "A versão " + n.optLong("versao") + " está disponível. Toque para atualizar.",
+            notificar(c, "Nova versão do Freedom", "A versão " + n.optString("nome").ifEmpty { n.optLong("versao").toString() } + " está disponível. Toque para atualizar.",
                 Intent(c, Tela::class.java).putExtra(Tela.EXTRA_ATUALIZAR, true), NOTIF)
         }
         return Conferencia.NOVA

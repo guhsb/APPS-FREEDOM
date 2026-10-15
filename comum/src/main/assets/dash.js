@@ -26,7 +26,8 @@ var Dash = (function () {
   // ---- site (só GET) ----
   /** Busca no site; 204 = vazio. Falha vira erro com a mensagem do site. */
   X.get = function (caminho) {
-    return F.api('GET', caminho).then(function (r) {
+    var limite = new Promise(function (ok, falha) { setTimeout(function () { var e = new Error('O site demorou demais para responder. Toque em Tentar.'); e.status = 0; falha(e); }, 60000); });
+    return Promise.race([F.api('GET', caminho), limite]).then(function (r) {
       if (r.status === 200) return r.json || {};
       if (r.status === 204) return {};
       var e = new Error(F.erroApi ? F.erroApi(r, 'Não consegui carregar') : 'Não consegui carregar (HTTP ' + r.status + ')'); e.status = r.status; throw e;
@@ -132,6 +133,13 @@ var Dash = (function () {
   X.abas = function (lista, atual, attr) { return '<div class="tabs' + (attr === 'sub' ? ' sub' : '') + '">' + lista.map(function (t) { var id = t[0], txt = t[1]; return '<b data-' + (attr || 'aba') + '="' + F.esc(id) + '"' + (id === atual ? ' class="on"' : '') + '>' + txt + '</b>'; }).join('') + '</div>'; };
   X.carregando = function (t) { return '<div class="carregando"><i></i>' + (t || 'Carregando…') + '</div>'; };
   X.erro = function (msg) { return '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar(true)">Tentar</button></div>'; };
+  /** Última resposta guardada no aparelho: a tela abre na hora com ela e se atualiza sozinha. */
+  X.cache = function (k, v) {
+    try {
+      if (v === undefined) { var s = localStorage.getItem('dc_' + k); return s ? JSON.parse(s) : null; }
+      localStorage.setItem('dc_' + k, JSON.stringify({ t: Date.now(), d: v }));
+    } catch (e) { try { localStorage.removeItem('dc_' + k); } catch (x) { } return null; }
+  };
   X.lembrar = function (k, v) { try { if (v === undefined) return localStorage.getItem('dash_' + k); localStorage.setItem('dash_' + k, v); } catch (e) { return null; } };
   return X;
 })();

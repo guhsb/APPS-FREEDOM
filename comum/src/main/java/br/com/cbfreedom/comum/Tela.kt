@@ -594,6 +594,12 @@ class Tela : Activity() {
             ajustarAbas()
             Atualizacao.conferirEmSegundoPlano(this, false) { avisarHelpdesk(); avisarPainel() }
         }
+        // interruptor remoto: se o controle.json mandar bloquear, sai da conta e mostra o aviso na tela de login
+        val appCtx = applicationContext
+        Thread {
+            try { Controle.conferir(appCtx) } catch (_: Exception) { }
+            if (Controle.estado(appCtx) != null && Store.logado(appCtx)) { Controle.aplicarSemTela(appCtx); runOnUiThread { Ponte().sair() } }
+        }.start()
     }
 
     override fun onPause() {
@@ -1131,6 +1137,8 @@ class Tela : Activity() {
             val e = email.trim()
             val app = applicationContext
             Thread {
+                try { Controle.conferir(app, true) } catch (_: Exception) { }
+                Controle.estado(app, e)?.let { b -> js(webApp, "erroLogin(" + JSONObject.quote(b.optString("mensagem")) + ")"); return@Thread }
                 try {
                     val api = Api(e, senha)
                     api.entrar()                    // confere se o login está certo antes de salvar
@@ -1150,6 +1158,10 @@ class Tela : Activity() {
                 }
             }.start()
         }
+
+        /** Interruptor remoto: {} = liberado; senão {tipo, mensagem} (a tela de login mostra o aviso). */
+        @JavascriptInterface
+        fun controle(): String = (Controle.estado(this@Tela) ?: JSONObject()).toString()
 
         @JavascriptInterface
         fun sair() {
@@ -1331,7 +1343,10 @@ class Tela : Activity() {
             val app = applicationContext
             Thread {
                 val r = Chamado.requisicao(app, metodo, caminho, corpo)
-                js(webApp, "window.apiResposta && apiResposta(" + req + "," + r.first + "," + JSONObject.quote(r.second) + ")")
+                val cod = "window.apiResposta && apiResposta(" + req + "," + r.first + "," + JSONObject.quote(r.second) + ")"
+                // a tela que pediu pode ser o Helpdesk ou um painel (dashboards): entrega para todas, cada uma só pega o próprio número
+                js(webApp, cod)
+                runOnUiThread { websPainel.values.toList().forEach { js(it, cod) } }
             }.start()
         }
 

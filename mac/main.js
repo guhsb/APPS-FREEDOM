@@ -14,6 +14,7 @@ const Helpdesk = require('./core/helpdesk');
 const { Chamado, Fila } = require('./core/chamado');
 const Paineis = require('./core/paineis');
 const Atualizacao = require('./core/atualizacao');
+const Controle = require('./core/controle');
 
 const SITE_HOST = 'relatorios.cbfreedom.com.br';
 const WWW = path.join(__dirname, 'www');
@@ -40,6 +41,7 @@ app.whenReady().then(() => {
   Store.usarCifra({ disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: s => safeStorage.encryptString(s), abrir: b => safeStorage.decryptString(b) });
   Api.definirVersao(app.getVersion());
   Atualizacao.definirVersao(app.getVersion());
+  Controle.definirVersao(app.getVersion());
   Helpdesk.usarFila(Fila);
   if (app.isPackaged) try { if (!Store.P.getBool('loginItem', false)) { app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true }); Store.P.editar().put('loginItem', true).commit(); } } catch (e) { }
 
@@ -227,11 +229,20 @@ function avisarVersaoNova() {
   const P = Atualizacao.P; if (P.getNum('avisada') === n.versao) return;
   P.editar().put('avisada', n.versao).commit();
   if (!Notification.isSupported()) return;
-  const nt = new Notification({ title: 'Nova versão do Freedom', body: 'A versão ' + n.versao + ' está disponível. Clique para atualizar.', silent: false });
+  const nt = new Notification({ title: 'Nova versão do Freedom', body: 'A versão ' + (n.nome || n.versao) + ' está disponível. Clique para atualizar.', silent: false });
   nt.on('click', () => { mostrar(); ponte.atualizarApp(vApp && vApp.webContents); });
   nt.show();
 }
-const conferirVersao = forcar => Atualizacao.conferir(forcar).then(() => { avisarTodas(); avisarVersaoNova(); }).catch(() => null);
+const conferirVersao = forcar => conferirControle().then(() => Atualizacao.conferir(forcar)).then(() => { avisarTodas(); avisarVersaoNova(); }).catch(() => null);
+/** Interruptor remoto (controle.json no GitHub): bloqueado = sai da conta e apaga o que o app guardou. */
+async function conferirControle() {
+  await Controle.conferir(false);
+  if (Controle.estado() && logado()) {
+    try { Fila.limpar(); } catch (e) { }
+    try { Prefs.de('metas').editar().clear().commit(); } catch (e) { }
+    ponte.sair();
+  }
+}
 
 function notificar(titulo, texto, caminho) {
   if (!Notification.isSupported()) return;
@@ -378,6 +389,9 @@ const ponte = {
   entrar: (wc, email, senha) => {
     const e = String(email || '').trim();
     (async () => {
+      await Controle.conferir(true);
+      const bl = Controle.estado(e);
+      if (bl) { js(wc, 'erroLogin(' + Q(bl.mensagem) + ')'); return; }
       try {
         const api = new Api(e, senha); await api.entrar(); await Acesso.atualizar(api); await api.sair();
         Store.salvarLogin(e, senha);
@@ -388,6 +402,7 @@ const ponte = {
       } catch (x) { js(wc, 'erroLogin(' + Q(Api.mensagem(x)) + ')'); }
     })();
   },
+  controle: () => JSON.stringify(Controle.estado() || {}),
   sair: () => {
     Store.sair(); Helpdesk.sair(); Acesso.limpar();
     if (vSite) { session.fromPartition('persist:site').clearStorageData().catch(() => null); janela.contentView.removeChildView(vSite); vSite.webContents.close(); vSite = null; }

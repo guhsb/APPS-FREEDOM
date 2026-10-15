@@ -20,10 +20,15 @@ var CORES_IDADE = ['#9aa9d6', '#7d8fd0', 'var(--azul)', 'var(--laranja)', 'var(-
 function carregar(forcar) {
   if (carregandoAgora && !forcar) return;
   carregandoAgora = true; document.getElementById('btAt').classList.add('gira');
+  // abre na hora com o que foi carregado da última vez; os números de agora chegam logo depois
+  if (!d) { var salvo = X.cache('log'); if (salvo && salvo.d && salvo.d.itens) { d = salvo.d; desenhar(); document.getElementById('sub').innerHTML += ' · atualizando…'; } }
   Promise.all([X.get('/logistics/pending/orders'), X.opc('/logistics/standby/summary'), X.opc('/logistics/report/snapshots'), X.opc('/logistics/billing/daily')]).then(function (r) {
     d = montar(r[0], r[1], r[2], r[3]);
     document.getElementById('aviso').innerHTML = '';
-    desenhar();
+    var y = window.scrollY, el = document.activeElement, id = el && el.id, pos = el && el.selectionStart;
+    desenhar(); window.scrollTo(0, y);
+    if (id) { var n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } }
+    X.cache('log', d);
   }).catch(function (e) {
     document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar');
     if (!d) document.getElementById('c').innerHTML = '';

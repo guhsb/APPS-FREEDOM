@@ -82,5 +82,17 @@ document.getElementById('f').onsubmit = function (ev) {
 };
 function mostrarErro(t) { erro.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(t) + '</span></div>'; }
 function erroLogin(msg) { btn.disabled = false; btnT.textContent = 'Entrar'; mostrarErro('Não entrou: ' + msg); }
+// interruptor remoto (controle.json no GitHub): app desativado ou versão velha demais -> não mostra o login
+function conferirControle() {
+  var c = null; try { c = JSON.parse(App.controle() || '{}'); } catch (e) { c = null; }
+  var f = document.getElementById('f');
+  if (!c || !c.tipo || c.tipo === 'usuario') { if (!f) location.reload(); return; }   // liberou de novo: volta o login
+  if (!f) return;
+  f.outerHTML = '<div class="aviso" style="margin:18px 0;align-items:flex-start">' + F.ic('alerta') + '<span><b>' + (c.tipo === 'versao' ? 'Atualize o app' : 'App desativado') + '</b><br>' + F.esc(c.mensagem || '') + '</span></div>' +
+    (c.tipo === 'versao' ? '<button class="entrar" id="btAtu" type="button"><span>Atualizar o app</span></button>' : '');
+  var b = document.getElementById('btAtu'); if (b) b.onclick = function () { try { App.atualizarApp(); } catch (e) { } };
+}
+conferirControle();
+setInterval(conferirControle, 60000);
 </script>
 </body></html>

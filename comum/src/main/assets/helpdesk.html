@@ -119,7 +119,7 @@ function render() {
   if (ap.baixando)
     h += '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Baixando a versão nova do app… <b>' + F.int(ap.progresso) + '%</b></span></div>';
   else if (ap.nova)
-    h += '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Nova versão do app disponível (<b>' + F.int(ap.nova) + '</b>).</span><button onclick="App.atualizarApp()">Atualizar</button></div>';
+    h += '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Nova versão do app disponível (<b>' + F.esc(ap.novaNome || F.int(ap.nova)) + '</b>).</span><button onclick="App.atualizarApp()">Atualizar</button></div>';
   if (ap.erro && !ap.baixando)
     h += '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(ap.erro) + '</span><button onclick="App.atualizarPeloNavegador()">Baixar</button></div>';
   if (!e.ativo)
@@ -201,7 +201,7 @@ function render() {
     linhaBotao('btTeste', 'sino', 'Testar notificação', 'Mostra um aviso de exemplo, com som', 'var(--rosa-s)', 'var(--rosa)') +
     linhaBotao('btSom', 'som', 'Som e estilo dos avisos', 'Som, vibração e tela de bloqueio', 'var(--sf3)', 'var(--tx2)') +
     (e.bateriaOk ? '' : linhaBotao('btBat', 'bateria', 'Uso em segundo plano', 'Liberar a bateria para os avisos não atrasarem', 'var(--sf3)', 'var(--tx2)')) +
-    linhaBotao('btVersao', 'atualizar', 'Versão do app', 'Versão ' + F.esc(ap.atual || '?') + (ap.nova ? ' · <b style="color:var(--rosa)">nova versão ' + F.int(ap.nova) + ' disponível</b>' : ' · toque para procurar atualização'), 'var(--sf3)', 'var(--tx2)') +
+    linhaBotao('btVersao', 'atualizar', 'Versão do app', 'Versão ' + F.esc(ap.atual || '?') + (ap.nova ? ' · <b style="color:var(--rosa)">nova versão ' + F.esc(ap.novaNome || F.int(ap.nova)) + ' disponível</b>' : ' · toque para procurar atualização'), 'var(--sf3)', 'var(--tx2)') +
     linhaBotao('btDiag', 'lista', 'Diagnóstico dos avisos', 'O que o app verificou e por que avisou (ou não). Ajuda a achar problemas.', 'var(--sf3)', 'var(--tx2)') +
     (diagAberto ? '<div class="item" style="display:block"><pre style="margin:0;white-space:pre-wrap;font:12px/1.45 ui-monospace,monospace;color:var(--tx2);max-height:320px;overflow:auto">' +
       ((e.diag || []).map(function (x) { return F.esc(quando(x.t) + ' · ' + x.x); }).join('\n') || 'Nada registrado ainda.') + '</pre>' +

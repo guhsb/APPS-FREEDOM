@@ -16,14 +16,15 @@ let versaoAtual = 0;
 const A = {
   baixando: false, progresso: 0, erro: null,
   get P() { return Prefs.de('atualizacao'); },
-  definirVersao(v) { const p = String(v).split('.'); versaoAtual = Number(p[1] || p[0]) || 0; },
+  /** Número da publicação (vN). Versão nova = 3.4.N; antigas = 1.N.0 / 3.N.0. */
+  definirVersao(v) { const p = String(v).split('.').map(Number); versaoAtual = (p[2] > 0 ? p[2] : p[1] || p[0]) || 0; },
   nova() {
     try { const o = JSON.parse(this.P.getStr('ultima')); return o.versao > versaoAtual && o.url ? o : null; } catch (e) { return null; }
   },
   resumo(versaoTexto) {
-    const o = { atual: versaoTexto, baixando: this.baixando, progresso: this.progresso, conferido: this.P.getNum('hora') };
+    const o = { atual: String(versaoTexto || '').split('.').slice(0, 2).join('.'), baixando: this.baixando, progresso: this.progresso, conferido: this.P.getNum('hora') };
     if (this.erro) o.erro = this.erro;
-    const n = this.nova(); if (n) { o.nova = n.versao; o.notas = n.notas; }
+    const n = this.nova(); if (n) { o.nova = n.versao; o.novaNome = n.nome || ''; o.notas = n.notas; }
     return o;
   },
   /** 0 = em dia, 1 = tem nova, -1 = falhou. */
@@ -42,7 +43,7 @@ const A = {
       const versao = Number(String(j.tag_name || '').replace(/\D/g, '')) || 0;
       const a = (j.assets || []).find(x => x.name === ARQUIVO) || {};
       const notas = String(j.body || '');
-      this.P.editar().put('ultima', JSON.stringify({ versao, url: a.browser_download_url || '', tamanho: a.size || -1, pagina: j.html_url || '', notas: notas.slice(0, 400) })).put('hora', t).commit();
+      this.P.editar().put('ultima', JSON.stringify({ versao, url: a.browser_download_url || '', tamanho: a.size || -1, pagina: j.html_url || '', notas: notas.slice(0, 400), nome: String(j.name || '').replace('Freedom', '').trim() })).put('hora', t).commit();
       return this.nova() ? 1 : 0;
     } catch (e) { this.P.editar().put('hora', t).commit(); return this.nova() ? 1 : -1; }
   },

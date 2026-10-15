@@ -26,6 +26,7 @@ function fx() {
   return f;
 }
 
+var mostrado = '';   // de qual filtro é o que está na tela
 function carregar(forcar) {
   if (carregandoAgora && !forcar) return;
   carregandoAgora = true; var meu = ++pedido;
@@ -34,20 +35,46 @@ function carregar(forcar) {
   pr.then(function (m) {
     me = m; P = X.perfil(m);
     var dt = datas(), q = '?start_date=' + dt[0] + '&end_date=' + dt[1] + fx();
-    var lst = [X.get('/dashboard/overview' + q), X.opc('/dashboard/overview/charts' + q), X.opc('/dashboard/clients' + q), X.opc('/dashboard/products' + q),
-      X.opc('/dashboard/networks' + q), X.opc('/dashboard/sellers' + q), X.opc('/dashboard/daily-evolution' + q),
-      P.tipo === 'dir' && !vendSel && !gestorSel ? X.opc('/dashboard/managers?start_date=' + dt[0] + '&end_date=' + dt[1]) : Promise.resolve({})];
-    return Promise.all(lst).then(function (r) {
+    var chave = 'com|' + (m.login || m.email || m.display_name || '') + '|' + periodo + '|' + gestorSel + '|' + vendSel;
+    // 1) abre na hora com o que foi carregado da última vez (se for deste mesmo login e filtro)
+    var salvo = X.cache(chave);
+    if (salvo && salvo.d && mostrado !== chave) { d = salvo.d; mostrado = chave; desenhar(); faixaAtualizando(salvo.t); }
+    else if (mostrado !== chave) { d = null; document.getElementById('c').innerHTML = X.carregando('Carregando o dashboard…'); }
+    var novo = { ini: dt[0], fim: dt[1], o: null, c: {}, cl: {}, pr: {}, nw: {}, se: {}, dv: {}, mg: {} };
+    var velho = salvo && salvo.d ? salvo.d : {};
+    // 2) o principal (Resumo) primeiro; clientes, produtos e redes chegam logo depois sem segurar a tela
+    var principal = Promise.all([X.get('/dashboard/overview' + q), X.opc('/dashboard/overview/charts' + q), X.opc('/dashboard/sellers' + q),
+      P.tipo === 'dir' && !vendSel && !gestorSel ? X.opc('/dashboard/managers?start_date=' + dt[0] + '&end_date=' + dt[1]) : Promise.resolve({})]);
+    var extras = Promise.all([X.opc('/dashboard/clients' + q), X.opc('/dashboard/products' + q), X.opc('/dashboard/networks' + q), X.opc('/dashboard/daily-evolution' + q)]);
+    return principal.then(function (r) {
       if (meu !== pedido) return;
-      d = { o: r[0], c: r[1], cl: r[2], pr: r[3], nw: r[4], se: r[5], dv: r[6], mg: r[7], ini: dt[0], fim: dt[1] };
-      document.getElementById('aviso').innerHTML = '';
-      desenhar();
+      novo.o = r[0]; novo.c = r[1]; novo.se = r[2]; novo.mg = r[3];
+      ['cl', 'pr', 'nw', 'dv'].forEach(function (k) { novo[k] = velho[k] || {}; });   // até chegar o novo, usa o guardado
+      d = novo; mostrado = chave; document.getElementById('aviso').innerHTML = ''; desenhar(); faixaAtualizando(null, true);
+      return extras.then(function (e) {
+        if (meu !== pedido) return;
+        novo.cl = e[0]; novo.pr = e[1]; novo.nw = e[2]; novo.dv = e[3];
+        d = novo; desenharMantendo(); faixaAtualizando(null);
+        X.cache(chave, novo);
+      });
     });
   }).catch(function (e) {
     if (meu !== pedido) return;
     document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar');
     if (!d) document.getElementById('c').innerHTML = '';
   }).then(function () { if (meu === pedido) { carregandoAgora = false; document.getElementById('btAt').classList.remove('gira'); } });
+}
+/** Redesenha sem perder a rolagem nem o que estiver digitando. */
+function desenharMantendo() {
+  var y = window.scrollY, el = document.activeElement, id = el && el.id, pos = el && el.selectionStart;
+  desenhar(); window.scrollTo(0, y);
+  if (id) { var n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } }
+}
+/** Texto do topo: "atualizando…" enquanto busca; nada quando os números já são os de agora. */
+function faixaAtualizando(t, quaseLa) {
+  var s = document.getElementById('sub'); if (!s || !P) return;
+  var b = d && d.o ? (d.o.last_movement_date || '') : '';
+  s.innerHTML = F.esc(P.nome) + (b ? ' · base de <b>' + X.dm(b) + '</b>' : '') + (t ? ' · atualizando…' : quaseLa ? ' · carregando detalhes…' : '');
 }
 
 // ---------- contas ----------

@@ -14,7 +14,7 @@ android {
         targetSdk = 34
         // cada build do GitHub ganha um número maior, assim o APK novo instala por cima do antigo
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "3." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        versionName = (System.getenv("VER_MAJ") ?: "3") + "." + (System.getenv("VER_MIN") ?: "0")   // 3.0 … 3.10, depois 4.0 … (o número de atualização é o versionCode)
     }
 
     // Assinatura: a chave NÃO fica no repositório. No GitHub ela vem dos Secrets

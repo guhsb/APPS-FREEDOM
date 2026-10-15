@@ -82,7 +82,7 @@ var F = {
 };
 
 // ---- acesso ao Helpdesk do site pelo app (mesmos endereços que o site usa) ----
-F._req = 0; F._pend = {};
+F._req = Math.floor(Math.random() * 1e6) * 1000; F._pend = {};   // número único por tela
 /** F.api('GET', '/helpdesk/...', corpo?) -> Promise({status, json, texto}) */
 F.api = function (metodo, caminho, corpo) {
   return new Promise(function (ok) {
@@ -223,7 +223,7 @@ var Base = {
     var ap = e.app || {};
     document.getElementById('aviso').innerHTML =
       (ap.baixando ? '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Baixando a versão nova do app… <b>' + F.int(ap.progresso) + '%</b></span></div>'
-        : ap.nova ? '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Nova versão do app disponível (<b>' + F.int(ap.nova) + '</b>).</span><button onclick="App.atualizarApp()">Atualizar</button></div>' : '') +
+        : ap.nova ? '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Nova versão do app disponível (<b>' + F.esc(ap.novaNome || F.int(ap.nova)) + '</b>).</span><button onclick="App.atualizarApp()">Atualizar</button></div>' : '') +
       ((e.erro && !e.atualizando)
       ? '<div class="aviso">' + F.ic('alerta') + '<span>Não atualizou agora: ' + F.esc(e.erro) + (e.dados ? '. Mostrando os números das ' + F.hhmm(e.hora) + '.' : '') + '</span></div>' : '');
     var conteudo = document.getElementById('conteudo');

@@ -16,6 +16,8 @@ class Tarefa : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         Thread {
             val app = applicationContext
+            // interruptor remoto (controle.json no GitHub): bloqueado = sai da conta e para tudo
+            try { Controle.conferir(app); if (Controle.aplicarSemTela(app)) { jobFinished(params, false); return@Thread } } catch (_: Exception) { }
             try { Fila.enviar(app) } catch (_: Exception) { }
             try { Atualizador.atualizar(app) } catch (_: Exception) { }
             try { Atualizacao.conferir(app, false) } catch (_: Exception) { }   // versão nova do app (no máximo a cada 30 min)

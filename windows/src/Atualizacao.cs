@@ -19,7 +19,8 @@ namespace Freedom
         public static volatile string Erro;
         static Prefs P { get { return Prefs.De("atualizacao"); } }
 
-        public static int VersaoAtual() { return Assembly.GetExecutingAssembly().GetName().Version.Minor; }
+        /// <summary>Número da publicação (vN). Versão nova = 3.4.N.0 (N no 3º campo); antigas = 2.N.0.</summary>
+        public static int VersaoAtual() { var v = Assembly.GetExecutingAssembly().GetName().Version; return v.Build > 0 ? v.Build : v.Minor; }
 
         public static JSONObject Nova()
         {
@@ -39,7 +40,7 @@ namespace Freedom
                 .Put("conferido", P.GetLong("hora"));
             if (Erro != null) o.Put("erro", Erro);
             var n = Nova();
-            if (n != null) o.Put("nova", n.OptLong("versao")).Put("notas", n.OptString("notas"));
+            if (n != null) o.Put("nova", n.OptLong("versao")).Put("novaNome", n.OptString("nome")).Put("notas", n.OptString("notas"));
             return o;
         }
 
@@ -108,7 +109,7 @@ namespace Freedom
                     }
                 var notas = j.OptString("body");
                 P.Edit().Put("ultima", new JSONObject().Put("versao", versao).Put("url", url).Put("tamanho", tam)
-                    .Put("pagina", j.OptString("html_url")).Put("notas", notas.Length > 400 ? notas.Substring(0, 400) : notas).ToString())
+                    .Put("pagina", j.OptString("html_url")).Put("notas", notas.Length > 400 ? notas.Substring(0, 400) : notas).Put("nome", (j.OptString("name") ?? "").Replace("Freedom", "").Trim()).ToString())
                     .Put("hora", agora).Commit();
                 return Nova() != null ? 1 : 0;
             }
