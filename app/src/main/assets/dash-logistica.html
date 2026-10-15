@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="dash.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
+<style>.perfil{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;background:var(--azul-s);color:var(--tx-azul);margin-left:6px;vertical-align:2px}</style>
+</head><body class="dash">
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1>Logística<span class="perfil">Dashboard</span></h1><div class="st" id="sub">Carregando…</div></div>
+  <button class="bt" id="btAt" aria-label="Atualizar"></button>
+</div>
+<div id="aviso"></div>
+<div id="c"><div class="carregando"><i></i>Carregando o dashboard…</div></div>
+<script src="base.js"></script>
+<script src="dash.js"></script>
+<script>
+var X = Dash, d = null, aba = Dash.lembrar('log_aba') || 'resumo', carregandoAgora = false, filtroPed = 'todos', busca = '', abertos = {}, nPed = 20, verRedes = false;
+var CORES_IDADE = ['#9aa9d6', '#7d8fd0', 'var(--azul)', 'var(--laranja)', 'var(--rosa)'];
+
+function carregar(forcar) {
+  if (carregandoAgora && !forcar) return;
+  carregandoAgora = true; document.getElementById('btAt').classList.add('gira');
+  Promise.all([X.get('/logistics/pending/orders'), X.opc('/logistics/standby/summary'), X.opc('/logistics/report/snapshots'), X.opc('/logistics/billing/daily')]).then(function (r) {
+    d = montar(r[0], r[1], r[2], r[3]);
+    document.getElementById('aviso').innerHTML = '';
+    desenhar();
+  }).catch(function (e) {
+    document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar');
+    if (!d) document.getElementById('c').innerHTML = '';
+  }).then(function () { carregandoAgora = false; document.getElementById('btAt').classList.remove('gira'); });
+}
+
+// ---------- contas ----------
+function montar(po, sb, sn, bd) {
+  var s = po.summary || {}, itens = (po.items || []).filter(function (i) { return i && i.effective_classification !== 'FINALIZADO'; }).map(function (i) {
+    var dt = String(i.order_date || '').slice(0, 10), dias = dt ? X.idade(dt) : 0, v = F.n(i.value);
+    return { n: i.order_number, dt: dt, dias: dias, cli: i.customer || '—', rede: i.network || 'SEM REDE', v: v, conf: i.conference_status || '', mot: (i.reason || '').trim(), itens: i.item_count, cls: i.operational_classification || i.classification || '',
+      score: v * Math.log(2 + dias) };
+  });
+  var somaItens = itens.reduce(function (a, i) { return a + i.v; }, 0), pend = F.n(s.pending_value) || somaItens, sbv = F.n(sb.combined_value);
+  // fotos do standby: a última de cada dia, em ordem
+  var fotos = {}; (sn.items || []).forEach(function (x) { var k = String(x.created_at || '').slice(0, 10); if (!k) return; if (!fotos[k] || x.created_at > fotos[k].t) fotos[k] = { t: x.created_at, sb: F.n(x.standby_value), pend: F.n(x.pending_total_at_snapshot), eq: F.n(x.team_pending) }; });
+  var serie = Object.keys(fotos).sort().map(function (k) { return { d: k, sb: fotos[k].sb, pend: fotos[k].pend, eq: fotos[k].eq }; });
+  var grupo = function (f) { var m = {}; itens.forEach(function (i) { var k = f(i); m[k] = m[k] || [0, 0]; m[k][0] += i.v; m[k][1]++; }); return Object.keys(m).map(function (k) { return [k, m[k][0], m[k][1]]; }).sort(function (a, b) { return b[1] - a[1]; }); };
+  var faixas = [['0–3 dias', 0, 3], ['4–7 dias', 4, 7], ['8–15 dias', 8, 15], ['16–30 dias', 16, 30], ['+30 dias', 31, 1e9]].map(function (f) {
+    var l = itens.filter(function (i) { return i.dias >= f[1] && i.dias <= f[2]; }); return [f[0], l.reduce(function (a, i) { return a + i.v; }, 0), l.length]; });
+  var dias = (bd.days || []).map(function (x) { return { d: String(x.invoice_date).slice(0, 10), v: F.n(x.total_value), p: F.n(x.order_count), tipos: x.types || [] }; }).sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+  return { s: s, itens: itens, pend: pend, base: Math.max(pend, somaItens, 1), ped: F.n(s.pending_orders) || itens.length, sb: sbv, sbPed: F.n(sb.distinct_orders), sel: F.n(sb.active_selections), fin: F.n(s.finalized_value), finPed: F.n(s.finalized_orders),
+    eq: serie.length ? serie[serie.length - 1].eq : F.n(s.team_value), serie: serie, clientes: grupo(function (i) { return i.cli; }), redes: grupo(function (i) { return i.rede; }),
+    motivos: grupo(function (i) { return i.mot; }).filter(function (m) { return m[0]; }), faixas: faixas, dias: dias, media: F.n(bd.daily_average), sel_dia: bd.selected_day || bd.latest_day || null };
+}
+function variacao(diasAtras) {
+  var s = d.serie; if (s.length < 2) return null;
+  var ult = s[s.length - 1], alvo = X.iso(new Date(X.de(ult.d).getTime() - diasAtras * 864e5)), ant = null;
+  for (var i = s.length - 2; i >= 0; i--) if (s[i].d <= alvo) { ant = s[i]; break; }
+  if (!ant && diasAtras >= 28) ant = s[0];
+  return ant ? { dif: ult.sb - ant.sb, de: ant.sb, desde: ant.d } : null;
+}
+function sinal(v) { return (v >= 0 ? '+' : '−') + X.k(Math.abs(v)); }
+
+// ---------- telas ----------
+function desenhar() {
+  document.getElementById('sub').innerHTML = 'Pendências agora · ' + X.int(d.ped) + ' pedidos';
+  var h = X.abas([['resumo', 'Resumo'], ['pend', 'Pendências'], ['standby', 'Standby'], ['fat', 'Faturamento']], aba);
+  if (aba === 'resumo') h += resumo();
+  if (aba === 'pend') h += pendencias();
+  if (aba === 'standby') h += standby();
+  if (aba === 'fat') h += faturamento();
+  var c = document.getElementById('c'); c.innerHTML = h; X.ligarGraficos(c);
+}
+
+function prioridade() { return d.itens.filter(function (i) { return i.dias > 15; }).sort(function (a, b) { return b.score - a.score; }); }
+function linhaPed(p) {
+  var cor = p.dias > 30 ? 'rosa' : p.dias > 15 ? 'laranja' : 'azul', ab = abertos[p.n];
+  return '<div class="ger" data-p="' + F.esc(p.n) + '"><div class="nm"><b>Pedido ' + F.esc(p.n) + ' · ' + F.esc(p.cli) + '</b><span>' + (p.mot ? F.esc(X.cap(p.mot)) + ' · ' : '') +
+    (p.conf === 'SEM_REGISTRO' ? 'sem conferência' : p.conf === 'EM_ANDAMENTO' ? 'conferência em andamento' : p.conf === 'FINALIZADA' ? 'conferido' : '') + '</span></div>' +
+    '<div style="text-align:right"><b style="font-size:14.5px;white-space:nowrap">' + X.k(p.v) + '</b><br><span class="st2" style="background:var(--' + cor + '-s);color:var(--tx-' + cor + ')">' + p.dias + ' dias</span></div></div>' +
+    (ab ? '<div class="det">Data: <b>' + F.dataBR(p.dt) + '</b> · Rede: <b>' + F.esc(p.rede) + '</b>' + (p.itens != null ? ' · Itens: <b>' + p.itens + '</b>' : '') + '<br>Valor: <b>' + F.brl(p.v) + '</b>' + (p.cls ? ' · ' + F.esc(X.cap(p.cls)) : '') + (p.mot ? '<br>Motivo: <b>' + F.esc(p.mot) + '</b>' : '') + '</div>' : '');
+}
+
+function resumo() {
+  var h = '', livre = Math.max(0, d.pend - d.sb), v1 = variacao(1);
+  h += '<div class="card hero"><div class="lb">Pendente agora</div><div class="v">' + X.brl0(d.pend) + '</div><div class="s"><b>' + X.int(d.ped) + '</b> pedidos aguardando faturar</div>';
+  if (d.sb > 0) h += X.faixa([['Standby', d.sb, 'var(--laranja)', ''], ['Livre', livre, 'var(--azul)', '']], 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') +
+    '<div class="leg"><span>■ Standby ' + X.k(d.sb) + ' (' + Math.round(d.sb / Math.max(1, d.pend) * 100) + '%)</span><span>■ Livre ' + X.k(livre) + '</span></div>';
+  h += '<div class="chips">';
+  if (v1) h += '<span class="chip ' + (v1.dif > 0 ? 'la' : 'ok') + '">Desde ontem: standby ' + sinal(v1.dif) + '</span>';
+  if (d.media > 0 && livre > 0) h += '<span class="chip az">Livre zera em ~' + Math.max(1, Math.round(livre / d.media)) + ' dias úteis</span>';
+  if (d.finPed) h += '<span class="chip ok">' + d.finPed + ' finalizados · ' + X.k(d.fin) + '</span>';
+  h += '</div></div>';
+  var pr = prioridade(), top = pr.slice(0, 5), soma = top.reduce(function (a, p) { return a + p.v; }, 0);
+  if (top.length) h += X.card('Prioridade de hoje', 'Maiores valores parados há mais tempo · toque para ver o pedido', top.map(linhaPed).join('') +
+    '<div class="cs" style="margin:8px 0 0">Esses ' + top.length + ' somam <b style="color:var(--tx)">' + X.k(soma) + '</b> · ' + Math.round(soma / d.base * 100) + '% de todo o pendente</div>');
+  var hj = hojeFat(), velhos = d.itens.filter(function (i) { return i.dias > 30; }), grandes = d.itens.filter(function (i) { return i.v >= 50000; });
+  var mes = mesFat();
+  h += X.k4([['Faturado hoje', hj ? X.k(hj.v) : '—', hj ? hj.p + ' pedidos · até agora' : 'sem faturamento ainda'], ['Faturado no mês', X.k(mes.tot), d.media ? 'média ' + X.k(d.media) + '/dia' : ''],
+    ['Mais de 30 dias', velhos.length, 'pedidos · ' + X.k(velhos.reduce(function (a, i) { return a + i.v; }, 0)), velhos.length ? 'neg' : ''],
+    ['Pedidos grandes', grandes.length, '≥ R$ 50 mil · ' + X.k(grandes.reduce(function (a, i) { return a + i.v; }, 0))]]);
+  h += X.card('Idade das pendências', 'Há quanto tempo o valor pendente espera', X.faixa(d.faixas.map(function (f, i) { return [f[0], f[1], CORES_IDADE[i]]; }), 30) +
+    X.legenda(d.faixas.map(function (f, i) { return [f[0], f[1], CORES_IDADE[i]]; }), X.k));
+  var ins = [], vm = variacao(31);
+  if (vm && vm.de > 0 && Math.abs(vm.dif) / vm.de >= 0.05) ins.push(X.ins(vm.dif > 0 ? 'laranja' : 'verde', vm.dif > 0 ? '▲' : '▼', 'Standby ' + (vm.dif > 0 ? 'subiu ' : 'caiu ') + Math.round(Math.abs(vm.dif) / vm.de * 100) + '% no período',
+    X.k(vm.de) + ' (' + X.dm(vm.desde) + ') → ' + X.k(d.sb || d.serie[d.serie.length - 1].sb) + ' hoje' + (d.sel ? ' · ' + d.sel + ' seleções ativas' : '')));
+  var semConf = d.itens.filter(function (i) { return i.conf === 'SEM_REGISTRO'; }).length;
+  if (d.itens.length && semConf / d.itens.length >= 0.5) ins.push(X.ins('azul', '◎', Math.round(semConf / d.itens.length * 100) + '% sem registro de conferência', semConf + ' de ' + d.itens.length + ' pedidos ainda não começaram a ser conferidos'));
+  var c3 = d.clientes.slice(0, 3), c3v = c3.reduce(function (a, c) { return a + c[1]; }, 0);
+  if (c3.length >= 3 && c3v / d.base >= 0.25) ins.push(X.ins('violeta', '👥', '3 clientes = ' + Math.round(c3v / d.base * 100) + '% do pendente', c3.map(function (c) { return X.cap(c[0]).slice(0, 24); }).join(', ') + ' · ' + X.k(c3v)));
+  if (d.motivos.length) { var m = d.motivos[0], vel = Math.max.apply(null, d.itens.filter(function (i) { return i.mot === m[0]; }).map(function (i) { return i.dias; }));
+    ins.push(X.ins('rosa', '!', '"' + X.cap(m[0]) + '" segura ' + X.k(m[1]), m[2] + (m[2] === 1 ? ' pedido' : ' pedidos') + ', o mais antigo há ' + vel + ' dias')); }
+  if (velhos.length && !ins.length) ins.push(X.ins('rosa', '⏱', velhos.length + ' pedidos parados há mais de 30 dias', 'Somam ' + X.k(velhos.reduce(function (a, i) { return a + i.v; }, 0))));
+  h += X.atencao(ins.slice(0, 5));
+  h += graficoPend();
+  return h;
+}
+function graficoPend() {
+  var s = d.serie.slice(-20); if (s.length < 2) return '';
+  var n = s.length, meio = Math.floor(n / 2), mx = Math.max.apply(null, s.map(function (x) { return x.pend; }));
+  var dicas = s.map(function (x) { return '<b>' + X.dm(x.d) + '</b><br>pendente ' + X.k(x.pend) + '<br>standby ' + X.k(x.sb); });
+  return X.card('Pendência no período', 'Total pendente × standby · toque para ver o dia', X.linhas('pend', [{ pts: s.map(function (x, i) { return [i, x.pend]; }), cor: 'var(--azul)' }, { pts: s.map(function (x, i) { return [i, x.sb]; }), cor: 'var(--laranja)', pontos: true }],
+    n, [[0, X.dm(s[0].d)], [meio, X.dm(s[meio].d)], [n - 1, X.dm(s[n - 1].d)]], mx, [], dicas) +
+    '<div class="lg"><span><i style="border-color:var(--azul)"></i>Total pendente</span><span><i style="border-color:var(--laranja)"></i>Standby</span></div>');
+}
+
+function filtrados() {
+  var b = busca.trim().toLowerCase(), l = d.itens;
+  if (filtroPed === '30') l = l.filter(function (i) { return i.dias > 30; });
+  if (filtroPed === 'mot') l = l.filter(function (i) { return i.mot; });
+  if (filtroPed === 'gr') l = l.filter(function (i) { return i.v >= 50000; });
+  if (b) l = l.filter(function (i) { return (i.n + ' ' + i.cli + ' ' + i.rede + ' ' + i.mot).toLowerCase().indexOf(b) >= 0; });
+  return l.slice().sort(function (a, c) { return c.score - a.score; });
+}
+function pendencias() {
+  var h = '<input class="busca" id="busca" placeholder="Buscar pedido, cliente, rede…" value="' + F.esc(busca) + '">';
+  var c30 = d.itens.filter(function (i) { return i.dias > 30; }).length, cm = d.itens.filter(function (i) { return i.mot; }).length, cg = d.itens.filter(function (i) { return i.v >= 50000; }).length;
+  h += X.abas([['todos', 'Todos · ' + d.itens.length], ['30', '+30 dias · ' + c30], ['mot', 'Com motivo · ' + cm], ['gr', 'Grandes · ' + cg]], filtroPed, 'sub');
+  if (!busca && filtroPed === 'todos') {
+    h += X.card('Por cliente', 'Quem tem mais valor esperando', X.barras(d.clientes.slice(0, 6).map(function (c) { return [c[0], c[1], null, c[2] + ' ped.']; })));
+    var rs = verRedes ? d.redes : d.redes.slice(0, 6);
+    h += X.card('Por rede', 'Valor pendente de cada rede', X.barras(rs.map(function (r) { return [r[0], r[1], null, r[2] + ' ped.']; })) +
+      (!verRedes && d.redes.length > 6 ? '<button class="mais" data-mais="redes">Ver todas (' + d.redes.length + ')</button>' : ''));
+    if (d.motivos.length) h += X.card('Motivos informados', 'Pedidos com observação de pendência', d.motivos.slice(0, 8).map(function (m) { return '<div class="row"><span>' + F.esc(X.cap(m[0])) + ' · ' + m[2] + ' ped.</span><b>' + X.k(m[1]) + '</b></div>'; }).join(''));
+  }
+  var l = filtrados();
+  h += X.card('Pedidos', l.length + ' pedidos · ordenados por valor parado × tempo · toque para ver detalhes', (l.slice(0, nPed).map(linhaPed).join('') || '<div class="vazio">Nenhum pedido encontrado.</div>') +
+    (l.length > nPed ? '<button class="mais" data-mais="ped">Ver mais (' + (l.length - nPed) + ')</button>' : ''));
+  return h;
+}
+
+function standby() {
+  var h = '', v1 = variacao(1), v7 = variacao(7), vm = variacao(31);
+  h += '<div class="card hero"><div class="lb">Em standby</div><div class="v">' + X.brl0(d.sb) + '</div><div class="s"><b>' + X.int(d.sbPed) + '</b> pedidos · <b>' + Math.round(d.sb / Math.max(1, d.pend) * 100) + '%</b> do pendente' + (d.sel ? ' · ' + d.sel + ' seleções ativas' : '') + '</div>' +
+    '<div class="k4" style="margin:14px 0 0;grid-template-columns:1fr 1fr 1fr">' + [['Ontem', v1], ['Na semana', v7], ['No período', vm]].map(function (x) {
+      return '<div class="k" style="box-shadow:none;background:var(--sf2)"><span>' + x[0] + '</span><b style="font-size:14px;white-space:nowrap;color:' + (!x[1] ? 'var(--tx3)' : x[1].dif > 0 ? 'var(--tx-laranja)' : 'var(--tx-verde)') + '">' + (x[1] ? sinal(x[1].dif) : '—') + '</b></div>'; }).join('') + '</div></div>';
+  var s = d.serie.slice(-20);
+  if (s.length >= 2) {
+    var n = s.length, meio = Math.floor(n / 2);
+    h += X.card('Evolução do standby', 'Toque no ponto para ver o dia', X.linhas('sb', [{ pts: s.map(function (x, i) { return [i, x.sb]; }), cor: 'var(--laranja)', pontos: true }], n,
+      [[0, X.dm(s[0].d)], [meio, X.dm(s[meio].d)], [n - 1, X.dm(s[n - 1].d)]], null, [], s.map(function (x) { return '<b>' + X.dm(x.d) + '</b> · standby ' + X.k(x.sb); })));
+    var amostra = s.length <= 5 ? s : [s[0], s[Math.floor(n / 3)], s[Math.floor(2 * n / 3)], s[n - 1]];
+    h += X.card('Parte do pendente em standby', 'Quanto do total está travado', amostra.map(function (x) { var p = x.pend > 0 ? x.sb / x.pend * 100 : 0;
+      return '<div class="hb"><span class="n">' + X.dm(x.d) + '</span><span class="p"><b>' + Math.round(p) + '%</b></span><div class="t"><i style="width:' + p + '%;background:var(--laranja)"></i></div></div>'; }).join(''));
+  } else h += '<div class="vazio">Ainda não há fotos do standby salvas no site para mostrar a evolução.</div>';
+  return h;
+}
+
+function hojeFat() { var h = X.hoje(); for (var i = d.dias.length - 1; i >= 0; i--) if (d.dias[i].d === h) return d.dias[i]; return null; }
+function mesFat() { var m = X.hoje().slice(0, 7), l = d.dias.filter(function (x) { return x.d.slice(0, 7) === m; }), melhor = null;
+  l.forEach(function (x) { if (x.d !== X.hoje() && (!melhor || x.v > melhor.v)) melhor = x; });
+  return { tot: l.reduce(function (a, x) { return a + x.v; }, 0), dias: l.filter(function (x) { return x.v > 0; }).length, melhor: melhor }; }
+function faturamento() {
+  var h = '', hj = hojeFat(), mes = mesFat();
+  h += '<div class="card hero"><div class="lb">Faturado hoje · até agora</div><div class="v">' + X.brl0(hj ? hj.v : 0) + '</div><div class="s"><b>' + (hj ? hj.p : 0) + '</b> pedidos' + (d.media ? ' · média ' + X.k(d.media) + '/dia' : '') + '</div>';
+  if (d.media > 0) { var pm = (hj ? hj.v : 0) / d.media; h += '<div class="barra"><i style="width:' + Math.min(100, pm * 100) + '%;background:var(--azul)"></i><u style="left:99%"></u></div><div class="leg"><span>0</span><span>' + Math.round(pm * 100) + '% da média diária</span><span>média</span></div>'; }
+  h += '<div class="chips"><span class="chip az">Mês: ' + X.k(mes.tot) + ' em ' + mes.dias + ' dias</span>' + (mes.melhor ? '<span class="chip ok">Melhor dia: ' + X.dm(mes.melhor.d) + ' · ' + X.k(mes.melhor.v) + '</span>' : '') + '</div></div>';
+  var tipos = (hj ? hj.tipos : []).map(function (t) { return [t.label || t.name || t.description || t.type || t.code, F.n(t.total_value != null ? t.total_value : t.value), F.n(t.order_count != null ? t.order_count : t.count)]; }).filter(function (t) { return t[1] > 0; });
+  if (tipos.length) h += X.card('Hoje por tipo', 'Venda, comodato, bonificação…', X.barras(tipos.map(function (t) { return [t[0], t[1], null, t[2] + ' ped.']; })));
+  var ult = d.dias.filter(function (x) { return X.util(x.d); }).slice(-12);
+  if (ult.length) h += X.card('Últimos dias úteis', 'Hoje ainda aberto (barra clara)', X.colunas(ult.map(function (x) { return x.v; }), function (i) { return i % 2 === 1 || i === ult.length - 1 ? X.dm(ult[i].d) : ''; },
+    d.media, 'média ' + X.k(d.media) + '/dia', ult.map(function (x) { return x.d === X.hoje() ? 'rgba(59,91,253,.35)' : 'var(--azul)'; })));
+  h += '<div class="card" style="text-align:center;cursor:pointer" id="btFatPainel"><b style="font-size:14px">' + F.ic('imagem') + ' Gerar imagem do faturamento</b><div class="cs" style="margin:4px 0 0">Abre o painel de Faturamento, com a imagem de sempre</div></div>';
+  return h;
+}
+
+// ---------- toques ----------
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-sub],[data-p],[data-mais],#btFatPainel') : null; if (!t) return;
+  if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('log_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
+  if (t.hasAttribute('data-sub')) { filtroPed = t.getAttribute('data-sub'); nPed = 20; desenhar(); return; }
+  if (t.hasAttribute('data-p')) { var n = t.getAttribute('data-p'); abertos[n] = !abertos[n]; desenhar(); return; }
+  if (t.hasAttribute('data-mais')) { var m = t.getAttribute('data-mais'); if (m === 'ped') nPed += 30; if (m === 'redes') verRedes = true; desenhar(); return; }
+  if (t.id === 'btFatPainel') { if (history.length > 1) history.back(); else location.href = 'painel-faturamento.html'; }
+});
+document.addEventListener('input', function (ev) {
+  if (ev.target.id === 'busca') { busca = ev.target.value; nPed = 20; var pos = ev.target.selectionStart; desenhar(); var el = document.getElementById('busca'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { } } }
+});
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btAt').innerHTML = F.ic('atualizar');
+document.getElementById('btVoltar').onclick = function () { if (history.length > 1) history.back(); else location.href = 'painel-faturamento.html'; };
+document.getElementById('btAt').onclick = function () { carregar(true); };
+window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t); };
+F.topoSombra();
+carregar();
+</script>
+</body></html>

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="dash.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
+<style>.perfil{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;background:var(--violeta-s);color:var(--tx-violeta);margin-left:6px;vertical-align:2px}</style>
+</head><body class="dash">
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1>Helpdesk<span class="perfil">Dashboard</span></h1><div class="st" id="sub">Carregando…</div></div>
+  <button class="bt" id="btAt" aria-label="Atualizar"></button>
+</div>
+<div id="aviso"></div>
+<div id="c"><div class="carregando"><i></i>Carregando o dashboard…</div></div>
+<script src="base.js"></script>
+<script src="dash.js"></script>
+<script>
+var X = Dash, acesso = null, d = null, aba = Dash.lembrar('hd_aba') || 'resumo', periodo = Dash.lembrar('hd_per') || 'mes', setor = '', carregandoAgora = false, pedido = 0, setoresPessoa = null;
+var FECH = ['RESOLVED', 'CLOSED', 'CANCELED', 'CANCELLED'];
+
+function datas() {
+  var h = X.hoje();
+  if (periodo === 'hoje') return [h, h];
+  if (periodo === '7') return [X.iso(new Date(X.de(h).getTime() - 6 * 864e5)), h];
+  if (periodo === 'ant') return X.mes(h, -1);
+  return [X.mes(h, 0)[0], h];
+}
+function carregar(forcar) {
+  if (carregandoAgora && !forcar) return;
+  carregandoAgora = true; var meu = ++pedido; document.getElementById('btAt').classList.add('gira');
+  (acesso ? Promise.resolve(acesso) : X.get('/helpdesk/workspace/access')).then(function (a) {
+    acesso = a;
+    var qs = Array.isArray(a.queues) ? a.queues : [];
+    if (a.can_access === false || !qs.length) { semSetor(); return; }
+    var dt = datas(), q = '?start_date=' + dt[0] + '&end_date=' + dt[1] + (setor ? '&queue_id=' + setor : '');
+    return Promise.all([X.get('/helpdesk/dashboard/overview' + q), X.opc('/helpdesk/workspace/tickets?view=queues&page_size=50' + (setor ? '&queue_id=' + setor : ''))]).then(function (r) {
+      if (meu !== pedido) return;
+      d = { o: r[0], tk: (r[1].items || r[1].tickets || []).filter(function (t) { return FECH.indexOf(t.status) < 0; }), ini: dt[0], fim: dt[1] };
+      document.getElementById('aviso').innerHTML = '';
+      desenhar();
+    });
+  }).catch(function (e) {
+    if (meu !== pedido) return;
+    document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar');
+    if (!d) document.getElementById('c').innerHTML = '';
+  }).then(function () { if (meu === pedido) { carregandoAgora = false; document.getElementById('btAt').classList.remove('gira'); } });
+}
+function semSetor() {
+  document.getElementById('sub').textContent = 'Só para quem atende algum setor';
+  document.getElementById('c').innerHTML = '<div class="vazio">Este dashboard mostra as filas de atendimento.<br>Você não atende nenhum setor no Helpdesk, então ele fica escondido.</div>';
+}
+
+function dur(min) { min = F.n(min); if (!min) return '—'; if (min < 60) return Math.round(min) + ' min'; var h = Math.floor(min / 60), m = Math.round(min % 60); if (h >= 48) return Math.round(h / 24) + ' dias'; return h + 'h' + (m ? ' ' + ('0' + m).slice(-2) + 'min' : ''); }
+function slaDe(t) { return t.sla_status || (t.sla && (t.sla.status || t.sla.resolution_status || t.sla.state)) || ''; }
+function ring(p, c) { var r = 17, L = 2 * Math.PI * r; return '<svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="' + r + '" fill="none" stroke="var(--sf3)" stroke-width="5"/><circle cx="22" cy="22" r="' + r + '" fill="none" stroke="var(--' + c + ')" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + (L * Math.min(100, F.n(p)) / 100) + ' ' + L + '" transform="rotate(-90 22 22)"/></svg>'; }
+function corSla(p) { return p == null ? 'tx3' : p >= 95 ? 'verde' : p >= 80 ? 'laranja' : 'rosa'; }
+function quando(iso) { if (!iso) return ''; var dt = new Date(iso), agora = new Date(), h = (agora - dt) / 36e5; if (h < 1) return 'há ' + Math.max(1, Math.round(h * 60)) + ' min'; if (h < 24) return 'há ' + Math.round(h) + 'h'; var dd = Math.round(h / 24); return 'há ' + dd + (dd === 1 ? ' dia' : ' dias'); }
+
+function desenhar() {
+  var qs = acesso.queues || [], o = d.o;
+  document.getElementById('sub').innerHTML = (qs.length === 1 ? F.esc(qs[0].name) : 'Seus ' + qs.length + ' setores') + ' · ' + (periodo === 'hoje' ? 'hoje' : X.dm(d.ini) + '–' + X.dm(d.fim));
+  var h = X.abas([['resumo', 'Resumo'], ['filas', 'Filas'], ['atend', 'Atendentes']], aba);
+  if (qs.length > 1) {
+    var venc = {}; (o.queues || []).forEach(function (q) { venc[q.queue_id] = F.n(q.breached); });
+    h += X.abas([['', 'Todos os meus setores · ' + qs.length]].concat(qs.map(function (q) { return [String(q.id), F.esc(X.cap(q.name)) + (venc[q.id] ? '<small>' + venc[q.id] + '</small>' : '')]; })), setor, 'setor').replace('class="tabs"', 'class="tabs" style="margin-top:-4px"');
+  }
+  h += '<div class="filtro"><span><b>Período</b><select id="selPer">' + [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['mes', 'Este mês'], ['ant', 'Mês passado']].map(function (p) { return '<option value="' + p[0] + '"' + (periodo === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select></span>' +
+    '<span class="fix"><b>Setores</b>' + (setor ? F.esc(X.cap((qs.filter(function (q) { return String(q.id) === setor; })[0] || {}).name)) : 'Todos os seus') + '</span></div>';
+  if (aba === 'resumo') h += resumo();
+  if (aba === 'filas') h += filas();
+  if (aba === 'atend') h += atendentes();
+  var c = document.getElementById('c'); c.innerHTML = h; X.ligarGraficos(c);
+}
+
+function resumo() {
+  var o = d.o, st = o.stock || {}, sla = o.sla || {}, du = o.durations || {}, fl = o.flow || {}, h = '';
+  var ativos = F.n(st.total_active);
+  var partes = [['Aberto', st.open, 'var(--azul)'], ['Em atendimento', st.in_progress, 'var(--violeta)'], ['Reaberto', st.reopened, 'var(--rosa)'], ['Aguardando', st.waiting, '#9aa9d6'],
+    ['Aguard. fornecedor', st.waiting_supplier, '#7d8fd0'], ['Aguard. aprovação', st.pending_approval, 'var(--laranja)']].filter(function (p) { return F.n(p[1]) > 0; });
+  h += '<div class="card hero"><div class="lb">Ativos agora</div><div class="v">' + ativos + ' <span style="font-size:16px;font-weight:600;color:var(--tx2)">chamado' + (ativos === 1 ? '' : 's') + '</span></div>' +
+    '<div class="s"><b style="color:var(--tx-' + (F.n(sla.breached_active) ? 'rosa' : 'verde') + ')">' + F.n(sla.breached_active) + ' vencido' + (F.n(sla.breached_active) === 1 ? '' : 's') + '</b> · ' + F.n(sla.at_risk_active) + ' em atenção</div>' +
+    (partes.length ? X.faixa(partes.map(function (p) { return [p[0], p[1], p[2], '']; }), 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') + X.legenda(partes.map(function (p) { return [F.n(p[1]) + ' ' + p[0].toLowerCase(), p[1], p[2]]; })) : '') + '</div>';
+  var tk = d.tk.slice().sort(function (a, b) { var pa = slaDe(a) === 'BREACHED' ? 0 : slaDe(a) === 'AT_RISK' ? 1 : 2, pb = slaDe(b) === 'BREACHED' ? 0 : slaDe(b) === 'AT_RISK' ? 1 : 2; return pa - pb || String(a.created_at).localeCompare(String(b.created_at)); });
+  if (tk.length) h += X.card('Precisa de atenção agora', 'Chamados ativos dos seus setores · toque para abrir', tk.slice(0, 5).map(function (t) {
+    var s = slaDe(t), stt = F.STATUS[t.status] || [t.status, 'var(--tx3)'];
+    var cor = s === 'BREACHED' ? 'rosa' : s === 'AT_RISK' ? 'laranja' : t.status === 'PENDING_APPROVAL' ? 'laranja' : t.status === 'OPEN' ? 'azul' : 'violeta';
+    return '<div class="tk" data-t="' + t.id + '"><div class="c"><b>' + F.esc((t.protocol || '#' + t.id) + ' · ' + t.title) + '</b><span>' + F.esc(X.cap(t.queue_name || '')) + ' · ' + F.esc(t.assignee_name || 'sem responsável') + ' · ' + quando(t.created_at) + '</span></div>' +
+      '<span class="st2" style="align-self:center;background:var(--' + cor + '-s);color:var(--tx-' + cor + ')">' + (s === 'BREACHED' ? 'vencido' : s === 'AT_RISK' ? 'em risco' : F.esc(String(stt[0]).toLowerCase())) + '</span></div>'; }).join('') +
+    (tk.length > 5 ? '<div class="cs" style="margin:8px 0 0">+ ' + (tk.length - 5) + ' ativos · veja em Atendimento</div>' : ''));
+  h += '<div class="sla"><div class="k"><div class="ring">' + ring(sla.first_response_percent, corSla(sla.first_response_percent)) + '<div><span>SLA 1ª resposta</span><b style="margin:0">' + (sla.first_response_percent != null ? Math.round(sla.first_response_percent) + '%' : '—') + '</b></div></div><em>média de ' + dur(du.first_response_minutes) + '</em></div>' +
+    '<div class="k"><div class="ring">' + ring(sla.resolution_percent, corSla(sla.resolution_percent)) + '<div><span>SLA resolução</span><b style="margin:0">' + (sla.resolution_percent != null ? Math.round(sla.resolution_percent) + '%' : '—') + '</b></div></div><em>média de ' + dur(du.resolution_minutes) + '</em></div></div>';
+  var pr = {}; (o.priority_distribution || []).forEach(function (p) { pr[p.key] = F.n(p.value); });
+  h += X.k4([['Abertos no período', F.n(fl.opened), (pr.URGENT ? pr.URGENT + ' urgentes' : '') + (pr.HIGH ? (pr.URGENT ? ' · ' : '') + pr.HIGH + ' altos' : '')], ['Resolvidos', F.n(fl.resolved), F.n(fl.opened) ? Math.round(F.n(fl.resolved) / F.n(fl.opened) * 100) + '% dos abertos' : '']]);
+  var tr = o.trends || [];
+  if (tr.length > 1) {
+    var W = 330, H = 140, n = tr.length, bw = (W - 12) / n, mx = Math.max.apply(null, tr.map(function (t) { return Math.max(F.n(t.opened), F.n(t.resolved)); }).concat([1]));
+    var s = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '"><line x1="6" x2="' + (W - 6) + '" y1="' + (H - 22) + '" y2="' + (H - 22) + '" stroke="var(--ln)"/>', im = 0;
+    tr.forEach(function (t, i) { if (F.n(t.opened) > F.n(tr[im].opened)) im = i; });
+    tr.forEach(function (t, i) { var xx = 6 + i * bw, a = F.n(t.opened) / mx * (H - 38), r = F.n(t.resolved) / mx * (H - 38), w = Math.max(1.5, bw / 2 - 2);
+      if (a) s += '<rect x="' + (xx + 1) + '" y="' + (H - 22 - a) + '" width="' + w + '" height="' + a + '" rx="2" fill="var(--azul)"/>';
+      if (r) s += '<rect x="' + (xx + bw / 2) + '" y="' + (H - 22 - r) + '" width="' + w + '" height="' + r + '" rx="2" fill="var(--verde)"/>';
+      if (n <= 16 ? i % 2 === 0 : i % Math.ceil(n / 7) === 0) s += '<text x="' + (xx + bw / 2) + '" y="' + (H - 6) + '" font-size="10" fill="var(--tx3)" text-anchor="middle">' + String(t.date).slice(8, 10) + '</text>'; });
+    if (F.n(tr[im].opened)) s += '<text x="' + (6 + im * bw + bw / 4) + '" y="' + (H - 22 - F.n(tr[im].opened) / mx * (H - 38) - 5) + '" font-size="10.5" font-weight="700" fill="var(--tx)" text-anchor="middle">' + F.n(tr[im].opened) + '</text>';
+    h += X.card('Abertos × resolvidos', 'Por dia', s + '</svg><div class="lg"><span><i style="border-color:var(--azul);border-top-width:6px"></i>Abertos</span><span><i style="border-color:var(--verde);border-top-width:6px"></i>Resolvidos</span></div>');
+  }
+  h += X.atencao(insights());
+  var pd = [['Baixa', pr.LOW, '#9aa9d6'], ['Média', pr.MEDIUM, 'var(--azul)'], ['Alta', pr.HIGH, 'var(--laranja)'], ['Urgente', pr.URGENT, 'var(--vermelho)']];
+  if (pd.some(function (p) { return F.n(p[1]) > 0; })) h += X.card('Prioridade dos chamados', 'Abertos no período', X.faixa(pd.map(function (p) { return [p[0], p[1], p[2], F.n(p[1]) || '']; }), 30) + X.legenda(pd.map(function (p) { return [p[0], p[1], p[2]]; })));
+  return h;
+}
+
+function insights() {
+  var o = d.o, r = [], ag = (o.agents || []).filter(function (a) { return F.n(a.assigned_current) > 0; }), tot = (o.agents || []).reduce(function (s, a) { return s + F.n(a.assigned_current); }, 0);
+  var sla = o.sla || {}, top = ag.slice().sort(function (a, b) { return F.n(b.assigned_current) - F.n(a.assigned_current); })[0];
+  if (F.n(sla.breached_active)) r.push(X.ins('rosa', '!', F.n(sla.breached_active) + (F.n(sla.breached_active) === 1 ? ' chamado vencido' : ' chamados vencidos') + ' agora', 'Veja em "Precisa de atenção agora"'));
+  if (top && tot >= 5 && F.n(top.assigned_current) / tot >= 0.6 && (o.agents || []).length > 1) {
+    var livres = (o.agents || []).filter(function (a) { return !F.n(a.assigned_current); }).length;
+    r.push(X.ins('laranja', '👤', X.cap(top.name).split(' ').slice(0, 2).join(' ') + ' concentra ' + F.n(top.assigned_current) + ' de ' + tot + ' atribuídos',
+      Math.round(F.n(top.assigned_current) / tot * 100) + '% da carga em uma pessoa' + (livres ? ' · ' + livres + (livres === 1 ? ' atendente sem nenhum' : ' atendentes sem nenhum') : '')));
+  }
+  var ap = d.tk.filter(function (t) { return t.status === 'PENDING_APPROVAL'; });
+  if (ap.length) r.push(X.ins('laranja', '⏳', ap.length === 1 ? (ap[0].protocol || '#' + ap[0].id) + ' espera o solicitante aprovar' : ap.length + ' chamados esperam o solicitante aprovar', 'Já têm solução · só fecham quando o solicitante confirmar'));
+  var tr = o.trends || [], mx = null; tr.forEach(function (t) { if (!mx || F.n(t.opened) > F.n(mx.opened)) mx = t; });
+  if (mx && F.n(mx.opened) >= 3 && tr.length > 3) r.push(X.ins('azul', '↗', X.dm(mx.date) + ' foi o dia com mais chamados', F.n(mx.opened) + ' abertos e ' + F.n(mx.resolved) + ' resolvidos · saldo do período: ' + ((F.n((o.flow || {}).opened) - F.n((o.flow || {}).resolved)) >= 0 ? '+' : '') + (F.n((o.flow || {}).opened) - F.n((o.flow || {}).resolved))));
+  if (sla.first_response_percent != null && sla.first_response_percent >= 100 && sla.resolution_percent >= 100 && !F.n(sla.breached_active)) r.push(X.ins('verde', '✓', 'Nenhum chamado fora do prazo', 'SLA de 1ª resposta e de resolução em 100% no período'));
+  else if (sla.resolution_percent != null && sla.resolution_percent < 90) r.push(X.ins('laranja', '⏱', 'SLA de resolução em ' + Math.round(sla.resolution_percent) + '%', 'Média de resolução de ' + dur((o.durations || {}).resolution_minutes)));
+  return r.slice(0, 5);
+}
+
+function filas() {
+  var h = '', qs = (d.o.queues || []).slice().sort(function (a, b) { return F.n(b.breached) - F.n(a.breached) || F.n(b.active) - F.n(a.active); });
+  if (qs.length > 1) h += X.card('Comparando seus setores', 'Ordenado por vencidos', '<div class="row" style="font-size:11.5px;color:var(--tx3);font-weight:700"><span>SETOR</span><span>ATIVOS · VENC. · SLA · 1ª RESP.</span></div>' +
+    qs.map(function (q) { return '<div class="row"><span><b>' + F.esc(X.cap(q.queue_name)) + '</b></span><b style="font-weight:600">' + F.n(q.active) + ' · <span style="color:var(--tx-' + (F.n(q.breached) ? 'rosa' : 'verde') + ')">' + F.n(q.breached) + '</span> · ' + (q.resolution_percent != null ? Math.round(q.resolution_percent) + '%' : '—') + ' · ' + dur(q.first_response_minutes) + '</b></div>'; }).join(''));
+  qs.forEach(function (q) {
+    h += X.card(F.esc(q.queue_name), F.n(q.opened) + ' abertos · ' + F.n(q.resolved) + ' resolvidos · ' + F.n(q.active) + ' ativos',
+      '<div class="k4" style="margin:0"><div class="k" style="box-shadow:none;background:var(--sf2)"><span>1ª resposta</span><b style="font-size:17px">' + dur(q.first_response_minutes) + '</b><em style="color:var(--tx-' + corSla(q.first_response_percent) + ')">● ' + (q.first_response_percent != null ? Math.round(q.first_response_percent) + '% no prazo' : 'sem SLA') + '</em></div>' +
+      '<div class="k" style="box-shadow:none;background:var(--sf2)"><span>Resolução</span><b style="font-size:17px">' + dur(q.resolution_minutes) + '</b><em style="color:var(--tx-' + corSla(q.resolution_percent) + ')">● ' + (q.resolution_percent != null ? Math.round(q.resolution_percent) + '% no prazo' : 'sem SLA') + '</em></div></div>' +
+      '<div class="row" style="margin-top:6px"><span>Vencidos agora</span><b style="color:var(--tx-' + (F.n(q.breached) ? 'rosa' : 'verde') + ')">' + F.n(q.breached) + '</b></div>');
+  });
+  var vol = (d.o.queue_volume || []).filter(function (v) { return F.n(v.value) > 0; }), tot = vol.reduce(function (s, v) { return s + F.n(v.value); }, 0);
+  if (vol.length > 1) h += X.card('Volume por fila', 'Chamados abertos no período', X.barras(vol.map(function (v) { return [X.cap(v.label), v.value, tot ? F.n(v.value) / tot * 100 : 0]; }), 'var(--violeta)', function (v) { return F.n(v); }));
+  if (!qs.length) h += '<div class="vazio">Nenhum dado de fila no período.</div>';
+  return h;
+}
+
+function atendentes() {
+  var ag = (d.o.agents || []).slice().sort(function (a, b) { return F.n(b.assigned_current) - F.n(a.assigned_current) || F.n(b.active_assigned) - F.n(a.active_assigned); });
+  var com = ag.filter(function (a) { return F.n(a.assigned_current) > 0; }).length, venc = ag.reduce(function (s, a) { return s + F.n(a.breached_active); }, 0), mx = Math.max.apply(null, ag.map(function (a) { return F.n(a.assigned_current); }).concat([1]));
+  var h = X.k4([['Atendentes', ag.length, com + ' com chamados no período'], ['Vencidos na mão', venc, venc ? 'fora do prazo agora' : 'ninguém fora do prazo', venc ? 'neg' : 'pos']]);
+  var qs = acesso.queues || [];
+  if (qs.length > 1 && !setor && !setoresPessoa) carregarSetoresPessoa();
+  h += X.card('Carga por atendente', 'Atribuídos no período · ativos agora' + (qs.length > 1 && !setor ? ' · setores marcados' : ''), ag.map(function (a) {
+    var tags = setoresPessoa && setoresPessoa[a.user_id] ? setoresPessoa[a.user_id].map(function (t) { return '<span class="tg">' + F.esc(t) + '</span>'; }).join('') : '';
+    var at = F.n(a.active_assigned), vc = F.n(a.breached_active);
+    return '<div class="ger"><div class="nm"><b>' + F.esc(a.name) + '</b>' + tags + '<div class="mini"><i style="width:' + (F.n(a.assigned_current) / mx * 100) + '%;background:var(--violeta)"></i></div></div>' +
+      '<b style="font-size:15px;min-width:30px;text-align:right">' + F.n(a.assigned_current) + '</b><span class="st2 ' + (vc ? '' : at ? 'ok' : 'sm') + '"' + (vc ? ' style="background:var(--rosa-s);color:var(--tx-rosa)"' : '') + '>' + (vc ? vc + ' vencido' + (vc > 1 ? 's' : '') : at ? at + ' ativo' + (at > 1 ? 's' : '') : 'livre') + '</span></div>'; }).join('') || '<div class="vazio">Nenhum atendente neste filtro.</div>');
+  var ins = insights().filter(function (x) { return x.indexOf('concentra') >= 0; });
+  if (ins.length) h += '<div class="card">' + ins.join('') + '</div>';
+  return h;
+}
+/** Em quais dos seus setores cada atendente está (uma consulta por setor, só quando abre a aba). */
+function carregarSetoresPessoa() {
+  setoresPessoa = {}; var qs = acesso.queues || [], dt = datas();
+  Promise.all(qs.map(function (q) { return X.opc('/helpdesk/dashboard/overview?start_date=' + dt[0] + '&end_date=' + dt[1] + '&queue_id=' + q.id).then(function (o) {
+    (o.agents || []).forEach(function (a) { (setoresPessoa[a.user_id] = setoresPessoa[a.user_id] || []).push(X.cap(String(q.name).split(' /')[0])); }); }); })).then(function () { if (aba === 'atend') desenhar(); });
+}
+
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-setor],[data-t]') : null; if (!t) return;
+  if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('hd_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
+  if (t.hasAttribute('data-setor')) { setor = t.getAttribute('data-setor'); carregar(true); return; }
+  if (t.hasAttribute('data-t')) { try { App.abrirSite('/helpdesk/tickets/' + t.getAttribute('data-t')); } catch (e) { } }
+});
+document.addEventListener('change', function (ev) { if (ev.target.id === 'selPer') { periodo = ev.target.value; X.lembrar('hd_per', periodo); setoresPessoa = null; carregar(true); } });
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btAt').innerHTML = F.ic('atualizar');
+document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
+document.getElementById('btAt').onclick = function () { setoresPessoa = null; carregar(true); };
+window.recebidoHelpdesk = function () { carregar(true); };
+window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t); };
+F.topoSombra();
+carregar();
+</script>
+</body></html>
