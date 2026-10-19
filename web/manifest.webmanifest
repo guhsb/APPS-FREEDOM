@@ -1,0 +1,14 @@
+{
+  "name": "Freedom",
+  "short_name": "Freedom",
+  "description": "Atalho para o site de relatórios da Freedom",
+  "start_url": "../?app=1",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#0f1b3d",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

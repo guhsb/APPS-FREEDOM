@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Freedom</title>
+<meta name="description" content="Atalho para o site de relatórios da Freedom">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f1b3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Freedom">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="web/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="web/icone-192.png">
+<link rel="manifest" href="web/manifest.webmanifest">
+<script>
+  // Aberto pelo ícone da Tela de Início: vai direto para o site.
+  var SITE = "https://relatorios.cbfreedom.com.br/";
+  var instalado = window.navigator.standalone === true ||
+    (window.matchMedia && matchMedia("(display-mode: standalone)").matches) ||
+    /[?&]app=1/.test(location.search);
+  if (instalado) location.replace(SITE);
+</script>
+<style>
+:root{--bg:#eef2f7;--sf:#fff;--sf2:#f6f8fc;--ln:#e1e7ef;--tx:#0f1b3d;--tx2:#4b5875;--tx3:#7b879e;
+ --rosa:#e0457f;--rosa-s:rgba(224,69,127,.10);--sombra:0 1px 2px rgba(15,27,61,.05),0 2px 10px rgba(15,27,61,.04)}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0d12;--sf:#12151d;--sf2:#171b25;--ln:#232a3a;--tx:#f3f5f9;--tx2:#a3abbd;--tx3:#6b7489;--rosa:#e84b8a;--sombra:none}}
+*{box-sizing:border-box}
+body{margin:0;padding:max(24px,env(safe-area-inset-top)) 16px 32px;background:var(--bg);color:var(--tx);
+ font:15px/1.45 Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:480px;margin:0 auto}
+.logo{display:inline-block;background:#fff;border-radius:14px;padding:10px 14px;margin-bottom:18px}
+.logo img{height:36px;display:block}
+h1{font-size:22px;margin:0 0 6px}
+p{margin:0 0 14px;color:var(--tx2)}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:var(--sombra)}
+.botao{display:block;text-align:center;background:var(--rosa);color:#fff;text-decoration:none;font-weight:700;
+ border-radius:12px;padding:14px;font-size:16px}
+.rotulo{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);margin-bottom:10px}
+ol{margin:0;padding:0;list-style:none;counter-reset:p}
+li{counter-increment:p;display:flex;gap:12px;align-items:flex-start;padding:8px 0;color:var(--tx)}
+li::before{content:counter(p);flex:0 0 26px;height:26px;border-radius:50%;background:var(--rosa-s);color:var(--rosa);
+ font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.ic{display:inline-block;vertical-align:-3px}
+small{display:block;color:var(--tx3);font-size:12.5px;margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+  <div class="logo"><img src="web/logo.png" alt="Freedom"></div>
+  <h1>Freedom no iPhone</h1>
+  <p>Coloque o atalho do site de relatórios na Tela de Início e abra com um toque, como um app.</p>
+
+  <div class="card">
+    <div class="rotulo">Como adicionar</div>
+    <ol>
+      <li><span>Abra esta página no <b>Safari</b>.</span></li>
+      <li><span>Toque em <b>Compartilhar</b>
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+        na barra de baixo.</span></li>
+      <li><span>Escolha <b>Adicionar à Tela de Início</b> e toque em <b>Adicionar</b>.</span></li>
+      <li><span>Pronto: o ícone <b>Freedom</b> abre direto o site.</span></li>
+    </ol>
+  </div>
+
+  <a class="botao" href="https://relatorios.cbfreedom.com.br/">Abrir o site agora</a>
+  <small>Android, Windows e Mac têm o app completo, com widgets e notificações.</small>
+</main>
+</body>
+</html>
