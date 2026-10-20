@@ -3,7 +3,7 @@
    ============================================================ */
 :root{
   --bg:#0b0d12; --sf:#12151d; --sf2:#171b25; --sf3:#1d2230; --ln:#232a3a; --ln2:#2c3447;
-  --tx:#f3f5f9; --tx2:#a3abbd; --tx3:#6b7489;
+  --tx:#f3f5f9; --tx2:#a3abbd; --tx3:#8b94a8;
   --rosa:#e84b8a; --rosa-s:rgba(232,75,138,.14); --azul:#4f7cff; --azul-s:rgba(79,124,255,.14);
   --verde:#1fbf8f; --verde-s:rgba(31,191,143,.14); --laranja:#f0a53a; --laranja-s:rgba(240,165,58,.14);
   --violeta:#8b6cf0; --violeta-s:rgba(139,108,240,.15); --vermelho:#ef4444;
@@ -15,7 +15,7 @@
 /* ---------- modo claro (padrão): as mesmas cores do site ---------- */
 :root[data-tema="claro"]{
   --bg:#eef2f7; --sf:#ffffff; --sf2:#f6f8fc; --sf3:#e8edf5; --ln:#e1e7ef; --ln2:#cdd6e4;
-  --tx:#0f1b3d; --tx2:#4b5875; --tx3:#7b879e;
+  --tx:#0f1b3d; --tx2:#4b5875; --tx3:#5f6b82;
   --rosa:#e0457f; --rosa-s:rgba(224,69,127,.10); --azul:#3b5bfd; --azul-s:rgba(59,91,253,.09);
   --verde:#0e9f6e; --verde-s:rgba(14,159,110,.10); --laranja:#d97706; --laranja-s:rgba(217,119,6,.10);
   --violeta:#6d4fe0; --violeta-s:rgba(109,79,224,.10); --vermelho:#dc2626;
@@ -120,3 +120,7 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;strok
 .modal .previa img{display:block;width:100%;height:auto}
 .modal .previa .carregando{padding:30px 0}
 .aviso.offline{background:rgba(139,108,240,.12);border-color:rgba(139,108,240,.35);color:var(--tx-violeta)}
+
+/* foco visível pelo teclado (acessibilidade) */
+:focus-visible{outline:2px solid var(--rosa);outline-offset:2px;border-radius:8px}
+.item:focus-visible{outline-offset:-2px}

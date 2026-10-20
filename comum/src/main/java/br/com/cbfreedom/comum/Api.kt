@@ -130,6 +130,26 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
         }
     }
 
+    /** POST que devolve um arquivo (Exportar Excel): (código, bytes, Content-Disposition). */
+    fun baixarPost(caminho: String, corpo: JSONObject, accept: String): Triple<Int, ByteArray, String> {
+        val c = abrir(caminho)
+        try {
+            c.instanceFollowRedirects = false
+            c.readTimeout = 120_000
+            c.requestMethod = "POST"
+            c.setRequestProperty("Accept", accept)
+            c.doOutput = true
+            c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            c.outputStream.use { it.write(corpo.toString().toByteArray(Charsets.UTF_8)) }
+            val cod = c.responseCode
+            val fluxo = if (cod >= 400) c.errorStream else c.inputStream
+            val bytes = fluxo?.use { it.readBytes() } ?: ByteArray(0)
+            return Triple(cod, bytes, c.getHeaderField("Content-Disposition") ?: "")
+        } finally {
+            c.disconnect()
+        }
+    }
+
     /** Envia um arquivo (multipart/form-data, campo "file"), como o site faz nos anexos. */
     fun enviarArquivo(caminho: String, nome: String, tipo: String, dados: ByteArray): Pair<Int, String> {
         val c = abrir(caminho)

@@ -33,6 +33,8 @@ object Acesso {
     /** Busca os módulos no site com uma sessão já aberta. Erros são ignorados (fica o que já sabia). */
     fun atualizar(c: Context, api: Api) {
         try { salvar(c, api.get("/auth/me")) } catch (_: Exception) { }
+        // administrador do Helpdesk (setores, equipes, SLA): o botão Admin aparece também para ele
+        if (helpdesk(c)) try { val r = api.bruto("/helpdesk/admin/access"); if (r.first == 200) p(c).edit().putBoolean("hd_admin", JSONObject(r.second).optBoolean("can_access")).apply() else if (r.first == 403) p(c).edit().putBoolean("hd_admin", false).apply() } catch (_: Exception) { }
     }
 
     fun modulos(c: Context): Set<String>? {
@@ -51,6 +53,7 @@ object Acesso {
 
     /** Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra). */
     fun admin(c: Context): Boolean {
+        if (p(c).getBoolean("hd_admin", false)) return true
         val s = p(c).getString("permissoes", null) ?: return false
         return try {
             val a = JSONArray(s)

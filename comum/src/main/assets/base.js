@@ -27,7 +27,11 @@ var F = {
   num: function (v) { return F.n(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); },
   brl: function (v) { return 'R$ ' + F.num(v); },
   um: function (x, c) { var s = x.toFixed(c || 1).replace('.', ','); return s.indexOf(',') >= 0 ? s.replace(/0+$/, '').replace(/,$/, '') : s; },
-  brlK: function (v) { v = F.n(v); return v >= 1e7 ? 'R$ ' + F.um(v / 1e6) + ' mi' : v >= 1e6 ? 'R$ ' + F.um(v / 1e6, 2) + ' mi' : v >= 1e3 ? 'R$ ' + F.um(v / 1e3) + ' mil' : F.brl(v); },
+  brlK: function (v) {
+    v = F.n(v); var neg = v < 0, a = Math.abs(v), g = function (x, c) { var t = F.um(x, c), p = t.split(','); p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return p.join(','); };
+    var t = a >= 1e9 ? 'R$ ' + g(a / 1e9, a >= 1e10 ? 1 : 2) + ' bi' : a >= 1e7 ? 'R$ ' + g(a / 1e6) + ' mi' : a >= 1e6 ? 'R$ ' + g(a / 1e6, 2) + ' mi' : a >= 1e3 ? 'R$ ' + g(a / 1e3) + ' mil' : F.brl(a);
+    return (neg ? '−' : '') + t;
+  },
   pct: function (v) { return F.n(v).toFixed(1).replace('.', ',') + '%'; },
   int: function (v) { return String(Math.round(F.n(v))); },
   hhmm: function (ms) { if (!ms) return '--:--'; var d = new Date(ms); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); },
@@ -235,3 +239,25 @@ var Base = {
     Base.render(e.dados, e);
   }
 };
+
+// ---- acessibilidade (todas as telas): o que se toca também funciona pelo teclado e é anunciado como botão; Esc fecha janelas ----
+(function () {
+  var SEL = '[data-aba],[data-sub],[data-psub],[data-fsub],[data-setor],[data-v],[data-p],[data-t],[data-mais],[data-fmais],[data-act]:not(button):not(input):not(select),[data-a]:not(button),[data-c],[data-id],[data-anexo],[data-nota]:not(button)';
+  var NAT = /^(BUTTON|A|INPUT|SELECT|TEXTAREA|LABEL)$/;
+  F.acessivel = function (raiz) {
+    [].forEach.call((raiz || document).querySelectorAll(SEL), function (e) {
+      if (NAT.test(e.tagName)) return;
+      if (!e.hasAttribute('tabindex')) e.setAttribute('tabindex', '0');
+      if (!e.hasAttribute('role')) e.setAttribute('role', e.hasAttribute('data-aba') ? 'tab' : 'button');
+      if (e.hasAttribute('data-aba')) e.setAttribute('aria-selected', e.classList.contains('on') ? 'true' : 'false');
+    });
+  };
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') { var m = document.getElementById('mfundo'); if (m) { m.parentNode.removeChild(m); ev.preventDefault(); } return; }
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var t = ev.target; if (!t || NAT.test(t.tagName) || !t.matches || !t.matches(SEL)) return;
+    ev.preventDefault(); t.click();
+  });
+  var agendado = false;
+  try { new MutationObserver(function () { if (agendado) return; agendado = true; setTimeout(function () { agendado = false; F.acessivel(); }, 0); }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { }
+})();

@@ -40,8 +40,27 @@ var LG = (function () {
   // =====================================================================
   function urlPed() { var s = st('ped'); return '/logistics/pending/orders' + X.q({ search: (s.busca || '').trim(), network: s.rede, classification: s.cls }); }
   function carregarPed() { var s = st('ped'); return buscar(s, 'd', urlPed()).then(function () { lista(s.d && s.d.items).forEach(function (i) { s.redes = s.redes || {}; if (i.network) s.redes[i.network] = 1; }); }); }
+  /** Classificações que o pedido pode receber: as do site + qualquer nova que já apareça nos pedidos (entra sozinha). */
+  function opcoesCls() {
+    var l = ['PENDENCIA', 'EQUIPE'], d = st('ped').d;
+    lista(d && d.items).forEach(function (i) { [i.operational_classification, i.classification].forEach(function (c) { if (c && c !== 'FINALIZADO' && l.indexOf(c) < 0) l.push(c); }); });
+    return l;
+  }
+  function nomeCls(c) { return CLS[c] || X.cap(String(c || '').toLowerCase().replace(/_/g, ' ')); }
+  /** Motivos já usados (nos pedidos de agora e nos que você salvou), do mais usado para o menos. */
+  function motivosUsados() {
+    var cont = {}, d = st('ped').d;
+    lista(d && d.items).forEach(function (i) { var m = (i.reason || '').trim(); if (m) cont[m] = (cont[m] || 0) + 1; });
+    try { JSON.parse(localStorage.getItem('log_motivos') || '[]').forEach(function (m) { cont[m] = (cont[m] || 0) + 0.5; }); } catch (e) { }
+    return Object.keys(cont).sort(function (a, b) { return cont[b] - cont[a]; }).slice(0, 12);
+  }
+  function lembrarMotivo(m) {
+    if (!m) return;
+    try { var l = JSON.parse(localStorage.getItem('log_motivos') || '[]').filter(function (x) { return x !== m; }); l.unshift(m); localStorage.setItem('log_motivos', JSON.stringify(l.slice(0, 20))); } catch (e) { }
+  }
   function telaPed() {
     var s = st('ped'); if (s.d == null && !s._cd) carregarPed();
+    s.marc = s.marc || {};
     var h = '';
     var sm = s.d && s.d.summary || {};
     h += '<div class="k4" style="grid-template-columns:1fr 1fr 1fr">' + [['PENDENCIA', 'Pendência', sm.pending_value, sm.pending_orders, 'lar'], ['EQUIPE', 'Equipe', sm.team_value, sm.team_orders, ''], ['FINALIZADO', 'Finalizado', sm.finalized_value, sm.finalized_orders, 'pos']].map(function (c) {
@@ -49,45 +68,95 @@ var LG = (function () {
     }).join('') + '</div>';
     var redes = Object.keys(s.redes || {}).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
     h += '<input class="busca" id="pedBusca" placeholder="Buscar cliente, rede ou pedido" value="' + F.esc(s.busca || '') + '">';
-    h += '<div class="sub2">' + sel('pedRede', redes, s.rede, 'Todas as redes') + sel('pedCls', [['PENDENCIA', 'Pendência'], ['EQUIPE', 'Equipe'], ['FINALIZADO', 'Finalizado']], s.cls, 'Todas as classificações') + '</div>';
+    h += '<div class="sub2">' + sel('pedRede', redes, s.rede, 'Todas as redes') + sel('pedCls', opcoesCls().concat(['FINALIZADO']).map(function (c) { return [c, nomeCls(c)]; }), s.cls, 'Todas as classificações') + '</div>';
+    var nMarc = Object.keys(s.marc).length;
+    h += '<div style="display:flex;gap:8px;align-items:center;margin:-2px 0 10px">' + (s.varios ? '<button class="btn cl mini" data-act="pedVarios">Cancelar seleção</button><button class="btn az mini" data-act="pedTodos">Marcar os mostrados</button>' :
+      '<button class="btn az mini" data-act="pedVarios">☑ Selecionar vários</button>') + '<span class="cs" style="margin:0">Toque em Pendência/Equipe no pedido para trocar na hora</span></div>';
     h += bloco(s, 'd', function (d) {
       var it = lista(d.items), n = s.n || 40;
       if (!it.length) return '<div class="vazio">Nenhum pedido encontrado.</div>';
-      return X.card(it.length + ' pedido(s)', 'Toque em "Ver itens" para abrir os produtos', it.slice(0, n).map(linhaPed).join('') +
+      return X.card(it.length + ' pedido(s)', s.varios ? 'Marque os pedidos e use a barra de baixo para classificar todos de uma vez' : 'Classificação e motivo gravam direto no site', it.slice(0, n).map(linhaPed).join('') +
         (it.length > n ? '<button class="mais" data-act="pedMais">Ver mais (' + (it.length - n) + ')</button>' : ''));
     });
+    if (s.varios && nMarc) h += '<div style="height:70px"></div><div class="barraLote"><span><b>' + nMarc + '</b> pedido' + (nMarc > 1 ? 's' : '') + ' marcado' + (nMarc > 1 ? 's' : '') + '</span><button class="btn ro" data-act="pedLote">Classificar / motivo</button></div>';
     return h;
   }
   function linhaPed(p) {
     var s = st('ped'), ef = p.effective_classification, ab = s.ab && s.ab[p.order_number], pr = s.prods && s.prods[p.order_number];
-    var cor = ef === 'FINALIZADO' ? 'vd' : ef === 'EQUIPE' ? 'az' : 'la';
-    var h = '<div class="lin"><div class="c"><b>' + F.esc(p.customer || '—') + '</b><span>Pedido ' + F.esc(p.order_number) + ' · ' + F.dataBR(p.order_date) + ' · ' + F.esc(p.network || 'SEM REDE') + '</span>' +
-      '<span class="bdg ' + cor + '">' + (CLS[ef] || ef) + '</span>' + (p.conference_status ? '<span class="bdg">' + F.esc(CONF[p.conference_status] || p.conference_status) + '</span>' : '') +
+    var cor = ef === 'FINALIZADO' ? 'vd' : ef === 'EQUIPE' ? 'az' : 'la', fin = ef === 'FINALIZADO', atual = p.operational_classification || p.classification;
+    var trocando = s.trocando === p.order_number;
+    var h = '<div class="lin">' + (s.varios && !fin ? '<input type="checkbox" class="chkPed" data-act="pedMarca" data-v="' + F.esc(p.order_number) + '"' + (s.marc[p.order_number] ? ' checked' : '') + ' style="width:20px;height:20px;margin-top:2px;accent-color:var(--rosa)">' : '') +
+      '<div class="c"><b>' + F.esc(p.customer || '—') + '</b><span>Pedido ' + F.esc(p.order_number) + ' · ' + F.dataBR(p.order_date) + ' · ' + F.esc(p.network || 'SEM REDE') + '</span>';
+    if (fin) h += '<span class="bdg vd">Finalizado</span>';
+    else h += '<div class="segm">' + opcoesCls().map(function (c) {
+      return '<button data-act="pedTroca" data-v="' + F.esc(p.order_number) + '" data-c="' + F.esc(c) + '" class="' + (c === atual ? 'on ' + (c === 'EQUIPE' ? 'az' : 'la') : '') + '"' + (trocando ? ' disabled' : '') + '>' + F.esc(nomeCls(c)) + '</button>'; }).join('') + '</div>';
+    h += (p.conference_status ? '<span class="bdg">' + F.esc(CONF[p.conference_status] || p.conference_status) + '</span>' : '') +
       (p.reason ? '<span style="display:block;font-size:12.5px;color:var(--tx2);margin-top:4px">Motivo: <b>' + F.esc(p.reason) + '</b></span>' : '') +
       '<div class="ac2"><button class="lnk" data-act="pedItens" data-v="' + F.esc(p.order_number) + '">' + (ab ? 'Ocultar itens' : 'Ver ' + F.n(p.item_count) + ' itens') + '</button>' +
-      (ef !== 'FINALIZADO' ? '<button class="lnk ro" data-act="pedEditar" data-v="' + F.esc(p.order_number) + '">Editar</button>' : '<span style="font-size:12px;color:var(--tx3)" title="Classificação definida pela conferência concluída.">Definido pela conferência</span>') + '</div>';
+      (!fin ? '<button class="lnk ro" data-act="pedEditar" data-v="' + F.esc(p.order_number) + '">' + (p.reason ? 'Trocar motivo' : '+ Motivo') + '</button>' : '<span style="font-size:12px;color:var(--tx3)" title="Classificação definida pela conferência concluída.">Definido pela conferência</span>') + '</div>';
     if (ab) h += '<div class="itens2">' + (pr === undefined || pr === 'c' ? '<div class="vazio2">Carregando produtos…</div>' : pr === 'e' ? '<div class="vazio2">Não consegui abrir os produtos.</div>' :
       lista(pr.products).map(function (x) { return '<div class="row"><span>' + F.esc(x.product) + (x.product_code ? ' <small style="color:var(--tx3)">' + F.esc(x.product_code) + '</small>' : '') + '<br><small style="color:var(--tx3)">' + F.esc(x.family || '') + ' · ' + qtd(x.quantity) + ' un</small></span><b>' + brl(x.value) + '</b></div>'; }).join('')) + '</div>';
     return h + '</div><div class="v">' + brl(p.value) + '</div></div>';
   }
   function pedPorNumero(n) { var d = st('ped').d; return lista(d && d.items).filter(function (x) { return x.order_number === n; })[0]; }
+  /** Grava no site; devolve a promessa. */
+  function gravarPed(n, cls, motivo) {
+    return X.enviar('PUT', '/logistics/pending/orders/' + encodeURIComponent(n) + '/control', { classification: cls, reason: motivo || null }, 'Este pedido não está mais disponível na lista de pendências.')
+      .then(function (j) { var p = pedPorNumero(n); if (p) { p.operational_classification = cls; p.classification = cls; p.effective_classification = cls; p.reason = motivo || null; } return j; });
+  }
+  /** Um toque em Pendência/Equipe: troca na hora, mantendo o motivo. */
+  function trocarPed(n, cls) {
+    var s = st('ped'), p = pedPorNumero(n); if (!p || (p.operational_classification || p.classification) === cls || s.trocando) return;
+    s.trocando = n; redesenhar();
+    gravarPed(n, cls, (p.reason || '').trim()).then(function () { F.toast('Pedido ' + n + ' → ' + nomeCls(cls)); })
+      .catch(function (e) { F.toast(e.message); if (e.status === 409) carregarPed(); })
+      .then(function () { s.trocando = null; redesenhar(); if (window.carregar) carregar(true); });
+  }
+  /** Janela de classificação + motivo (um pedido ou vários marcados). */
+  function formPed(titulo, sub, cls, motivo, alvo) {
+    var sug = motivosUsados();
+    X.modal(titulo, sub,
+      '<div class="campo"><span>Classificação</span><div class="segm grande" id="mSeg">' + opcoesCls().map(function (c) { return '<button type="button" data-cls="' + F.esc(c) + '" class="' + (c === cls ? 'on ' + (c === 'EQUIPE' ? 'az' : 'la') : '') + '">' + F.esc(nomeCls(c)) + '</button>'; }).join('') + '</div></div>' +
+      '<div class="campo"><span>Motivo</span>' + (sug.length ? '<div class="sugs">' + sug.map(function (m) { return '<button type="button" data-sug="' + F.esc(m) + '">' + F.esc(m) + '</button>'; }).join('') + '</div>' : '') +
+      '<textarea id="mMot" maxlength="1000" rows="3" placeholder="Escreva ou toque num motivo acima">' + F.esc(motivo || '') + '</textarea></div>',
+      [['cancelar', 'Cancelar', 'cl'], ['salvarPed', 'Salvar', 'ro']]).setAttribute('data-n', alvo);
+    var m = document.getElementById('mfundo');
+    m.setAttribute('data-cls', cls);
+    m.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-cls],[data-sug]'); if (!b) return;
+      if (b.hasAttribute('data-cls')) { var c = b.getAttribute('data-cls'); m.setAttribute('data-cls', c); [].forEach.call(m.querySelectorAll('[data-cls]'), function (x) { x.className = x === b ? 'on ' + (c === 'EQUIPE' ? 'az' : 'la') : ''; }); }
+      else { var t = document.getElementById('mMot'); t.value = b.getAttribute('data-sug'); t.focus(); }
+    });
+  }
   function editarPed(n) {
     var p = pedPorNumero(n); if (!p) return;
-    X.modal('Editar pedido ' + F.esc(n), F.esc(p.customer || '') + ' · ' + brl(p.value),
-      X.campo('Classificação', '<select id="mCls">' + X.opcoes([['PENDENCIA', 'Pendência'], ['EQUIPE', 'Equipe']], p.operational_classification || 'PENDENCIA') + '</select>') +
-      X.campo('Motivo', '<textarea id="mMot" maxlength="1000" rows="4">' + F.esc(p.reason || '') + '</textarea>'),
-      [['cancelar', 'Cancelar', 'cl'], ['salvarPed', 'Salvar', 'ro']]).setAttribute('data-n', n);
+    formPed('Pedido ' + F.esc(n), F.esc(p.customer || '') + ' · ' + brl(p.value), p.operational_classification || 'PENDENCIA', p.reason || '', n);
   }
   function salvarPed() {
-    var n = document.getElementById('mfundo').getAttribute('data-n'), mot = X.val('mMot').trim();
+    var m = document.getElementById('mfundo'), alvo = m.getAttribute('data-n'), cls = m.getAttribute('data-cls'), mot = X.val('mMot').trim(), s = st('ped');
     X.ocupado('salvarPed', true); X.erroModal('');
-    X.enviar('PUT', '/logistics/pending/orders/' + encodeURIComponent(n) + '/control', { classification: X.val('mCls'), reason: mot || null },
-      'Este pedido não está mais disponível na lista de pendências.').then(function () {
-      X.fechar(); F.toast('Pedido ' + n + ' atualizado no site'); carregarPed(); if (window.carregar) carregar(true);
-    }).catch(function (e) {
-      if (e.status === 409) { X.fechar(); F.toast(e.message); carregarPed(); return; }
-      X.ocupado('salvarPed', false); X.erroModal(e.message);
-    });
+    if (alvo !== '*') {
+      gravarPed(alvo, cls, mot).then(function () { lembrarMotivo(mot); X.fechar(); F.toast('Pedido ' + alvo + ' atualizado no site'); redesenhar(); if (window.carregar) carregar(true); })
+        .catch(function (e) { if (e.status === 409) { X.fechar(); F.toast(e.message); carregarPed(); return; } X.ocupado('salvarPed', false); X.erroModal(e.message); });
+      return;
+    }
+    // vários pedidos: um de cada vez, mostrando o andamento
+    var nums = Object.keys(s.marc), ok = 0, falhas = [], i = 0;
+    function prox() {
+      if (i >= nums.length) {
+        lembrarMotivo(mot); X.fechar(); s.marc = {}; s.varios = false;
+        F.toast(ok + ' pedido(s) atualizados' + (falhas.length ? ' · ' + falhas.length + ' não deu (' + falhas.slice(0, 3).join(', ') + ')' : ''));
+        carregarPed(); if (window.carregar) carregar(true); return;
+      }
+      var n = nums[i++]; X.ocupado('salvarPed', false); X.ocupado('salvarPed', true, 'Salvando ' + i + ' de ' + nums.length + '…');
+      gravarPed(n, cls, mot).then(function () { ok++; }).catch(function () { falhas.push(n); }).then(prox);
+    }
+    prox();
+  }
+  function lotePed() {
+    var s = st('ped'), nums = Object.keys(s.marc); if (!nums.length) return;
+    var tot = nums.reduce(function (a, n) { var p = pedPorNumero(n); return a + F.n(p && p.value); }, 0);
+    formPed(nums.length + ' pedidos marcados', 'Total ' + brl(tot) + ' · a mesma classificação e o mesmo motivo para todos', 'EQUIPE', '', '*');
   }
   function itensPed(n) {
     var s = st('ped'); s.ab = s.ab || {}; s.prods = s.prods || {};
@@ -193,7 +262,7 @@ var LG = (function () {
     if (s.op == null && !s._cop) opcoesSb();
     var sm = s.sum || {}, h = '';
     h += '<div class="card hero"><div class="lb">Total combinado (sem duplicar)</div><div class="v">' + (s.sum ? X.brl0(sm.combined_value) : '…') + '</div><div class="s"><b>' + X.int(sm.distinct_orders) + '</b> pedidos · <b>' + X.int(sm.active_selections) + '</b> seleções ativas' + (F.n(sm.inactive_selections) ? ' · ' + X.int(sm.inactive_selections) + ' inativas' : '') + '</div>' +
-      '<div class="acoes" style="justify-content:flex-start"><button class="btn ro" data-act="sbEnviar">Enviar soma para Relatório</button></div></div>';
+      '<div class="acoes" style="justify-content:flex-start"><button class="btn ro" data-act="sbEnviar">Enviar soma para Relatório</button><button class="btn cl" data-act="sbPng">' + F.ic('imagem') + ' Imagem (PNG)</button></div></div>';
     var sels = lista(s.sel && s.sel.items);
     h += X.abas(CATS.map(function (c) { var n = sels.filter(function (x) { return x.category === c[0]; }).length; return [c[0], c[1] + (n ? ' <small>' + n + '</small>' : '')]; }), s.cat, 'sbcat').replace(/data-sbcat=/g, 'data-act="sbCat" data-v=');
     var cat = CATS.filter(function (c) { return c[0] === s.cat; })[0];
@@ -256,7 +325,8 @@ var LG = (function () {
       var atual = it.filter(function (x) { return String(x.id) === String(s.snap); })[0] || it[0];
       return '<label class="campo"><span>Histórico de snapshots</span>' + sel('relSnap', it.map(function (x) { return [x.id, '#' + x.id + ' · ' + X.dh(x.created_at)]; }), atual.id) + '</label>' +
         X.k4([['PEND no snapshot', X.k(atual.pending_total_at_snapshot)], ['Standby', X.k(atual.standby_value), '', 'lar'], ['PEND da equipe', X.k(atual.team_pending)], ['Pedidos no Standby', X.int(atual.standby_distinct_orders)]]) +
-        '<p class="cs" style="margin:-4px 0 12px">Enviado em ' + X.dh(atual.created_at) + ' por ' + F.esc(atual.created_by || '—') + '. Snapshot imutável.</p>';
+        '<p class="cs" style="margin:-4px 0 8px">Enviado em ' + X.dh(atual.created_at) + ' por ' + F.esc(atual.created_by || '—') + '. Snapshot imutável.</p>' +
+        '<button class="btn cl" data-act="relPng" style="width:100%;margin-bottom:12px">' + F.ic('imagem') + ' Gerar imagem do Relatório (PNG)</button>';
     });
     h += '<div class="card"><p class="ct">Listas operacionais de produtos</p><p class="cs">Adicione um produto da PEND em "Em produção" ou "Sem estoque"</p><input class="inp" id="relBusca" placeholder="Buscar produto" value="' + F.esc(s.busca || '') + '" style="margin-bottom:8px">' +
       bloco(s, 'op', function (o) { var it = lista(o.items); return it.length ? sel('relProd', it, s.prodSel, 'Selecione para adicionar') : '<div class="vazio2">Nenhuma sugestão encontrada.</div>'; }) +
@@ -470,6 +540,33 @@ var LG = (function () {
     return h;
   }
 
+
+  // =====================================================================
+  // Imagens (PNG) iguais às do site: Standby e Relatório de Pendências
+  // =====================================================================
+  function quandoImg() { var d = new Date(); return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  function pngStandby() {
+    var s = st('sb'); if (!s.sel || !s.sum) { F.toast('Espere o Standby carregar'); return; }
+    var sels = lista(s.sel.items), bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Total combinado (sem duplicar)', valor: F.n(s.sum.combined_value), pill: X.int(s.sum.distinct_orders) + ' pedidos', sub: X.int(s.sum.active_selections) + ' seleções ativas' }] }];
+    CATS.forEach(function (c) {
+      var l = sels.filter(function (x) { return x.category === c[0]; });
+      bl.push({ tipo: 'tabela', titulo: c[1], d: l.length ? l.length + ' item(ns)' : '', cols: [[X.cap(c[2]), 'l', 0.46], ['Motivo', 'l', 0.3], ['Valor', 'r', 0.24, 1]],
+        linhas: l.map(function (x) { return [x.item_value, (x.reason || '').trim() || '—', F.brl(x.value)]; }) });
+    });
+    F.gerarImagem({ titulo: 'Standby', sub: 'Painel de Pendências · ' + quandoImg(), arquivo: 'freedom-logistica-standby', blocos: bl });
+  }
+  function pngRelatorio() {
+    var s = st('rel'), it = lista(s.snaps && s.snaps.items); if (!it.length || !s.prods) { F.toast('Espere o Relatório carregar'); return; }
+    var sn = it.filter(function (x) { return String(x.id) === String(s.snap); })[0] || it[0], pr = lista(s.prods.items);
+    var bl = [{ tipo: 'card', blocos: [{ tipo: 'linha', r: 'TOTAL PENDENTE', v: F.brl(sn.pending_total_at_snapshot), c: 'vermelho' }, { tipo: 'linha', r: 'STANDBY', v: F.brl(sn.standby_value), c: 'azul' }, { tipo: 'linha', r: 'EQUIPE TEM PENDENTE', v: F.brl(sn.team_pending), c: 'verde' }] }];
+    [['IN_PRODUCTION', 'Itens em Produção', 'azul'], ['OUT_OF_STOCK', 'Itens sem estoque', 'rosa']].forEach(function (g) {
+      var l = pr.filter(function (x) { return x.status === g[0]; });
+      bl.push({ tipo: 'tabela', titulo: g[1], cor: g[2], d: l.length + ' produto(s)', cols: [['Produto', 'l', 0.36], ['Valor un.', 'r', 0.15], ['Valor Total', 'r', 0.19, 1], ['Qtd Vend.', 'r', 0.15], ['Nº Ped.', 'r', 0.15]],
+        linhas: l.map(function (x) { return [x.product, x.unit_value != null ? F.brl(x.unit_value) : '—', F.brl(x.value), qtd(x.quantity), X.int(x.distinct_orders)]; }) });
+    });
+    F.gerarImagem({ titulo: 'Relatório de Pendências', sub: 'Painel de Pendências · snapshot #' + sn.id + ' de ' + X.dh(sn.created_at), arquivo: 'freedom-logistica-pendencias', blocos: bl });
+  }
+
   // =====================================================================
   // Toques e campos
   // =====================================================================
@@ -477,9 +574,14 @@ var LG = (function () {
     pedCls: function (v) { var s = st('ped'); s.cls = s.cls === v ? '' : v; s.n = 40; carregarPed(); },
     pedMais: function () { st('ped').n = (st('ped').n || 40) + 60; redesenhar(); },
     pedItens: itensPed, pedEditar: editarPed,
+    pedTroca: function (v, t) { trocarPed(v, t.getAttribute('data-c')); },
+    pedVarios: function () { var s = st('ped'); s.varios = !s.varios; s.marc = {}; redesenhar(); },
+    pedMarca: function (v, t) { var s = st('ped'); if (t.checked) s.marc[v] = 1; else delete s.marc[v]; redesenhar(); },
+    pedTodos: function () { var s = st('ped'); lista(s.d && s.d.items).slice(0, s.n || 40).forEach(function (p) { if (p.effective_classification !== 'FINALIZADO') s.marc[p.order_number] = 1; }); redesenhar(); },
+    pedLote: lotePed,
     consModo: function (v) { st('cons').modo = v; redesenhar(); },
     sbCat: function (v) { var s = st('sb'); s.cat = v; s.op = null; opcoesSb(); redesenhar(); },
-    sbRem: sbRem, sbEnviar: sbEnviar,
+    sbRem: sbRem, sbEnviar: sbEnviar, sbPng: pngStandby, relPng: pngRelatorio,
     relAdd: relAdd, relMover: relMover, relRem: relRem,
     irAba: function (v) { if (window.irAba) irAba(v); },
     fatSub: function (v) { st('fat').sub = v; redesenhar(); },
@@ -502,7 +604,7 @@ var LG = (function () {
     var a = t.getAttribute('data-act');
     if (a === 'diaRem') { diaRem(t.getAttribute('data-t'), t.getAttribute('data-v')); return; }
     if (a === 'nfRem') { nfRem(t.getAttribute('data-t'), t.getAttribute('data-v')); return; }
-    if (ACT[a]) { ev.preventDefault(); ACT[a](t.getAttribute('data-v')); }
+    if (ACT[a]) { if (t.type !== 'checkbox') ev.preventDefault(); ACT[a](t.getAttribute('data-v'), t); }
   });
   var digitou = {
     pedBusca: X.espera(function (v) { st('ped').busca = v; carregarPed(); }),

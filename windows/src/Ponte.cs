@@ -1,3 +1,4 @@
+using System.Text;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -265,6 +266,35 @@ namespace Freedom
                 j.JsApp(cod);
                 j.JsPainel(cod);
                 j.JsDash(cod);
+            });
+        }
+
+        /// <summary>Exportar Excel do Comercial: salva em Downloads e abre a planilha.</summary>
+        public void exportar(object reqO, string corpo)
+        {
+            int req = N(reqO);
+            Fundo(() =>
+            {
+                int cod; string msg;
+                try
+                {
+                    string nome;
+                    var r = Chamado.Exportar(corpo, out nome);
+                    if (r.Status == 200 && r.Bytes.Length > 0)
+                    {
+                        var pasta = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                        System.IO.Directory.CreateDirectory(pasta);
+                        var arq = System.IO.Path.Combine(pasta, nome);
+                        for (int i = 2; System.IO.File.Exists(arq) && i < 100; i++) arq = System.IO.Path.Combine(pasta, System.IO.Path.GetFileNameWithoutExtension(nome) + " (" + i + ")" + System.IO.Path.GetExtension(nome));
+                        System.IO.File.WriteAllBytes(arq, r.Bytes);
+                        try { Process.Start(arq); } catch (Exception) { try { Process.Start("explorer.exe", "/select,\"" + arq + "\""); } catch (Exception) { } }
+                        cod = 200; msg = "Salvo em Downloads: " + System.IO.Path.GetFileName(arq);
+                    }
+                    else { cod = r.Status; msg = Encoding.UTF8.GetString(r.Bytes); }
+                }
+                catch (Exception e) { cod = 0; msg = "Sem conexão com o site: " + e.Message; }
+                var js = "window.exportado && exportado(" + req + "," + cod + "," + Q(msg) + ")";
+                j.JsDash(js); j.JsPainel(js);
             });
         }
 

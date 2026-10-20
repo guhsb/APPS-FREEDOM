@@ -192,14 +192,18 @@ const Acesso = {
     if (!Array.isArray(me.modules)) return;
     this.P.editar().put('modulos', me.modules.map(x => String(x).toLowerCase())).put('permissoes', Array.isArray(me.permissions) ? me.permissions.map(String) : []).put('perfil', me.role || '').put('nome', me.display_name || '').commit();
   },
-  async atualizar(api) { try { this.salvar(await api.get('/auth/me')); } catch (e) { } },
+  async atualizar(api) {
+    try { this.salvar(await api.get('/auth/me')); } catch (e) { }
+    // administrador do Helpdesk (setores, equipes, SLA): o botão Admin aparece também para ele
+    if (this.helpdesk()) try { const r = await api.bruto('/helpdesk/admin/access'); if (r.status === 200) this.P.editar().put('hd_admin', !!JSON.parse(r.body).can_access).commit(); else if (r.status === 403) this.P.editar().put('hd_admin', false).commit(); } catch (e) { }
+  },
   modulos() { const m = this.P.get('modulos'); return Array.isArray(m) ? m : null; },
   tem(modulo) { const m = this.modulos(); return m == null || m.indexOf(String(modulo).toLowerCase()) >= 0; },
   helpdesk() { return this.tem(this.HELPDESK); },
   comercial() { return this.tem('commercial'); },
   logistica() { return this.tem('logistics'); },
   /** Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra). */
-  admin() { const p = this.P.get('permissoes'); return Array.isArray(p) && p.some(x => x === 'users:manage' || x === 'audit:view' || x === 'firebird_mappings:view'); },
+  admin() { if (this.P.getBool('hd_admin', false)) return true; const p = this.P.get('permissoes'); return Array.isArray(p) && p.some(x => x === 'users:manage' || x === 'audit:view' || x === 'firebird_mappings:view'); },
   perfil() { return this.P.getStr('perfil', ''); },
   nome() { return this.P.getStr('nome', ''); },
   limpar() { this.P.editar().clear().commit(); }

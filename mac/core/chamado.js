@@ -8,7 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const dns = require('dns');
 const { EventEmitter } = require('events');
-const { Pastas, Prefs, Store, Api, ErroLogin, agora } = require('./base');
+const { Pastas, Prefs, Store, Api, ErroLogin, agora, BASE: BASE_API } = require('./base');
 const Helpdesk = require('./helpdesk');
 const Engine = require('./engine');
 
@@ -26,6 +26,7 @@ const ESCRITAS = [
 function permitido(m, caminho) {
   if (!caminho || caminho.indexOf('..') >= 0 || caminho[0] !== '/') return false;
   const p = caminho.split('?')[0];
+  if (p.startsWith('/helpdesk/admin/')) return ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'].indexOf(m) >= 0;   // Administração do Helpdesk (o site confere quem pode)
   if (p.startsWith('/helpdesk/')) return ['GET', 'POST', 'PATCH'].indexOf(m) >= 0;
   if (m === 'GET') return p === '/auth/me' || p.startsWith('/dashboard/') || p.startsWith('/logistics/') || p.startsWith('/admin/users') || p.startsWith('/admin/audit') || p.startsWith('/admin/firebird-mappings');
   return ESCRITAS.some(e => e[0] === m && e[1].test(p));
@@ -153,6 +154,21 @@ const Chamado = {
     if (r.status === 401) { api = new Api(login[0], login[1]); await api.entrar(); hp.editar().put('cookie', api.cookie).commit(); r = await ir(); }
     online = true;
     return r;
+  },
+
+  /** Exportar Excel (POST /exports, igual ao site). Só relatórios do Comercial. Devolve { status, bytes, nome }. */
+  async exportar(corpo) {
+    const o = JSON.parse(corpo); const rel = String(o.report || '');
+    if (!/^(clients|bonuses|daily_evolution|managers|networks|overview|products|sellers)$/.test(rel)) return { status: 0, bytes: Buffer.alloc(0), nome: '' };
+    let { api, login, hp } = await api0();
+    const ir = () => api.executar('POST', BASE_API + '/exports', JSON.stringify(o), 'application/json; charset=utf-8', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    let r = await ir();
+    if (r.status === 401) { api = new Api(login[0], login[1]); await api.entrar(); hp.editar().put('cookie', api.cookie).commit(); r = await ir(); }
+    const bytes = Buffer.from(await r.arrayBuffer()), disp = r.headers.get('content-disposition') || '';
+    let nome = ''; let m = /filename\*=UTF-8''([^;]+)/i.exec(disp); if (m) { try { nome = decodeURIComponent(m[1]); } catch (e) { nome = m[1]; } }
+    if (!nome) { m = /filename="([^"]+)"/i.exec(disp); if (m) nome = m[1]; }
+    nome = (nome || 'Freedom_' + rel + '.xlsx').replace(/[\\/:*?"<>|]/g, '_');
+    return { status: r.status, bytes, nome };
   },
 
   /** Requisição genérica das telas (só endereços do Helpdesk). Status 0 = sem conexão. */

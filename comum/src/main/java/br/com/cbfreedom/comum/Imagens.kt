@@ -42,6 +42,18 @@ class Imagens : ContentProvider() {
             c.startActivity(Intent.createChooser(envio, "Compartilhar imagem").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         }
 
+        /** Planilha exportada: grava e abre o "Abrir com / Compartilhar" (Excel, Drive, WhatsApp, e-mail…). */
+        fun compartilharArquivo(c: Context, dados: ByteArray, nome: String, tipo: String) {
+            val dir = pasta(c)
+            dir.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 3600_000L) it.delete() }
+            val f = File(dir, nome.replace(Regex("[^A-Za-z0-9À-ú._ -]"), "_"))
+            f.writeBytes(dados)
+            val uri = Uri.Builder().scheme("content").authority(autoridade(c)).appendPath(f.name).build()
+            val envio = Intent(Intent.ACTION_SEND).setType(tipo).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            envio.clipData = android.content.ClipData.newRawUri(f.name, uri)
+            c.startActivity(Intent.createChooser(envio, "Abrir ou enviar a planilha").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        }
+
         /** Arquivo vazio para a câmera gravar a foto (content://…/Foto_AAAAMMDD_HHMMSS.jpg). */
         fun novaFoto(c: Context): Pair<File, Uri> {
             val nome = "Foto_" + java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date()) + ".jpg"
@@ -72,7 +84,11 @@ class Imagens : ContentProvider() {
 
     override fun onCreate() = true
 
-    override fun getType(uri: Uri) = if (uri.lastPathSegment?.endsWith(".jpg") == true) "image/jpeg" else "image/png"
+    override fun getType(uri: Uri) = when {
+        uri.lastPathSegment?.endsWith(".jpg") == true -> "image/jpeg"
+        uri.lastPathSegment?.endsWith(".xlsx") == true -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        else -> "image/png"
+    }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
         val f = arquivo(context ?: return null, uri) ?: throw java.io.FileNotFoundException(uri.toString())

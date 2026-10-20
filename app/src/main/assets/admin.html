@@ -18,6 +18,7 @@
 <script>
 /* Administração do site dentro do app: Usuários (cria, edita, senha, ativa/desativa), Auditoria (consulta)
    e De/Para Firebird (acompanhar; publicar e reprocessar continuam no site). Mesmos endereços e regras do site. */
+var HD = {};
 var X = Dash, me = null, aba = X.lembrar('adm_aba') || '', S = { us: {}, au: {}, fb: {} }, seq = 0;
 var PAPEIS = [['director', 'Diretor'], ['manager', 'Gerente'], ['seller', 'Vendedor'], ['logistics', 'Logística'], ['finance', 'Financeiro'], ['hr', 'RH'], ['marketing', 'Marketing']];
 var HIER = [['analyst', 'Analista'], ['assistant', 'Assistente'], ['coordinator', 'Coordenador']];
@@ -37,7 +38,7 @@ function perfilTxt(role, hier) {
   return nomeP(role, PAPEIS);
 }
 function pode(p) { return me && lista(me.permissions).indexOf(p) >= 0; }
-function abas() { var a = []; if (pode('users:manage')) a.push(['us', 'Usuários']); if (pode('audit:view')) a.push(['au', 'Auditoria']); if (pode('firebird_mappings:view')) a.push(['fb', 'De/Para Firebird']); return a; }
+function abas() { var a = []; if (pode('users:manage')) a.push(['us', 'Usuários']); if (pode('audit:view')) a.push(['au', 'Auditoria']); if (pode('firebird_mappings:view')) a.push(['fb', 'De/Para Firebird']); if (HD.acc && HD.acc.can_access) a.push(['hd', 'Helpdesk']); return a; }
 function buscar(alvo, campo, url) {
   var meu = ++seq; alvo['_s' + campo] = meu; alvo['_e' + campo] = null; alvo['_c' + campo] = true;
   return X.get(url).then(function (j) { if (alvo['_s' + campo] === meu) alvo[campo] = j; })
@@ -52,7 +53,8 @@ function bloco(alvo, campo, fn) {
 function desenharMantendo() { X.manter(desenhar); }
 function carregar(forcar) {
   document.getElementById('btAt').classList.add('gira');
-  X.get('/auth/me').then(function (m) { me = m; if (forcar) { S = { us: {}, au: {}, fb: {} }; } desenhar(); })
+  X.get('/auth/me').then(function (m) { me = m; if (forcar) { S = { us: {}, au: {}, fb: {} }; HD = {}; }
+    return (Array.isArray(m.modules) && m.modules.indexOf('helpdesk') >= 0 ? X.opc('/helpdesk/admin/access') : Promise.resolve({})).then(function (a) { HD.acc = a; desenhar(); }); })
     .catch(function (e) { document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); document.getElementById('c').innerHTML = ''; })
     .then(function () { document.getElementById('btAt').classList.remove('gira'); });
 }
@@ -66,6 +68,7 @@ function desenhar() {
   if (aba === 'us') h += telaUsuarios();
   if (aba === 'au') h += telaAuditoria();
   if (aba === 'fb') h += telaFirebird();
+  if (aba === 'hd') h += telaHelpdesk();
   document.getElementById('c').innerHTML = h;
 }
 
@@ -260,12 +263,213 @@ function telaFirebird() {
   return h;
 }
 
+
+// =================== Administração do Helpdesk (setores, equipes, tipos, SLA, administradores e calendário) ===================
+var PRIO = [['LOW', 'Baixa'], ['MEDIUM', 'Média'], ['HIGH', 'Alta'], ['URGENT', 'Urgente']];
+var DIAS = [['NATIONAL_HOLIDAY', 'Feriado nacional'], ['STATE_HOLIDAY', 'Feriado estadual'], ['CITY_HOLIDAY', 'Feriado municipal'], ['COMPANY_RECESS', 'Recesso da empresa'], ['OTHER', 'Outro']];
+var PH = 'Placeholders: {{solicitante}}, {{protocolo}}, {{setor}}, {{prioridade}}, {{sla_primeira_resposta}}, {{sla_resolucao}}';
+function hdGet(campo, url) { if (HD[campo] == null && !HD['_c' + campo]) buscar(HD, campo, url); }
+function arr(x) { return Array.isArray(x) ? x : (x && Array.isArray(x.items) ? x.items : []); }
+function hdOk(m) { F.toast(m); }
+function telaHelpdesk() {
+  var glob = HD.acc && HD.acc.is_global_admin, h = '';
+  HD.sub = HD.sub || 'setores';
+  var subs = [['setores', 'Setores']]; if (glob) subs.push(['admins', 'Administradores'], ['cal', 'Calendário do SLA']);
+  h += X.abas(subs, HD.sub, 'sub').replace(/data-sub=/g, 'data-hsub=');
+  if (HD.sub === 'setores') h += HD.q ? telaSetor() : telaSetores(glob);
+  if (HD.sub === 'admins') h += telaAdmins();
+  if (HD.sub === 'cal') h += telaCalendario();
+  return h;
+}
+function telaSetores(glob) {
+  hdGet('filas', '/helpdesk/admin/queues');
+  var h = glob ? '<button class="btn ro" data-a="hdNovoSetor" style="margin-bottom:12px">+ Novo setor</button>' : '';
+  return h + bloco(HD, 'filas', function (d) {
+    var l = arr(d); if (!l.length) return '<div class="vazio">Nenhum setor configurado.</div>';
+    return X.card('Setores do Helpdesk', 'Toque em um setor para editar dados, equipe, tipos e SLA', l.map(function (q) {
+      return '<div class="lin" data-a="hdAbrir" data-v="' + q.id + '" style="cursor:pointer"><div class="c"><b>' + F.esc(q.name) + ' <code style="font-size:11px;color:var(--tx3)">' + F.esc(q.code) + '</code></b><span>' + F.esc(q.description || 'Sem descrição') + '</span>' +
+        '<span class="bdg ' + (q.is_active ? 'vd' : '') + '">' + (q.is_active ? 'Ativo' : 'Inativo') + '</span><span class="bdg">' + X.int(q.member_count) + ' membros · ' + X.int(q.manager_count) + ' gestores</span></div>' +
+        '<div class="v">' + (q.can_manage_status ? '<button class="lnk ' + (q.is_active ? 'ro' : '') + '" data-a="hdAtivar" data-v="' + q.id + '">' + (q.is_active ? 'Inativar' : 'Ativar') + '</button>' : '') + '<small>Abrir ›</small></div></div>';
+    }).join(''));
+  });
+}
+function fila(id) { return arr(HD.filas).filter(function (q) { return String(q.id) === String(id); })[0]; }
+function telaSetor() {
+  var q = fila(HD.q); if (!q) { HD.q = null; return telaSetores(); }
+  HD.qs = HD.qs || 'dados';
+  var h = '<button class="btn cl mini" data-a="hdVoltar" style="margin-bottom:10px">‹ Todos os setores</button>';
+  h += '<div class="card"><p class="ct" style="font-size:17px">' + F.esc(q.name) + '</p><p class="cs">' + F.esc(q.code) + ' · ' + (q.is_active ? 'Ativo' : 'Inativo') + ' · ' + X.int(q.member_count) + ' membros</p></div>';
+  h += X.abas([['dados', 'Dados'], ['equipe', 'Equipe'], ['tipos', 'Tipos de solicitação'], ['sla', 'SLA']], HD.qs, 'sub').replace(/data-sub=/g, 'data-qsub=');
+  if (HD.qs === 'dados') h += formSetor(q);
+  if (HD.qs === 'equipe') h += telaEquipe(q);
+  if (HD.qs === 'tipos') h += telaTipos(q);
+  if (HD.qs === 'sla') h += telaSla(q);
+  return h;
+}
+function camposSetor(q, novo) {
+  var cfg = novo || q.can_manage_configuration;
+  return (novo ? X.campo('Código', '<input id="sCod" maxlength="32" placeholder="Ex.: FISCAL" style="text-transform:uppercase"><span class="cs">De 2 a 32 caracteres: letras, números, hífen ou sublinhado.</span>') : '') +
+    X.campo('Nome', '<input id="sNome" maxlength="120" value="' + F.esc(q ? q.name : '') + '">') +
+    X.campo('Descrição', '<textarea id="sDesc" maxlength="500" rows="2">' + F.esc(q ? q.description || '' : '') + '</textarea>') +
+    (cfg ? X.campo('Prefixo do protocolo', '<input id="sPref" maxlength="5" value="' + F.esc(q ? q.protocol_prefix || '' : '') + '" style="text-transform:uppercase"><span class="cs">De 1 a 5 letras ou números (fica em maiúsculas).</span>') +
+      '<label class="campo" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sAuto"' + (q && q.auto_reply_enabled ? ' checked' : '') + ' style="width:auto;accent-color:var(--rosa)"> Enviar resposta automática</label>' +
+      X.campo('Mensagem automática', '<textarea id="sMsg" maxlength="10000" rows="4">' + F.esc(q ? q.auto_reply_template || '' : '') + '</textarea><span class="cs">' + PH + '</span>') : '');
+}
+function formSetor(q) { return '<div class="card">' + camposSetor(q) + '<div class="acoes"><button class="btn ro" data-a="hdSalvarSetor" data-v="' + q.id + '">Salvar setor</button></div></div>'; }
+function lerSetor(q, novo) {
+  var o = { name: X.val('sNome').trim(), description: X.val('sDesc').trim() }, cfg = novo || (q && q.can_manage_configuration);
+  if (o.name.length < 2) throw new Error('Nome inválido. Use de 2 a 120 caracteres.');
+  if (cfg) {
+    var pf = X.val('sPref').trim().toUpperCase(); if (pf && !/^[A-Z0-9]{1,5}$/.test(pf)) throw new Error('Prefixo inválido. Use de 1 a 5 letras ou números.');
+    var msg = X.val('sMsg'); o.protocol_prefix = pf || null; o.auto_reply_enabled = !!(document.getElementById('sAuto') || {}).checked; o.auto_reply_template = msg.trim() ? msg : null;
+  }
+  return o;
+}
+function recarregarFilas() { HD.filas = null; buscar(HD, 'filas', '/helpdesk/admin/queues'); }
+// ---- equipe ----
+function telaEquipe(q) {
+  if (HD.memQ !== q.id) { HD.memQ = q.id; HD.mem = null; buscar(HD, 'mem', '/helpdesk/admin/queues/' + q.id + '/members'); }
+  var eleg = arr(HD.eleg);
+  return '<div class="card"><p class="ct">Adicionar atendente</p><input class="inp" id="hdBuscaMem" placeholder="Buscar por nome ou login" maxlength="120" value="' + F.esc(HD.buscaMem || '') + '" style="margin:6px 0">' +
+    (HD.buscaMem ? (eleg.length ? '<div style="display:flex;gap:8px"><select class="sel" id="hdEleg">' + X.opcoes(eleg.map(function (u) { return [u.id, u.display_name + ' · ' + u.login]; }), '', 'Selecione um usuário') + '</select><button class="btn ro" data-a="hdAddMem">Adicionar</button></div>' : '<div class="vazio2">' + (HD._celeg ? 'Buscando usuários…' : 'Nenhum usuário elegível encontrado.') + '</div>') : '') + '</div>' +
+    bloco(HD, 'mem', function (m) {
+      var l = arr(m); return X.card('Equipe de atendimento', l.length + ' membro(s)', l.map(function (u) {
+        var ger = u.member_role === 'MANAGER';
+        return '<div class="lin"><div class="c"><b>' + F.esc(u.display_name) + '</b><span>' + F.esc(u.login) + '</span><span class="bdg ' + (ger ? 'vi' : '') + '">' + (ger ? 'Gestor' : 'Atendente') + '</span>' +
+          '<div class="ac2"><button class="lnk" data-a="hdPapel" data-v="' + u.user_id + '" data-r="' + (ger ? 'AGENT' : 'MANAGER') + '">' + (ger ? 'Rebaixar a atendente' : 'Promover a gestor') + '</button><button class="lnk ro" data-a="hdRemMem" data-v="' + u.user_id + '">Remover</button></div></div></div>';
+      }).join('') || '<div class="vazio2">Nenhum membro.</div>');
+    });
+}
+// ---- tipos ----
+function telaTipos(q) {
+  if (HD.tipQ !== q.id) { HD.tipQ = q.id; HD.tip = null; buscar(HD, 'tip', '/helpdesk/admin/queues/' + q.id + '/request-types?search='); }
+  return '<div class="card"><p class="ct">Tipos de solicitação</p><p class="cs">Os títulos oficiais disponíveis na abertura de chamados deste setor · ' + (q.request_types_required ? 'obrigatório escolher' : 'opcional') + '</p>' +
+    '<button class="btn cl mini" data-a="hdObrig" data-v="' + q.id + '">' + (q.request_types_required ? 'Desativar obrigatoriedade' : 'Ativar obrigatoriedade') + '</button>' +
+    X.campo('Nome do tipo', '<input id="tNome" maxlength="160">') + X.campo('Descrição opcional', '<input id="tDesc" maxlength="500">') +
+    '<button class="btn ro" data-a="hdAddTipo" data-v="' + q.id + '">Cadastrar tipo</button></div>' +
+    bloco(HD, 'tip', function (t) {
+      var l = arr(t); return X.card('Tipos cadastrados', '', l.map(function (r) {
+        return '<div class="lin"><div class="c"><b>' + F.esc(r.name) + '</b><span>' + F.esc(r.description || 'Sem descrição') + ' · ' + X.int(r.ticket_count) + ' chamado(s)</span><span class="bdg ' + (r.is_active ? 'vd' : '') + '">' + (r.is_active ? 'Ativo' : 'Inativo') + '</span>' +
+          '<div class="ac2"><button class="lnk" data-a="hdEdTipo" data-v="' + r.id + '">Editar</button><button class="lnk ' + (r.is_active ? 'ro' : '') + '" data-a="hdAtTipo" data-v="' + r.id + '">' + (r.is_active ? 'Inativar' : 'Ativar') + '</button></div></div></div>';
+      }).join('') || '<div class="vazio2">Nenhum tipo cadastrado.</div>');
+    });
+}
+// ---- SLA ----
+function telaSla(q) {
+  if (HD.slaQ !== q.id) { HD.slaQ = q.id; HD.sla = null; buscar(HD, 'sla', '/helpdesk/admin/queues/' + q.id + '/sla'); }
+  return bloco(HD, 'sla', function (sl) {
+    var sc = sl.schedule || {}, rg = {}, ed = !!sl.can_edit; (sl.rules || []).forEach(function (r) { rg[r.priority] = r; });
+    var h = '<div class="card"><p class="ct">SLA de ' + F.esc(sl.queue_name || q.name) + '</p><p class="cs">' + (sl.version ? 'Versão ' + sl.version : 'Versão ainda não configurada') + '</p>' +
+      '<div class="det">Segunda a sexta: <b>' + F.esc(sc.weekday_start || '') + ' às ' + F.esc(sc.weekday_end || '') + '</b> · sábados e domingos não contam · feriados pausam a contagem · ' + F.esc(sc.timezone || '') + '</div></div>';
+    PRIO.forEach(function (p) {
+      var r = rg[p[0]] || { enabled: false }, on = !!r.enabled, dis = (!ed || !on) ? ' disabled' : '';
+      function hm(min, k) { min = F.n(min); return '<div class="sub2"><input class="inp" type="number" min="0" max="8760" id="sla_' + p[0] + '_' + k + 'h" value="' + (r[k] != null ? Math.floor(min / 60) : '') + '" placeholder="horas"' + dis + '><input class="inp" type="number" min="0" max="59" id="sla_' + p[0] + '_' + k + 'm" value="' + (r[k] != null ? min % 60 : '') + '" placeholder="min"' + dis + '></div>'; }
+      h += '<div class="card"><label style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" data-slaon="' + p[0] + '"' + (on ? ' checked' : '') + (ed ? '' : ' disabled') + ' style="accent-color:var(--rosa)"> ' + p[1] + ' · SLA ativo</label>' +
+        '<p class="cs" style="margin:8px 0 4px">Primeira resposta (horas úteis e minutos)</p>' + hm(r.first_response_minutes, 'first_response_minutes') +
+        '<p class="cs" style="margin:4px 0">Resolução (horas úteis e minutos)</p>' + hm(r.resolution_minutes, 'resolution_minutes') + '</div>';
+    });
+    if (ed) h += '<button class="btn ro" data-a="hdSalvarSla" data-v="' + q.id + '" style="width:100%">Salvar nova versão do SLA</button>';
+    return h;
+  });
+}
+// ---- administradores ----
+function telaAdmins() {
+  hdGet('adm', '/helpdesk/admin/global-administrators');
+  return '<button class="btn ro" data-a="hdAddAdm" style="margin-bottom:12px">+ Adicionar administrador</button>' + bloco(HD, 'adm', function (a) {
+    var l = arr(a);
+    return X.card('Administradores do Helpdesk', 'Autoridade global, independente de perfil e setor', l.map(function (u) {
+      return '<div class="lin"><div class="c"><b>' + F.esc(u.display_name) + '</b><span>' + F.esc(u.login) + '</span></div>' + (l.length > 1 ? '<button class="lnk ro" data-a="hdRemAdm" data-v="' + u.user_id + '">Remover</button>' : '<span class="cs" title="Pelo menos um administrador deve permanecer.">único</span>') + '</div>';
+    }).join('') || '<div class="vazio2">Nenhum administrador encontrado.</div>') + (l.length === 1 ? '<p class="cs">Pelo menos um administrador global deve permanecer.</p>' : '');
+  });
+}
+// ---- calendário ----
+function telaCalendario() {
+  hdGet('cal', '/helpdesk/admin/sla/calendar');
+  return bloco(HD, 'cal', function (c) {
+    var sc = c.schedule || {}, h = '<div class="card"><p class="cs">Jornada global: segunda a sexta, ' + F.esc(sc.weekday_start || '') + '–' + F.esc(sc.weekday_end || '') + ' · sábado e domingo não úteis · ' + F.esc(sc.timezone || '') + '. Dias passados são aceitos para registro, mas não recalculam prazos.</p>';
+    if (c.can_manage) h += '<div class="sub2">' + X.campo('Data', '<input type="date" id="cData">') + X.campo('Tipo', '<select id="cTipo">' + X.opcoes(DIAS, 'NATIONAL_HOLIDAY') + '</select>') + '</div>' + X.campo('Nome', '<input id="cNome" maxlength="120" placeholder="Ex.: Proclamação da República">') +
+      '<button class="btn ro" data-a="hdAddDia">Adicionar dia não útil</button>';
+    h += '</div>';
+    return h + X.card('Dias não úteis', '', arr(c.items).map(function (dd) {
+      return '<div class="lin"><div class="c"><b>' + F.dataBR(dd.date) + ' · ' + F.esc(dd.name) + (dd.is_past ? ' <span class="cs">(passado)</span>' : '') + '</b><span>' + F.esc(nomeP(dd.day_type, DIAS)) + '</span></div>' +
+        (c.can_manage ? '<div class="v"><button class="lnk" data-a="hdEdDia" data-v="' + dd.id + '">Editar</button><br><button class="lnk ro" data-a="hdRemDia" data-v="' + dd.id + '">Remover</button></div>' : '') + '</div>';
+    }).join('') || '<div class="vazio2">Nenhum dia não útil cadastrado.</div>');
+  });
+}
+// ---- ações ----
+function hdEnviar(m, url, corpo, depois, ok) {
+  return X.enviar(m, url, corpo, 'Esta configuração foi alterada por outra pessoa. Atualize a tela.').then(function (j) { if (ok) hdOk(ok); if (depois) depois(j); return j; }).catch(function (e) { F.toast(e.message); return null; });
+}
+var buscaEleg = X.espera(function (v) { HD.buscaMem = v; HD.eleg = null; if (v.trim()) buscar(HD, 'eleg', '/helpdesk/admin/queues/' + HD.q + '/eligible-users?search=' + encodeURIComponent(v.trim()) + '&limit=20'); else desenharMantendo(); });
+var buscaAdm = X.espera(function (v) { X.get('/helpdesk/admin/global-administrators/eligible-users?search=' + encodeURIComponent(v.trim()) + '&limit=20').then(function (l) {
+  var s = document.getElementById('aSel'); if (s) s.innerHTML = X.opcoes(arr(l).map(function (u) { return [u.id, u.display_name + ' · ' + u.login]; }), '', arr(l).length ? 'Selecione um usuário' : 'Nenhum usuário elegível encontrado.'); }); });
+var HDA = {
+  hdNovoSetor: function () { X.modal('Novo setor', 'Todo setor nasce inativo; ative depois de montar a equipe', camposSetor(null, true), [['cancelar', 'Cancelar', 'cl'], ['hdCriarSetor', 'Criar', 'ro']]); },
+  hdAbrir: function (v) { HD.q = v; HD.qs = 'dados'; desenhar(); window.scrollTo(0, 0); },
+  hdVoltar: function () { HD.q = null; desenhar(); },
+  hdAtivar: function (v) { var q = fila(v); hdEnviar('PATCH', '/helpdesk/admin/queues/' + v, { is_active: !q.is_active, version: q.version }, recarregarFilas, q.is_active ? 'Setor inativado' : 'Setor ativado'); },
+  hdSalvarSetor: function (v) { var q = fila(v), o; try { o = lerSetor(q); } catch (e) { F.toast(e.message); return; } o.version = q.version; hdEnviar('PATCH', '/helpdesk/admin/queues/' + v, o, recarregarFilas, 'Setor salvo com sucesso.'); },
+  hdAddMem: function () { var u = X.val('hdEleg'); if (!u) { F.toast('Escolha o usuário'); return; } hdEnviar('POST', '/helpdesk/admin/queues/' + HD.q + '/members', { user_id: Number(u), member_role: 'AGENT' }, function (j) { if (j && Array.isArray(j.items)) HD.mem = j; else HD.memQ = null; HD.buscaMem = ''; HD.eleg = null; recarregarFilas(); }, 'Atendente adicionado'); },
+  hdPapel: function (v, t) { hdEnviar('PATCH', '/helpdesk/admin/queues/' + HD.q + '/members/' + v, { member_role: t.getAttribute('data-r') }, function (j) { if (j && Array.isArray(j.items)) HD.mem = j; else HD.memQ = null; recarregarFilas(); }, 'Papel alterado'); },
+  hdRemMem: function (v) { var u = arr(HD.mem).filter(function (x) { return String(x.user_id) === String(v); })[0]; X.modal('Remover da equipe?', F.esc(u ? u.display_name : '') + ' deixa de atender este setor', '', [['cancelar', 'Cancelar', 'cl'], ['hdRemMemOk', 'Remover', 'ro']]).setAttribute('data-n', v); },
+  hdObrig: function (v) { var q = fila(v); hdEnviar('PATCH', '/helpdesk/admin/queues/' + v, { request_types_required: !q.request_types_required, version: q.version }, recarregarFilas, 'Obrigatoriedade alterada'); },
+  hdAddTipo: function (v) { var n = X.val('tNome').trim(); if (n.length < 3) { F.toast('Nome do tipo: de 3 a 160 caracteres'); return; } hdEnviar('POST', '/helpdesk/admin/queues/' + v + '/request-types', { name: n, description: X.val('tDesc').trim() || null }, function () { HD.tipQ = null; }, 'Tipo cadastrado'); },
+  hdAtTipo: function (v) { var r = arr(HD.tip).filter(function (x) { return String(x.id) === String(v); })[0]; hdEnviar('PATCH', '/helpdesk/admin/queues/' + HD.q + '/request-types/' + v, { is_active: !r.is_active, version: r.version }, function () { HD.tipQ = null; desenhar(); }, r.is_active ? 'Tipo inativado' : 'Tipo ativado'); },
+  hdEdTipo: function (v) { var r = arr(HD.tip).filter(function (x) { return String(x.id) === String(v); })[0]; X.modal('Editar tipo de solicitação', '', X.campo('Nome', '<input id="eNome" maxlength="160" value="' + F.esc(r.name) + '">') + X.campo('Descrição', '<input id="eDesc" maxlength="500" value="' + F.esc(r.description || '') + '">'), [['cancelar', 'Cancelar', 'cl'], ['hdEdTipoOk', 'Salvar', 'ro']]).setAttribute('data-n', v); },
+  hdSalvarSla: function (v) {
+    var sl = HD.sla, rules = [], erro = '';
+    PRIO.forEach(function (p) {
+      var on = !!(document.querySelector('[data-slaon="' + p[0] + '"]') || {}).checked;
+      function min(k) { var hh = X.val('sla_' + p[0] + '_' + k + 'h'), mm = X.val('sla_' + p[0] + '_' + k + 'm'); return hh === '' && mm === '' ? null : F.n(hh) * 60 + F.n(mm); }
+      var fr = on ? min('first_response_minutes') : null, rs = on ? min('resolution_minutes') : null;
+      if (on && (!fr || !rs || fr > 525600 || rs > 525600 || rs < fr)) erro = erro || 'Revise os prazos da prioridade ' + p[1] + '.';
+      rules.push({ priority: p[0], enabled: on, first_response_minutes: fr, resolution_minutes: rs });
+    });
+    if (erro) { F.toast(erro); return; }
+    hdEnviar('PUT', '/helpdesk/admin/queues/' + v + '/sla', { expected_version: sl.version || 0, rules: rules }, function (j) { if (j && j.rules) HD.sla = j; else HD.slaQ = null; desenhar(); }, 'SLA salvo em nova versão');
+  },
+  hdAddAdm: function () { X.modal('Adicionar administrador', 'Autoridade global do Helpdesk', X.campo('Buscar por nome ou login', '<input id="aBusca" maxlength="120">') + X.campo('Usuário elegível', '<select id="aSel"><option value="">Buscando…</option></select>'), [['cancelar', 'Cancelar', 'cl'], ['hdAddAdmOk', 'Confirmar concessão', 'ro']]); buscaAdm(''); },
+  hdRemAdm: function (v) { var u = arr(HD.adm).filter(function (x) { return String(x.user_id) === String(v); })[0]; X.modal('Remover administrador?', 'Remover ' + F.esc(u ? u.display_name : '') + ' da administração do Helpdesk', '', [['cancelar', 'Cancelar', 'cl'], ['hdRemAdmOk', 'Remover', 'ro']]).setAttribute('data-n', v); },
+  hdAddDia: function () { var dt = X.val('cData'), n = X.val('cNome').trim(); if (!dt || n.length < 2) { F.toast('Informe a data e um nome (2 a 120 caracteres)'); return; } hdEnviar('POST', '/helpdesk/admin/sla/calendar', { date: dt, name: n, day_type: X.val('cTipo') }, function () { HD.cal = null; desenhar(); }, 'Dia não útil adicionado'); },
+  hdEdDia: function (v) { var dd = arr(HD.cal && HD.cal.items).filter(function (x) { return String(x.id) === String(v); })[0]; X.modal('Editar dia não útil', '', X.campo('Data', '<input type="date" id="eData" value="' + F.esc(dd.date) + '">') + X.campo('Nome', '<input id="eNomeD" maxlength="120" value="' + F.esc(dd.name) + '">') + X.campo('Tipo', '<select id="eTipo">' + X.opcoes(DIAS, dd.day_type) + '</select>'), [['cancelar', 'Cancelar', 'cl'], ['hdEdDiaOk', 'Salvar', 'ro']]).setAttribute('data-n', v); },
+  hdRemDia: function (v) { var dd = arr(HD.cal && HD.cal.items).filter(function (x) { return String(x.id) === String(v); })[0]; X.modal('Remover do calendário?', F.esc(dd ? dd.name : ''), '', [['cancelar', 'Cancelar', 'cl'], ['hdRemDiaOk', 'Remover', 'ro']]).setAttribute('data-n', v); }
+};
+var HDM = {
+  hdCriarSetor: function () {
+    var cod = X.val('sCod').trim().toUpperCase(), o; if (!/^[A-Z0-9][A-Z0-9_-]{1,31}$/.test(cod)) { X.erroModal('Código inválido. Use de 2 a 32 caracteres: letras, números, hífen ou sublinhado.'); return; }
+    try { o = lerSetor(null, true); } catch (e) { X.erroModal(e.message); return; }
+    o.code = cod; o.is_active = false; X.ocupado('hdCriarSetor', true);
+    X.enviar('POST', '/helpdesk/admin/queues', o).then(function () { X.fechar(); F.toast('Setor criado (inativo)'); recarregarFilas(); }).catch(function (e) { X.ocupado('hdCriarSetor', false); X.erroModal(e.message); });
+  },
+  hdRemMemOk: function () { var v = document.getElementById('mfundo').getAttribute('data-n'); X.fechar(); hdEnviar('DELETE', '/helpdesk/admin/queues/' + HD.q + '/members/' + v, null, function (j) { if (j && Array.isArray(j.items)) HD.mem = j; else HD.memQ = null; recarregarFilas(); }, 'Removido da equipe'); },
+  hdEdTipoOk: function () { var v = document.getElementById('mfundo').getAttribute('data-n'), r = arr(HD.tip).filter(function (x) { return String(x.id) === String(v); })[0], n = X.val('eNome').trim();
+    if (n.length < 3) { X.erroModal('Nome do tipo: de 3 a 160 caracteres'); return; }
+    X.enviar('PATCH', '/helpdesk/admin/queues/' + HD.q + '/request-types/' + v, { name: n, description: X.val('eDesc').trim() || null, version: r.version }).then(function () { X.fechar(); F.toast('Tipo atualizado'); HD.tipQ = null; desenhar(); }).catch(function (e) { X.erroModal(e.message); }); },
+  hdAddAdmOk: function () { var u = X.val('aSel'); if (!u) { X.erroModal('Escolha o usuário'); return; } X.ocupado('hdAddAdmOk', true, 'Adicionando…');
+    X.enviar('POST', '/helpdesk/admin/global-administrators', { user_id: Number(u) }).then(function () { X.fechar(); F.toast('Administrador adicionado com sucesso.'); HD.adm = null; desenhar(); }).catch(function (e) { X.ocupado('hdAddAdmOk', false); X.erroModal(e.message); }); },
+  hdRemAdmOk: function () { var v = document.getElementById('mfundo').getAttribute('data-n'); X.fechar();
+    hdEnviar('DELETE', '/helpdesk/admin/global-administrators/' + v, null, function () { HD.adm = null; X.get('/helpdesk/admin/access').then(function (a) { HD.acc = a; desenhar(); }); }, 'Administrador removido com sucesso.'); },
+  hdEdDiaOk: function () { var v = document.getElementById('mfundo').getAttribute('data-n'), n = X.val('eNomeD').trim(); if (!X.val('eData') || n.length < 2) { X.erroModal('Informe a data e um nome'); return; }
+    X.enviar('PUT', '/helpdesk/admin/sla/calendar/' + v, { date: X.val('eData'), name: n, day_type: X.val('eTipo') }).then(function () { X.fechar(); F.toast('Dia atualizado'); HD.cal = null; desenhar(); }).catch(function (e) { X.erroModal(e.message); }); },
+  hdRemDiaOk: function () { var v = document.getElementById('mfundo').getAttribute('data-n'); X.fechar(); hdEnviar('DELETE', '/helpdesk/admin/sla/calendar/' + v, null, function () { HD.cal = null; desenhar(); }, 'Dia removido'); }
+};
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-hsub],[data-qsub]') : null; if (!t) return;
+  if (t.hasAttribute('data-hsub')) { HD.sub = t.getAttribute('data-hsub'); HD.q = null; desenhar(); }
+  else { HD.qs = t.getAttribute('data-qsub'); desenhar(); }
+});
+document.addEventListener('input', function (ev) { if (ev.target.id === 'hdBuscaMem') buscaEleg(ev.target.value); if (ev.target.id === 'aBusca') buscaAdm(ev.target.value); });
+document.addEventListener('change', function (ev) {
+  var p = ev.target.getAttribute && ev.target.getAttribute('data-slaon'); if (!p) return;
+  [].forEach.call(document.querySelectorAll('[id^="sla_' + p + '_"]'), function (i) { i.disabled = !ev.target.checked; if (!ev.target.checked) i.value = ''; });
+});
+
 // =================== toques ===================
 var MB = { cancelar: X.fechar, salvarUs: salvarUs, senhaOk: senhaOk, ativarOk: ativarOk,
   copiarCor: function () { var c = document.getElementById('mfundo').getAttribute('data-cor') || ''; try { navigator.clipboard.writeText(c).then(function () { F.toast('Correlation ID copiado'); }, function () { F.toast(c); }); } catch (e) { F.toast(c); } } };
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest ? ev.target.closest('[data-aba],[data-a],[data-m],[data-pag],[data-fsub]') : null; if (!t || t.disabled) return;
-  if (t.hasAttribute('data-m')) { var f = MB[t.getAttribute('data-m')]; if (f) f(); return; }
+  if (t.hasAttribute('data-m')) { var f = MB[t.getAttribute('data-m')] || HDM[t.getAttribute('data-m')]; if (f) f(); return; }
   if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('adm_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
   if (t.hasAttribute('data-fsub')) { S.fb.sub = t.getAttribute('data-fsub'); desenhar(); return; }
   if (t.hasAttribute('data-pag')) {
@@ -274,6 +478,7 @@ document.addEventListener('click', function (ev) {
     desenhar(); window.scrollTo(0, 0); return;
   }
   var a = t.getAttribute('data-a'), v = t.getAttribute('data-v');
+  if (HDA[a]) { ev.stopPropagation(); HDA[a](v, t); return; }
   if (a === 'novo') { if (!S.us.op) { F.toast('Carregando as opções…'); return; } abrirForm(null); }
   if (a === 'editar') { if (!S.us.op) { F.toast('Carregando as opções…'); return; } abrirForm(usuario(v)); }
   if (a === 'senha') senha(v);

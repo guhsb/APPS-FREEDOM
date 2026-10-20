@@ -13,6 +13,8 @@
 <div id="c"><div class="carregando"><i></i>Carregando o dashboard…</div></div>
 <script src="base.js"></script>
 <script src="dash.js"></script>
+<script src="logo-dados.js"></script>
+<script src="imagem.js"></script>
 <script src="logistica.js"></script>
 <script>
 var X = Dash, d = null, aba = Dash.lembrar('log_aba2') || 'resumo', carregandoAgora = false, filtroPed = 'todos', busca = '', abertos = {}, nPed = 20, verRedes = false;
@@ -89,7 +91,7 @@ function resumo() {
   var h = '', livre = Math.max(0, d.pend - d.sb), v1 = variacao(1);
   h += '<div class="card hero"><div class="lb">Pendente agora</div><div class="v">' + X.brl0(d.pend) + '</div><div class="s"><b>' + X.int(d.ped) + '</b> pedidos aguardando faturar</div>';
   if (d.sb > 0) h += X.faixa([['Standby', d.sb, 'var(--laranja)', ''], ['Livre', livre, 'var(--azul)', '']], 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') +
-    '<div class="leg"><span>■ Standby ' + X.k(d.sb) + ' (' + Math.round(d.sb / Math.max(1, d.pend) * 100) + '%)</span><span>■ Livre ' + X.k(livre) + '</span></div>';
+    '<div class="leg"><span><b style="color:var(--laranja)">■</b> Standby ' + X.k(d.sb) + ' (' + Math.round(d.sb / Math.max(1, d.pend) * 100) + '%)</span><span><b style="color:var(--azul)">■</b> Livre ' + X.k(livre) + '</span></div>';
   h += '<div class="chips">';
   if (v1) h += '<span class="chip ' + (v1.dif > 0 ? 'la' : 'ok') + '">Desde ontem: standby ' + sinal(v1.dif) + '</span>';
   if (d.media > 0 && livre > 0) h += '<span class="chip az">Livre zera em ~' + Math.max(1, Math.round(livre / d.media)) + ' dias úteis</span>';

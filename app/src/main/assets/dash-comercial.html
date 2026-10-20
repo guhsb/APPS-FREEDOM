@@ -18,12 +18,31 @@ var me = null, P = null, d = null, aba = Dash.lembrar('com_aba') || 'resumo', pe
 var verTodos = {};
 var X = Dash;
 
-function datas() { var h = X.hoje(); return periodo === 'ant' ? X.mes(h, -1) : X.mes(h, 0); }
-function fx() {
+// filtros extras (iguais aos do site): período livre, vários gestores/vendedores, categoria, rede e situação do pedido
+var FX = { ini: '', fim: '', ger: [], ven: [], cat: [], rede: [], st: [] };
+function datas() {
+  var h = X.hoje();
+  if (periodo === 'pers') return [FX.ini || X.mes(h, 0)[0], FX.fim || h];
+  return periodo === 'ant' ? X.mes(h, -1) : X.mes(h, 0);
+}
+function qlista(k, v) { return (v || []).map(function (x) { return '&' + k + '=' + encodeURIComponent(x); }).join(''); }
+/** Parte extra do endereço; semRede = Faturamento (o site não manda rede nem situação ali). */
+function fxExtra(semRede) {
+  var f = '';
+  if (P.tipo !== 'ven' && !vendSel && FX.ven.length && podeVend()) f += qlista('seller', FX.ven);
+  f += qlista('category', FX.cat);
+  if (!semRede) f += qlista('network', FX.rede) + qlista('order_status', FX.st);
+  return f;
+}
+function permis(p) { return me && Array.isArray(me.permissions) && me.permissions.indexOf(p) >= 0; }
+function podeVend() { return permis('filters:seller') || permis('filters:team_seller') || P.tipo !== 'ven'; }
+function nFiltros() { return FX.ger.length + FX.ven.length + FX.cat.length + FX.rede.length + FX.st.length + (periodo === 'pers' ? 1 : 0); }
+function fx(semRede) {
   var f = P.fx;
+  if (P.tipo === 'dir' && FX.ger.length && !gestorSel) f = qlista('manager', FX.ger);
   if (P.tipo === 'dir' && gestorSel) f = '&manager=' + encodeURIComponent(gestorSel);
   if (vendSel) f = (P.tipo === 'ger' ? P.fx : '') + '&seller=' + encodeURIComponent(vendSel);
-  return f;
+  return f + fxExtra(semRede);
 }
 
 var mostrado = '';   // de qual filtro é o que está na tela
@@ -35,7 +54,7 @@ function carregar(forcar) {
   pr.then(function (m) {
     me = m; P = X.perfil(m);
     var dt = datas(), q = '?start_date=' + dt[0] + '&end_date=' + dt[1] + fx();
-    var chave = 'com|' + (m.login || m.email || m.display_name || '') + '|' + periodo + '|' + gestorSel + '|' + vendSel;
+    var chave = 'com|' + (m.login || m.email || m.display_name || '') + '|' + periodo + '|' + gestorSel + '|' + vendSel + '|' + JSON.stringify(FX);
     // 1) abre na hora com o que foi carregado da última vez (se for deste mesmo login e filtro)
     var salvo = X.cache(chave);
     if (salvo && salvo.d && mostrado !== chave) { d = salvo.d; mostrado = chave; desenhar(); faixaAtualizando(salvo.t); }
@@ -53,7 +72,7 @@ function carregar(forcar) {
       d = novo; mostrado = chave; document.getElementById('aviso').innerHTML = ''; desenhar(); faixaAtualizando(null, true);
       return extras.then(function (e) {
         if (meu !== pedido) return;
-        novo.cl = e[0]; novo.pr = e[1]; novo.nw = e[2]; novo.dv = e[3];
+        novo.cl = e[0]; novo.pr = e[1]; novo.nw = e[2]; novo.dv = e[3]; novo.extrasOk = true; novo.hora = Date.now();
         d = novo; desenharMantendo(); faixaAtualizando(null);
         X.cache(chave, novo);
       });
@@ -96,7 +115,7 @@ function ordenar(l) { return l.slice().sort(function (a, b) { if ((a.m > 0) !== 
 function desenhar() {
   var b = base();
   document.getElementById('tit').innerHTML = 'Painel Comercial<span class="perfil">' + P.papel + '</span>';
-  document.getElementById('sub').innerHTML = F.esc(P.nome) + (b.baseDia ? ' · base de <b>' + X.dm(b.baseDia) + '</b>' : '');
+  document.getElementById('sub').innerHTML = F.esc(P.nome) + (b.baseDia ? ' · base de <b>' + X.dm(b.baseDia) + '</b>' : '') + (d.hora ? ' · ' + F.hhmm(d.hora) : '');
   var tabs = P.tipo === 'dir' ? [['resumo', 'Resumo'], ['vendedores', 'Vendedores'], ['clientes', 'Clientes'], ['produtos', 'Produtos'], ['redes', 'Redes']]
     : P.tipo === 'ger' ? [['resumo', 'Resumo'], ['vendedores', 'Equipe'], ['clientes', 'Clientes'], ['produtos', 'Produtos'], ['redes', 'Redes']]
     : [['resumo', 'Resumo'], ['clientes', 'Clientes'], ['produtos', 'Produtos'], ['redes', 'Redes']];
@@ -106,13 +125,17 @@ function desenhar() {
   if (vendSel && aba === 'vendedores') aba = 'resumo';
   if (!tabs.some(function (t) { return t[0] === aba; })) aba = 'resumo';
   var h = X.abas(vendSel ? tabs.filter(function (t) { return t[0] !== 'vendedores'; }) : tabs, aba);
-  h += '<div class="filtro"><span><b>Período</b><select id="selPer"><option value="mes"' + (periodo === 'mes' ? ' selected' : '') + '>Este mês · ' + X.dm(d.ini) + '–' + X.dm(d.fim) + '</option>' +
-    '<option value="ant"' + (periodo === 'ant' ? ' selected' : '') + '>Mês passado</option></select></span>';
+  h += '<div class="filtro"><span><b>Período</b><select id="selPer"><option value="mes"' + (periodo === 'mes' ? ' selected' : '') + '>Este mês</option>' +
+    '<option value="ant"' + (periodo === 'ant' ? ' selected' : '') + '>Mês passado</option><option value="pers"' + (periodo === 'pers' ? ' selected' : '') + '>Escolher datas…</option></select></span>';
   if (P.tipo === 'dir') {
     var gs = gestores();
     h += '<span><b>Equipe</b><select id="selGer"><option value="">Todos os gestores</option>' + gs.map(function (g) { return '<option value="' + F.esc(g) + '"' + (g === gestorSel ? ' selected' : '') + '>' + F.esc(X.nome(g)) + '</option>'; }).join('') + '</select></span>';
   } else h += '<span class="fix"><b>' + (P.tipo === 'ger' ? 'Equipe' : 'Vendedor') + '</b>' + (P.tipo === 'ger' ? 'Só a sua equipe' : 'Só os seus números') + '</span>';
   h += '</div>';
+  if (periodo === 'pers') { var dt0 = datas(); h += '<div class="sub2"><input type="date" class="inp" id="fxIni" value="' + dt0[0] + '"' + (OPC.d && OPC.d.available_period ? ' min="' + OPC.d.available_period.minimum + '"' : '') + '><input type="date" class="inp" id="fxFim" value="' + dt0[1] + '"></div>'; }
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:-2px 0 12px"><button class="btn cl mini" data-cx="filtros">' + F.ic('ajustes') + ' Filtros' + (nFiltros() ? ' (' + nFiltros() + ')' : '') + '</button>' +
+    (nFiltros() ? '<button class="btn cl mini" data-cx="limpar">Limpar</button>' : '') +
+    (RELAT[aba] ? '<button class="btn az mini" data-cx="excel" style="margin-left:auto">' + F.ic('baixar') + ' Exportar Excel</button>' : '') + '</div>';
   if (vendSel) h += '<div class="vendo">' + F.ic('olho') + '<span>Vendo só ' + F.esc(X.nome(vendSel)) + '</span><button id="btTodos">Ver todos</button></div>';
   if (aba === 'resumo') h += resumo(b);
   if (aba === 'vendedores') h += telaVendedores(b);
@@ -135,7 +158,7 @@ function gestores() {
 
 function resumo(b) {
   var h = '', quem = vendSel ? X.nome(vendSel) + ' faturou' : P.tipo === 'ven' ? 'Você faturou' : P.tipo === 'ger' ? 'Sua equipe faturou' : gestorSel ? 'Equipe ' + X.nome(gestorSel) + ' faturou' : 'Faturado';
-  var noMes = periodo === 'mes' ? ' no mês' : ' no mês passado', acima = b.p >= b.idealP;
+  var noMes = periodo === 'mes' ? ' no mês' : periodo === 'pers' ? ' no período' : ' no mês passado', acima = b.p >= b.idealP;
   h += '<div class="card hero"><div class="lb">' + quem + noMes + '</div><div class="v">' + X.brl0(b.fat) + '</div>';
   if (b.meta > 0) {
     h += '<div class="s"><b>' + X.p0(b.p) + '</b> da meta de ' + X.k(b.meta) + '</div>' +
@@ -252,11 +275,13 @@ function telaVendedores(b) {
   if (periodo === 'mes') h += X.k4([['No ritmo', no, 'de ' + com.length + ' com meta', 'pos'], ['Abaixo do ritmo', com.length - no, 'ideal hoje ' + X.p0(b.idealP), 'lar']]);
   h += X.card(P.tipo === 'ger' ? 'Minha equipe' : 'Ranking de vendedores', 'Ordenado por % da meta · toque para abrir o vendedor',
     ordenar(lista).map(function (v) { return X.meta(v.nome, X.k(v.v) + (v.m > 0 ? ' de ' + X.k(v.m) : '') + ' · ' + v.cli + ' clientes' + (P.tipo === 'dir' && v.gestor ? ' · ' + X.cap(v.gestor) : ''), v.p, b.idealP, 'v:' + v.chave, v.m <= 0); }).join('') || '<div class="vazio">Nenhum vendedor neste filtro.</div>');
+  if (!filtroGer) h += tabelaVendedores();
   return h;
 }
 
 function clientes() {
   var h = '', s = d.cl.summary || {}, abc = Array.isArray(d.cl.abc_summary) ? d.cl.abc_summary : [];
+  var tabCli = tabelaClientes();
   h += X.k4([['Clientes', X.int(s.unique_clients), 'no período'], ['Compraram 1 vez', Math.round(F.n(s.single_purchase_percentage)) + '%', X.int(s.single_purchase_clients) + ' clientes']]);
   if (abc.length) {
     var cores = { A: 'var(--azul)', B: '#7d8fd0', C: '#9aa9d6' };
@@ -273,6 +298,7 @@ function clientes() {
       var pc = F.n(c.percentage_change); return '<div class="row"><span>' + F.esc(c.client_name) + '</span><b style="color:var(--tx-rosa)">' + (pc <= -99.5 ? 'parou' : Math.round(pc) + '%') + '</b></div>'; }).join('') +
       (!verTodos.queda && ra.length > 5 ? '<button class="mais" data-mais="queda">Ver todos (' + ra.length + ')</button>' : ''));
   }
+  h += tabCli;
   return h;
 }
 
@@ -288,8 +314,8 @@ function produtos() {
   var todos = Array.isArray(d.pr.products) && d.pr.products.length ? d.pr.products : (d.pr.top_products || []);
   var b = buscaProd.trim().toLowerCase(), lista = b ? todos.filter(function (p) { return (String(p.product_name) + ' ' + String(p.product_code)).toLowerCase().indexOf(b) >= 0; }) : todos;
   var n = verTodos.prod ? 40 : 8;
-  h += X.card('Top produtos', 'Por faturamento · pesquise por nome ou código', '<input class="busca" id="buscaProd" placeholder="Buscar produto…" value="' + F.esc(buscaProd) + '">' +
-    (lista.slice(0, n).map(function (p) { return '<div class="row"><span><b style="color:var(--tx3);display:inline-block;width:24px">' + p.rank + '</b>' + F.esc(p.product_name) + '<br><span style="font-size:11.5px;color:var(--tx3);padding-left:24px">' + X.int(p.quantity) + ' un. · ' + X.int(p.client_count) + ' clientes</span></span><b>' + X.k(p.revenue) + '</b></div>'; }).join('') || '<div class="vazio">Nenhum produto encontrado.</div>') +
+  h += X.card('Todos os produtos no filtro', 'Pesquise por nome ou código', '<input class="busca" id="buscaProd" placeholder="Buscar produto…" value="' + F.esc(buscaProd) + '">' +
+    tabelaProdutos((ordenarPor(lista, ordProd).slice(0, n).map(linhaProduto).join('') || '<div class="vazio">Nenhum produto encontrado.</div>')) +
     (lista.length > n ? '<button class="mais" data-mais="prod">Ver mais (' + lista.length + ')</button>' : ''));
   return h;
 }
@@ -305,6 +331,135 @@ function redes() {
   return h;
 }
 
+
+
+// ---------- Filtros (janela) ----------
+var OPC = { d: null, c: false };
+var GRUPOS = [['ger', 'Gestor', 'managers', 'gestores'], ['ven', 'Vendedor', 'sellers', 'vendedores'], ['cat', 'Categoria', 'categories', 'categorias'], ['rede', 'Rede', 'networks', 'redes'], ['st', 'Situação do pedido', 'order_statuses', 'situações']];
+function gruposVisiveis() { return GRUPOS.filter(function (g) { if (g[0] === 'ger') return P.tipo === 'dir'; if (g[0] === 'ven') return P.tipo !== 'ven' && podeVend(); return true; }); }
+function abrirFiltros() {
+  var dt = datas();
+  X.modal('Filtros', 'Os mesmos do site · valem para todas as abas', X.carregando('Buscando as opções…'), [['fxLimpar', 'Limpar', 'cl'], ['fxAplicar', 'Aplicar', 'ro']]);
+  X.get('/dashboard/overview/filters?start_date=' + dt[0] + '&end_date=' + dt[1] + (P.tipo === 'dir' ? '' : P.fx)).then(function (o) { OPC.d = o; desenharFiltros(); })
+    .catch(function (e) { X.erroModal(e.message); document.getElementById('mcorpo').innerHTML = ''; });
+}
+var FXT = null;   // seleção em edição na janela
+function desenharFiltros() {
+  var c = document.getElementById('mcorpo'); if (!c || !OPC.d) return;
+  FXT = FXT || JSON.parse(JSON.stringify(FX));
+  if (P.tipo === 'dir' && gestorSel && !FXT.ger.length) FXT.ger = [gestorSel];
+  c.innerHTML = gruposVisiveis().map(function (g) {
+    var ops = (OPC.d[g[2]] || []).map(function (o) { return o && typeof o === 'object' ? [String(o.value), String(o.label || o.value)] : [String(o), String(o)]; });
+    var selc = FXT[g[0]];
+    return '<details class="campo grupoF"' + (selc.length ? ' open' : '') + '><summary><span style="display:inline">' + g[1] + '</span> <b style="font-size:12px;color:var(--tx2)">' + (selc.length ? selc.length === 1 ? F.esc((ops.filter(function (o) { return o[0] === selc[0]; })[0] || [0, selc[0]])[1]) : selc.length + ' ' + g[3] : 'Todos') + '</b></summary>' +
+      (ops.length > 8 ? '<input class="inp" data-fbusca="' + g[0] + '" placeholder="Pesquisar ' + g[1].toLowerCase() + '" style="margin:6px 0">' : '') +
+      '<div class="chk2" data-fgrupo="' + g[0] + '" style="max-height:220px;overflow:auto;margin-top:6px">' + (ops.length ? ops.map(function (o) {
+        return '<label data-nome="' + F.esc(o[1].toLowerCase()) + '"><input type="checkbox" data-fop="' + g[0] + '" value="' + F.esc(o[0]) + '"' + (selc.indexOf(o[0]) >= 0 ? ' checked' : '') + '>' + F.esc(X.nome(o[1])) + '</label>'; }).join('') : '<span class="cs">Nenhuma opção no período.</span>') + '</div></details>';
+  }).join('');
+}
+document.addEventListener('change', function (ev) {
+  var g = ev.target.getAttribute && ev.target.getAttribute('data-fop'); if (!g || !FXT) return;
+  var v = ev.target.value, l = FXT[g], i = l.indexOf(v);
+  if (ev.target.checked && i < 0) l.push(v); if (!ev.target.checked && i >= 0) l.splice(i, 1);
+});
+document.addEventListener('input', function (ev) {
+  var g = ev.target.getAttribute && ev.target.getAttribute('data-fbusca'); if (!g) return;
+  var b = ev.target.value.trim().toLowerCase();
+  [].forEach.call(document.querySelectorAll('[data-fgrupo="' + g + '"] label'), function (l) { l.style.display = !b || l.getAttribute('data-nome').indexOf(b) >= 0 ? '' : 'none'; });
+});
+function aplicarFiltros(limpar) {
+  if (limpar) { FX = { ini: '', fim: '', ger: [], ven: [], cat: [], rede: [], st: [] }; if (periodo === 'pers') periodo = 'mes'; }
+  else if (FXT) { FXT.ini = FX.ini; FXT.fim = FX.fim; FX = FXT; }
+  FXT = null; gestorSel = P.tipo === 'dir' && FX.ger.length === 1 ? FX.ger[0] : '';
+  if (FX.ger.length === 1) FX.ger = [];
+  vendSel = ''; verTodos = {}; EX = {}; X.fechar(); carregar(true);
+}
+
+// ---------- Exportar Excel (mesmo relatório do site) ----------
+var RELAT = { resumo: ['overview', 'Visão Geral'], vendedores: ['sellers', 'Vendedores'], gestores: ['managers', 'Gestores'], clientes: ['clients', 'Clientes'], produtos: ['products', 'Produtos'],
+  redes: ['networks', 'Redes'], evolucao: ['daily_evolution', 'Evolução diária'], bonif: ['bonuses', 'Bonificações'] };
+var expId = 0;
+function exportar() {
+  var r = RELAT[aba]; if (!r) return;
+  var dt = datas(), ger = P.tipo === 'ger' ? (me.manager_name || null) : gestorSel ? gestorSel : FX.ger.length ? FX.ger : null;
+  var ven = P.tipo === 'ven' ? (me.seller_name || null) : vendSel ? vendSel : FX.ven.length ? FX.ven : null;
+  var corpo = { report: r[0], format: 'xlsx', filters: { start_date: dt[0], end_date: dt[1], manager: ger, seller: ven, category: FX.cat.length ? FX.cat : null, network: FX.rede.length ? FX.rede : null, order_status: FX.st.map(Number) } };
+  if (!window.App || !App.exportar) { F.toast('Atualize o app para exportar o Excel'); return; }
+  X.modal('Gerando relatório', r[1] + ' · ' + F.dataBR(dt[0]) + ' a ' + F.dataBR(dt[1]), X.carregando('Preparando a planilha com os filtros e permissões atuais…'), [['cancelar', 'Fechar', 'cl']]);
+  var id = ++expId; try { App.exportar(id, JSON.stringify(corpo)); } catch (e) { X.erroModal('O app não respondeu.'); }
+}
+window.exportado = function (id, st, msg) {
+  if (id !== expId) return;
+  var c = document.getElementById('mcorpo'); if (!c) { if (st === 200) F.toast('Planilha pronta'); return; }
+  var t = '', det = null; try { det = JSON.parse(msg).detail; } catch (e) { }
+  if (st === 200) { c.innerHTML = '<div class="det" style="background:var(--verde-s);color:var(--tx-verde)">Relatório pronto · ' + F.esc(msg) + '</div>'; setTimeout(X.fechar, 2500); return; }
+  t = st === 204 ? 'Nenhum dado para exportar: não encontramos registros para os filtros aplicados.' : st === 403 ? 'Exportação não permitida: os filtros ultrapassam o seu escopo de acesso.' :
+    st === 413 ? 'Limite de exportação excedido. Reduza o período ou aplique mais filtros.' + (det && det.limit ? ' (linhas: ' + (det.actual || '—') + ' · limite: ' + det.limit + ')' : '') :
+    st === 503 ? 'Dados temporariamente indisponíveis. Tente de novo em alguns instantes.' : st === 0 ? (msg || 'Sem conexão com o site.') : 'Não foi possível gerar o relatório' + (det && det.message ? ': ' + det.message : '.');
+  c.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(t) + '</span></div>';
+};
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-cx],[data-m="fxAplicar"],[data-m="fxLimpar"],[data-m="cancelar"],[data-cord],[data-pord],[data-vord]') : null; if (!t) return;
+  if (t.getAttribute('data-m') === 'cancelar') { X.fechar(); FXT = null; return; }
+  if (t.getAttribute('data-m') === 'fxAplicar') { aplicarFiltros(false); return; }
+  if (t.getAttribute('data-m') === 'fxLimpar') { aplicarFiltros(true); return; }
+  var a = t.getAttribute('data-cx');
+  if (a === 'filtros') { FXT = null; abrirFiltros(); }
+  if (a === 'limpar') aplicarFiltros(true);
+  if (a === 'excel') exportar();
+});
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'fxIni' || ev.target.id === 'fxFim') {
+    var i = document.getElementById('fxIni').value, f = document.getElementById('fxFim').value;
+    if (i && f && i > f) { F.toast('A data inicial é depois da final'); return; }
+    FX.ini = i; FX.fim = f; EX = {}; carregar(true);
+  }
+  if (ev.target.id === 'cliOrd') { ordCli = ev.target.value; desenharMantendo(); }
+  if (ev.target.id === 'prodOrd') { ordProd = ev.target.value; desenharMantendo(); }
+  if (ev.target.id === 'venOrd') { ordVen = ev.target.value; desenharMantendo(); }
+});
+
+// ---------- Tabelas completas (iguais ao site) ----------
+var buscaCli = '', ordCli = 'revenue', nCli = 30, ordProd = 'revenue', ordVen = 'revenue', buscaVen = '';
+function ordenarPor(l, k) {
+  var txt = ['client_name', 'network', 'seller', 'product_name', 'category', 'seller_name', 'manager_name'].indexOf(k) >= 0;
+  return l.slice().sort(function (a, b) { return txt ? String(a[k] || '').localeCompare(String(b[k] || ''), 'pt-BR') : F.n(b[k]) - F.n(a[k]); });
+}
+function corAbc(c) { return c === 'A' ? 'az' : c === 'B' ? 'vi' : ''; }
+function tabelaClientes() {
+  var todos = Array.isArray(d.cl.clients) ? d.cl.clients : []; if (!todos.length) return '';
+  var b = buscaCli.trim().toLowerCase(), l = ordenarPor(b ? todos.filter(function (c) { return String(c.client_name || '').toLowerCase().indexOf(b) >= 0 || String(c.client_code || '').indexOf(b) >= 0; }) : todos, ordCli);
+  return X.card('Todos os clientes no filtro', l.length + ' de ' + todos.length + ' clientes', '<input class="busca" id="buscaCli" placeholder="Buscar cliente por nome ou código" value="' + F.esc(buscaCli) + '">' +
+    '<select class="sel" id="cliOrd" style="margin-bottom:8px">' + X.opcoes([['revenue', 'Ordenar: maior faturamento'], ['order_count', 'Mais pedidos'], ['average_ticket', 'Maior ticket médio'], ['client_name', 'Nome (A–Z)'], ['network', 'Rede (A–Z)']], ordCli) + '</select>' +
+    (l.slice(0, nCli).map(function (c) {
+      return '<div class="lin"><div class="c"><b><span style="color:var(--tx3)">' + c.rank + '.</span> ' + F.esc(c.client_name) + '</b><span>' + F.esc(c.network || 'Sem rede') + ' · ' + F.esc(X.nome(c.seller || '')) + '</span>' +
+        '<span>' + X.int(c.order_count) + ' pedidos · ticket ' + F.brl(c.average_ticket) + ' · ' + F.pct(c.revenue_percentage) + ' do total · acum. ' + F.pct(c.cumulative_percentage) + '</span></div>' +
+        '<div class="v">' + F.brl(c.revenue) + '<br><span class="bdg ' + corAbc(c.abc_class) + '">Classe ' + F.esc(c.abc_class) + '</span></div></div>';
+    }).join('') || '<div class="vazio2">Nenhum resultado para a busca atual.</div>') +
+    (l.length > nCli ? '<button class="mais" data-mais="cli">Ver mais (' + (l.length - nCli) + ')</button>' : ''));
+}
+function tabelaProdutos(html) {
+  return '<select class="sel" id="prodOrd" style="margin-bottom:8px">' + X.opcoes([['revenue', 'Ordenar: maior faturamento'], ['quantity', 'Mais unidades'], ['order_count', 'Mais pedidos'], ['client_count', 'Mais clientes'], ['average_unit_revenue', 'Maior valor médio'], ['product_name', 'Nome (A–Z)']], ordProd) + '</select>' + html;
+}
+function linhaProduto(p) {
+  return '<div class="lin"><div class="c"><b><span style="color:var(--tx3)">' + p.rank + '.</span> ' + F.esc(p.product_name) + '</b><span>Cód. ' + F.esc(p.product_code || '—') + (p.category ? ' · ' + F.esc(X.cap(p.category)) : '') + '</span>' +
+    '<span>' + X.int(p.quantity) + ' un · ' + X.int(p.order_count) + ' pedidos · ' + X.int(p.client_count) + ' clientes' + (p.average_unit_revenue != null ? ' · méd. ' + F.brl(p.average_unit_revenue) : '') + '</span>' +
+    '<span>' + F.pct(p.revenue_percentage) + ' do total · acum. ' + F.pct(p.cumulative_percentage) + '</span></div><div class="v">' + F.brl(p.revenue) + (p.abc_class ? '<br><span class="bdg ' + corAbc(p.abc_class) + '">Classe ' + F.esc(p.abc_class) + '</span>' : '') + '</div></div>';
+}
+var RIT = { above_pace: ['Acima do ritmo', 'vd'], on_pace: ['No ritmo', 'la'], below_pace: ['Abaixo do ritmo', 'ro'], no_target: ['Sem meta', ''] };
+function tabelaVendedores() {
+  var todos = Array.isArray(d.se.sellers) ? d.se.sellers : []; if (!todos.length) return '';
+  var b = buscaVen.trim().toLowerCase(), l = ordenarPor(b ? todos.filter(function (v) { return String(v.seller_name || '').toLowerCase().indexOf(b) >= 0; }) : todos, ordVen);
+  return X.card('Detalhamento por vendedor', 'Todos os vendedores do recorte', '<input class="busca" id="buscaVen" placeholder="Buscar vendedor" value="' + F.esc(buscaVen) + '">' +
+    '<select class="sel" id="venOrd" style="margin-bottom:8px">' + X.opcoes([['revenue', 'Ordenar: maior faturamento'], ['meta_revenue', 'Maior meta'], ['remaining_to_target_revenue', 'Mais falta para a meta'], ['order_count', 'Mais pedidos'], ['client_count', 'Mais clientes'], ['seller_name', 'Nome (A–Z)']], ordVen) + '</select>' +
+    l.map(function (v) {
+      var r = RIT[v.pace_status] || ['', ''];
+      return '<div class="lin"><div class="c"><b>' + F.esc(X.nome(v.seller_name)) + '</b><span>' + F.esc(X.nome(v.manager_name || '')) + '</span>' +
+        '<span>Meta ' + (v.meta_revenue != null ? F.brl(v.meta_revenue) : '—') + ' · falta ' + (v.remaining_to_target_revenue != null ? F.brl(v.remaining_to_target_revenue) : '—') + '</span>' +
+        '<span>' + X.int(v.order_count) + ' pedidos · ' + X.int(v.client_count) + ' clientes · ' + X.int(v.quantity) + ' un · ticket ' + (v.average_ticket != null ? F.brl(v.average_ticket) : '—') + ' · ' + F.pct(v.revenue_percentage) + '</span>' +
+        (r[0] ? '<span class="bdg ' + r[1] + '">' + r[0] + '</span>' : '') + '</div><div class="v">' + F.brl(v.revenue) + '</div></div>';
+    }).join('') || '<div class="vazio2">Nenhum resultado para a busca atual.</div>');
+}
 
 // ---------- telas que buscam na hora (Gestores, Evolução, Faturamento, Bonificações, Infalíveis) ----------
 var EX = {};
@@ -339,7 +494,7 @@ function telaGestores(b) {
 }
 function telaEvolucao() {
   var dv = d.dv || {}, sm = dv.summary;
-  if (!sm) return X.carregando('Carregando a evolução…');
+  if (!sm) return d.extrasOk ? '<div class="vazio">Sem vendas no período para mostrar a evolução.</div>' : X.carregando('Carregando a evolução…');
   var h = '', v = sm.half_variation_percentage;
   h += X.k4([['Faturamento no período', X.k(sm.period_revenue), X.int(sm.sales_day_count) + ' dias com venda'], ['Média diária', X.k(sm.daily_average), 'por dia com venda'],
     ['Variação 1ª → 2ª metade', v == null ? 'Não comparável' : (F.n(v) >= 0 ? '+' : '') + Math.round(F.n(v)) + '%', X.k(sm.first_half_revenue) + ' → ' + X.k(sm.second_half_revenue), v == null ? '' : F.n(v) >= 0 ? 'pos' : 'neg']]);
@@ -353,7 +508,7 @@ function telaEvolucao() {
 }
 var verFat = {};
 function telaFaturamento() {
-  var e = extra('fat', '/dashboard/billing?start_date=' + d.ini + '&end_date=' + d.fim + fx());
+  var e = extra('fat', '/dashboard/billing?start_date=' + d.ini + '&end_date=' + d.fim + fx(true));
   return blocoEx(e, function (f) {
     var sm = f.summary || {}, h = '';
     h += X.k4([['Faturamento líquido', X.k(sm.net_revenue), X.int(sm.movement_count) + ' movimentos'], ['Quantidade líquida', X.int(sm.net_quantity) + ' un', ''], ['Devoluções', X.k(sm.return_value), '', F.n(sm.return_value) ? 'neg' : ''],
@@ -399,7 +554,7 @@ document.addEventListener('click', function (ev) {
   if (t.hasAttribute('data-fmais')) { verFat[t.getAttribute('data-fmais')] = true; desenharMantendo(); return; }
   if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('com_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
   if (t.hasAttribute('data-sub')) { filtroGer = t.getAttribute('data-sub'); desenhar(); return; }
-  if (t.hasAttribute('data-mais')) { verTodos[t.getAttribute('data-mais')] = true; desenhar(); return; }
+  if (t.hasAttribute('data-mais')) { var mm = t.getAttribute('data-mais'); if (mm === 'cli') { nCli += 60; desenharMantendo(); return; } verTodos[mm] = true; desenharMantendo(); return; }
   if (t.id === 'btTodos') { vendSel = ''; carregar(true); return; }
   var v = t.getAttribute('data-v');
   if (v.indexOf('v:') === 0) { vendSel = v.slice(2); aba = 'resumo'; verTodos = {}; window.scrollTo(0, 0); carregar(true); }
@@ -410,6 +565,8 @@ document.addEventListener('change', function (ev) {
   if (ev.target.id === 'selGer') { gestorSel = ev.target.value; vendSel = ''; filtroGer = ''; verTodos = {}; carregar(true); }
 });
 document.addEventListener('input', function (ev) {
+  if (ev.target.id === 'buscaCli') { buscaCli = ev.target.value; nCli = 30; desenharMantendo(); return; }
+  if (ev.target.id === 'buscaVen') { buscaVen = ev.target.value; desenharMantendo(); return; }
   if (ev.target.id === 'buscaGer') { buscaGer = ev.target.value; desenharMantendo(); return; }
   if (ev.target.id === 'buscaProd') { buscaProd = ev.target.value; var pos = ev.target.selectionStart; desenhar(); var el = document.getElementById('buscaProd'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { } } }
 });

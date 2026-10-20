@@ -3,7 +3,7 @@
 // As chamadas são síncronas (ipcRenderer.sendSync), como a ponte do Android.
 const { contextBridge, ipcRenderer } = require('electron');
 const METODOS = ['nome', 'plataforma', 'tema', 'definirTema', 'dadosPainel', 'dados', 'atualizar', 'buscarPainel', 'entrar', 'sair', 'helpdesk', 'verificarHelpdesk',
-  'configurarHelpdesk', 'abrirSite', 'siteDireto', 'aba', 'abrirTela', 'voltar', 'liberarBateria', 'configurarNotificacoes', 'configurarSom',
+  'configurarHelpdesk', 'abrirSite', 'siteDireto', 'aba', 'exportar', 'abrirTela', 'voltar', 'liberarBateria', 'configurarNotificacoes', 'configurarSom',
   'testarNotificacao', 'carregarChamado', 'responderChamado', 'assumirChamado', 'operarChamado', 'anexosChamado', 'anexarChamado',
   'baixarAnexo', 'enviarAnexoNovo', 'api', 'atualizarApp', 'atualizarPeloNavegador', 'copiarDiagnostico', 'copiarImagem', 'salvarImagem', 'configurarAvisoMeta', 'controle'];
 const App = {};

@@ -94,10 +94,32 @@ object Chamado {
     fun permitido(m: String, caminho: String): Boolean {
         if (caminho.contains("..") || !caminho.startsWith("/")) return false
         val p = caminho.substringBefore('?')
+        if (p.startsWith("/helpdesk/admin/")) return m in setOf("GET", "POST", "PATCH", "PUT", "DELETE")   // Administração do Helpdesk (o site confere quem pode)
         if (p.startsWith("/helpdesk/")) return m in setOf("GET", "POST", "PATCH")
         if (m == "GET") return p == "/auth/me" || p.startsWith("/dashboard/") || p.startsWith("/logistics/") ||
             p.startsWith("/admin/users") || p.startsWith("/admin/audit") || p.startsWith("/admin/firebird-mappings")
         return ESCRITAS.any { it.first == m && it.second.matches(p) }
+    }
+
+    /** Exportar Excel (POST /exports, igual ao site). Só relatórios do Comercial. Devolve (código, bytes, nome do arquivo). */
+    fun exportar(c: Context, corpo: String): Triple<Int, ByteArray, String> {
+        val json = JSONObject(corpo)
+        if (!json.optString("report").matches(Regex("^(clients|bonuses|daily_evolution|managers|networks|overview|products|sellers)$"))) return Triple(0, ByteArray(0), "")
+        val login = Store.login(c) ?: throw ErroLogin("faça o login no app")
+        val hp = Helpdesk.prefs(c)
+        var api = Api(login.first, login.second, hp.getString("cookie", "") ?: "")
+        if (api.cookie.isEmpty()) { api.entrar(); hp.edit().putString("cookie", api.cookie).apply() }
+        var r = api.baixarPost("/exports", json, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        if (r.first == 401) { api = Api(login.first, login.second); api.entrar(); hp.edit().putString("cookie", api.cookie).apply(); r = api.baixarPost("/exports", json, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") }
+        return Triple(r.first, r.second, nomeArquivo(r.third, json.optString("report")))
+    }
+
+    /** Nome do arquivo que o site mandou (Content-Disposition) ou Freedom_{relatório}.xlsx. */
+    fun nomeArquivo(disp: String, report: String): String {
+        var n = Regex("filename\\*=UTF-8''([^;]+)", RegexOption.IGNORE_CASE).find(disp)?.groupValues?.get(1)?.let { try { java.net.URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it } }
+        if (n.isNullOrBlank()) n = Regex("filename=\"([^\"]+)\"", RegexOption.IGNORE_CASE).find(disp)?.groupValues?.get(1)
+        if (n.isNullOrBlank()) n = "Freedom_$report.xlsx"
+        return n.replace(Regex("[\\\\/:*?\"<>|]"), "_")
     }
 
     /** Usado pela fila: (código, corpo) ou null se continua sem internet. */

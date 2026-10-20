@@ -61,11 +61,32 @@ namespace Freedom
         {
             if (caminho == null || caminho.Contains("..") || !caminho.StartsWith("/")) return false;
             var p = caminho.Split('?')[0];
+            if (p.StartsWith("/helpdesk/admin/")) return m == "GET" || m == "POST" || m == "PATCH" || m == "PUT" || m == "DELETE";   // Administração do Helpdesk (o site confere quem pode)
             if (p.StartsWith("/helpdesk/")) return m == "GET" || m == "POST" || m == "PATCH";
             if (m == "GET") return p == "/auth/me" || p.StartsWith("/dashboard/") || p.StartsWith("/logistics/") ||
                 p.StartsWith("/admin/users") || p.StartsWith("/admin/audit") || p.StartsWith("/admin/firebird-mappings");
             foreach (var e in ESCRITAS) if (e.Key == m && e.Value.IsMatch(p)) return true;
             return false;
+        }
+
+        /// <summary>Exportar Excel (POST /exports, igual ao site). Só relatórios do Comercial.</summary>
+        public static Api.Arquivo Exportar(string json, out string nome)
+        {
+            var o = new JSONObject(json); var rel = o.OptString("report", "");
+            nome = "Freedom_" + rel + ".xlsx";
+            if (!System.Text.RegularExpressions.Regex.IsMatch(rel, "^(clients|bonuses|daily_evolution|managers|networks|overview|products|sellers)$")) return new Api.Arquivo { Status = 0 };
+            var login = Store.Login();
+            if (login == null) throw new ErroLogin("faça o login no app");
+            var hp = Helpdesk.P;
+            var api = new Api(login.Value.Key, login.Value.Value, hp.GetString("cookie", ""));
+            if (api.Cookie.Length == 0) { api.Entrar(); hp.Edit().Put("cookie", api.Cookie).Commit(); }
+            var r = api.BaixarPost("/exports", json, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            if (r.Status == 401) { api = new Api(login.Value.Key, login.Value.Value); api.Entrar(); hp.Edit().Put("cookie", api.Cookie).Commit(); r = api.BaixarPost("/exports", json, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+            var m = System.Text.RegularExpressions.Regex.Match(r.Disposicao, "filename\\*=UTF-8''([^;]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success) nome = Uri.UnescapeDataString(m.Groups[1].Value);
+            else { m = System.Text.RegularExpressions.Regex.Match(r.Disposicao, "filename=\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase); if (m.Success) nome = m.Groups[1].Value; }
+            foreach (var ch in System.IO.Path.GetInvalidFileNameChars()) nome = nome.Replace(ch, '_');
+            return r;
         }
 
         /// <summary>Requisição genérica das telas (só endereços do Helpdesk). Status 0 = sem conexão.</summary>

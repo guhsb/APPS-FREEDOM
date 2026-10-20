@@ -1409,6 +1409,23 @@ class Tela : Activity() {
             recreate()
         }
 
+        /** Exportar Excel do Comercial: baixa a planilha do site e abre o "Abrir com / Compartilhar". */
+        @JavascriptInterface
+        fun exportar(req: Int, corpo: String) {
+            val app = applicationContext
+            Thread {
+                val (cod, msg) = try {
+                    val r = Chamado.exportar(app, corpo)
+                    if (r.first == 200 && r.second.isNotEmpty()) {
+                        runOnUiThread { try { Imagens.compartilharArquivo(this@Tela, r.second, r.third, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") } catch (_: Exception) { toast("Não consegui abrir a planilha") } }
+                        Pair(200, r.third)
+                    } else Pair(r.first, String(r.second, Charsets.UTF_8))
+                } catch (e: Exception) { Pair(0, "Sem conexão com o site: " + Api.mensagem(e)) }
+                js(webDash, "window.exportado && exportado(" + req + "," + cod + "," + JSONObject.quote(msg) + ")")
+                runOnUiThread { websPainel.values.toList().forEach { js(it, "window.exportado && exportado(" + req + "," + cod + "," + JSONObject.quote(msg) + ")") } }
+            }.start()
+        }
+
         @JavascriptInterface
         fun atualizarPeloNavegador() = runOnUiThread { Atualizacao.abrirNoNavegador(this@Tela) }
 

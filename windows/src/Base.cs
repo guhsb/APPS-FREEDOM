@@ -268,6 +268,27 @@ namespace Freedom
             return Executar(r, corpo == null ? null : Encoding.UTF8.GetBytes(corpo.ToString()), "application/json; charset=utf-8");
         }
 
+        public class Arquivo { public int Status; public byte[] Bytes = new byte[0]; public string Disposicao = ""; }
+
+        /// <summary>POST que devolve um arquivo (Exportar Excel).</summary>
+        public Arquivo BaixarPost(string caminho, string json, string accept)
+        {
+            var r = Abrir(BASE + caminho, "POST");
+            r.Accept = accept; r.Timeout = 120000; r.ReadWriteTimeout = 120000;
+            var b = Encoding.UTF8.GetBytes(json);
+            r.ContentType = "application/json; charset=utf-8"; r.ContentLength = b.Length;
+            using (var s = r.GetRequestStream()) s.Write(b, 0, b.Length);
+            HttpWebResponse resp;
+            try { resp = (HttpWebResponse)r.GetResponse(); }
+            catch (WebException e) { if (e.Response == null) throw; resp = (HttpWebResponse)e.Response; }
+            using (resp)
+            using (var ms = new MemoryStream())
+            {
+                resp.GetResponseStream().CopyTo(ms);
+                return new Arquivo { Status = (int)resp.StatusCode, Bytes = ms.ToArray(), Disposicao = resp.Headers["Content-Disposition"] ?? "" };
+            }
+        }
+
         public Engine.Resp EnviarArquivo(string caminho, string nome, string tipo, byte[] dados)
         {
             var r = Abrir(BASE + caminho, "POST");
@@ -320,7 +341,12 @@ namespace Freedom
             P.Edit().Put("modulos", arr.ToString()).Put("permissoes", pm != null ? pm.ToString() : "[]").Put("perfil", me.OptString("role")).Put("nome", me.OptString("display_name")).Commit();
         }
 
-        public static void Atualizar(Api api) { try { Salvar(api.Get("/auth/me")); } catch (Exception) { } }
+        public static void Atualizar(Api api)
+        {
+            try { Salvar(api.Get("/auth/me")); } catch (Exception) { }
+            // administrador do Helpdesk (setores, equipes, SLA): o botão Admin aparece também para ele
+            if (Helpdesk()) try { var r = api.Bruto("/helpdesk/admin/access"); if (r.Status == 200) P.Edit().Put("hd_admin", new JSONObject(r.Body).OptBoolean("can_access")).Commit(); else if (r.Status == 403) P.Edit().Put("hd_admin", false).Commit(); } catch (Exception) { }
+        }
 
         public static HashSet<string> Modulos()
         {
@@ -343,6 +369,7 @@ namespace Freedom
         /// <summary>Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra).</summary>
         public static bool Admin()
         {
+            if (P.GetBool("hd_admin", false)) return true;
             var s = P.GetString("permissoes");
             if (s == null) return false;
             try

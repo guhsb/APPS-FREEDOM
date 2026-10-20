@@ -190,6 +190,33 @@
       });
       return y + 20;
     },
+    /** Tabela: { titulo, cols: [[rótulo, 'l'|'r', fração da largura]], linhas: [[...]], vazio } */
+    tabela: function (ctx, b, x, y, w) {
+      var y0 = y, ix = x + 12, iw = w - 24, cols = b.cols, lin = b.linhas || [], LIM = 80, extra = Math.max(0, lin.length - LIM);
+      lin = lin.slice(0, LIM);
+      var xs = [], acc = 0; cols.forEach(function (c) { xs.push(ix + acc * iw); acc += c[2]; });
+      var yy = y + 14;
+      if (b.titulo) { fonte(ctx, 13.5, 800); ctx.fillStyle = b.cor ? cor(b.cor) : C.tx; texto(ctx, b.titulo, ix, yy + 12, iw * 0.7);
+        if (b.d) { fonte(ctx, 11.5); ctx.fillStyle = C.tx3; texto(ctx, b.d, ix + iw, yy + 12, iw * 0.3, 'right'); } yy += 24; }
+      fonte(ctx, 10.5, 700); ctx.fillStyle = C.tx3;
+      cols.forEach(function (c, k) { var cw = c[2] * iw; if (c[1] === 'r') texto(ctx, c[0].toUpperCase(), xs[k] + cw, yy + 10, cw - 4, 'right'); else texto(ctx, c[0].toUpperCase(), xs[k], yy + 10, cw - 6); });
+      yy += 16; ctx.fillStyle = C.ln; ctx.fillRect(ix, yy, iw, 1); yy += 2;
+      if (!lin.length) { fonte(ctx, 12); ctx.fillStyle = C.tx3; texto(ctx, b.vazio || '—', ix, yy + 18, iw); yy += 26; }
+      lin.forEach(function (l, i) {
+        fonte(ctx, 12, 400);
+        cols.forEach(function (c, k) { var cw = c[2] * iw, v = l[k] == null ? '—' : String(l[k]);
+          ctx.fillStyle = k === 0 ? C.tx : (c[1] === 'r' ? C.tx : C.tx2); if (k === 0 || c[3]) fonte(ctx, 12, k === 0 ? 600 : 700); else fonte(ctx, 12, 400);
+          if (c[1] === 'r') texto(ctx, v, xs[k] + cw, yy + 17, cw - 6, 'right'); else texto(ctx, v, xs[k], yy + 17, cw - 8); });
+        yy += 25;
+        if (i < lin.length - 1) { ctx.fillStyle = C.ln; ctx.fillRect(ix, yy - 1, iw, 1); }
+      });
+      if (extra) { fonte(ctx, 11.5); ctx.fillStyle = C.tx3; texto(ctx, '+ ' + extra + ' itens (veja no app)', ix, yy + 14, iw); yy += 22; }
+      yy += 8;
+      ctx.save(); ctx.globalCompositeOperation = 'destination-over';
+      ctx.strokeStyle = C.ln; ctx.lineWidth = 1; rr(ctx, x + .5, y0 + .5, w - 1, yy - y0 - 1, 16); ctx.stroke();
+      ctx.fillStyle = C.sf; rr(ctx, x, y0, w, yy - y0, 16); ctx.fill(); ctx.restore();
+      return yy + 12;
+    },
     card: function (ctx, b, x, y, w) {
       var y0 = y, yy = y + PAD;
       b.blocos.forEach(function (k) { yy = desenhar(ctx, k, x + PAD, yy, w - PAD * 2); });
@@ -208,11 +235,15 @@
 
   /** Desenha a descrição e chama pronto(dataUrl) */
   F.desenharImagem = function (spec, pronto) {
+    function medir(ctx) { var y = M + 52 + 24; (spec.blocos || []).forEach(function (b) { y = desenhar(ctx, b, M, y, W - M * 2); }); return y + 34; }
     var logo = new Image();
     var fazer = function () {
       C = F.tema && F.tema() === 'escuro' ? ESCURO : CLARO;
+      // 1ª passada num canvas mínimo só para medir a altura; 2ª de verdade
+      var altura = 4600;
+      try { var t0 = document.createElement('canvas'); t0.width = 4; t0.height = 4; altura = Math.min(14000, medir(t0.getContext('2d')) + 40); } catch (e) { }
       var tela = document.createElement('canvas');
-      tela.width = W * ESC; tela.height = 4600 * ESC;
+      tela.width = W * ESC; tela.height = altura * ESC;
       var ctx = tela.getContext('2d');
       ctx.scale(ESC, ESC); ctx.textBaseline = 'alphabetic';
       var y = M;

@@ -487,6 +487,22 @@ const ponte = {
   api: (wc, req, metodo, caminho, corpo) => {
     Chamado.requisicao(metodo, caminho, corpo).then(r => js(wc, 'window.apiResposta && apiResposta(' + Number(req) + ',' + r.status + ',' + Q(r.body) + ')'));
   },
+  exportar: (wc, req, corpo) => {
+    (async () => {
+      let cod = 0, msg = '';
+      try {
+        const r = await Chamado.exportar(String(corpo || ''));
+        if (r.status === 200 && r.bytes.length) {
+          const pasta = path.join(require('os').homedir(), 'Downloads'); fs.mkdirSync(pasta, { recursive: true });
+          let arq = path.join(pasta, r.nome), i = 2; const ext = path.extname(r.nome), base = path.basename(r.nome, ext);
+          while (fs.existsSync(arq) && i < 100) arq = path.join(pasta, base + ' (' + (i++) + ')' + ext);
+          fs.writeFileSync(arq, r.bytes); shell.openPath(arq).catch(() => shell.showItemInFolder(arq));
+          cod = 200; msg = 'Salvo em Downloads: ' + path.basename(arq);
+        } else { cod = r.status; msg = r.bytes.toString('utf8'); }
+      } catch (e) { cod = 0; msg = 'Sem conexão com o site: ' + Api.mensagem(e); }
+      js(wc, 'window.exportado && exportado(' + Number(req) + ',' + cod + ',' + Q(msg) + ')');
+    })();
+  },
   atualizarApp: (wc) => {
     (async () => {
       {   // sempre confere o GitHub na hora: se saíram várias versões, baixa direto a última (não uma por vez)

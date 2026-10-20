@@ -107,3 +107,27 @@ html.raiz .topo .bt.voltar{display:none}
 .vazio2{padding:14px 0;text-align:center;color:var(--tx3);font-size:13px}
 .json{white-space:pre-wrap;word-break:break-word;background:var(--sf2);border-radius:10px;padding:10px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--tx2);max-height:260px;overflow:auto}
 .lin .c>span.bdg{display:inline-block;margin-top:5px}
+/* troca rápida de classificação (Pedidos da Logística) */
+.segm{display:inline-flex;background:var(--sf3);border-radius:10px;padding:3px;gap:3px;margin-top:6px;flex-wrap:wrap}
+.segm button{border:0;background:transparent;color:var(--tx2);font:inherit;font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer}
+.segm button.on{background:var(--sf);box-shadow:var(--sombra)}.segm button.on.la{color:var(--tx-laranja)}.segm button.on.az{color:var(--tx-azul)}
+.segm button:disabled{opacity:.6}
+.segm.grande{display:flex}.segm.grande button{flex:1;padding:10px;font-size:14px}
+.sugs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.sugs button{border:1px solid var(--ln);background:var(--sf2);color:var(--tx);border-radius:99px;padding:6px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+.sugs button:active{border-color:var(--rosa)}
+.barraLote{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--sf);border-top:1px solid var(--ln);padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(15,27,61,.12)}
+@media (min-width:760px){.barraLote{left:50%;transform:translateX(-50%);max-width:760px;border-radius:14px 14px 0 0}}
+
+/* ---- auditoria: acessibilidade e textos longos ---- */
+:focus-visible{outline:2px solid var(--rosa);outline-offset:2px;border-radius:8px}
+[data-aba],[data-sub],[data-psub],[data-fsub],[data-v],[data-p],[data-t],[data-mais],[data-fmais],[data-act],[data-a],[data-pag],[data-nota]{-webkit-tap-highlight-color:transparent}
+.row span:first-child{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.lin .c>b,.ger .nm b,.tk b{overflow-wrap:anywhere}
+.hb .n{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hero .v{font-size:clamp(24px,8.5vw,34px);overflow-wrap:anywhere}
+.k b{overflow-wrap:anywhere}
+.filtro select{text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.btn svg.ic{width:16px;height:16px;vertical-align:-3px;margin-right:4px;stroke-width:2}
+.btn.mini svg.ic{width:14px;height:14px;vertical-align:-2px}
+details.grupoF{border:1px solid var(--ln);border-radius:12px;padding:10px 12px}
+details.grupoF summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--tx)}

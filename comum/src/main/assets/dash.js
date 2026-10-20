@@ -6,7 +6,8 @@
 var Dash = (function () {
   var X = {};
   X.k = function (v) { return F.brlK(v); };
-  X.brl0 = function (v) { return 'R$ ' + Math.round(F.n(v)).toLocaleString('pt-BR'); };
+  /** Valor principal (número grande do cartão): sempre com vírgula e centavos, ex.: R$ 2.670.173,45 */
+  X.brl0 = function (v) { return F.brl(v); };
   X.p0 = function (v) { return Math.round(F.n(v) * 100) + '%'; };
   X.int = function (v) { return Math.round(F.n(v)).toLocaleString('pt-BR'); };
   X.nome = function (s) { return String(s || '').replace(/^(SUPERVISOR|DIRETORIA|GERENTE|GESTOR)\s*-\s*/i, ''); };
@@ -132,7 +133,7 @@ var Dash = (function () {
   // ---- abas e estado ----
   X.abas = function (lista, atual, attr) { return '<div class="tabs' + (attr === 'sub' ? ' sub' : '') + '">' + lista.map(function (t) { var id = t[0], txt = t[1]; return '<b data-' + (attr || 'aba') + '="' + F.esc(id) + '"' + (id === atual ? ' class="on"' : '') + '>' + txt + '</b>'; }).join('') + '</div>'; };
   X.carregando = function (t) { return '<div class="carregando"><i></i>' + (t || 'Carregando…') + '</div>'; };
-  X.erro = function (msg) { return '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar(true)">Tentar</button></div>'; };
+  X.erro = function (msg) { var st = document.getElementById('sub'); if (st && /Carregando/.test(st.textContent)) st.textContent = 'Não atualizou · toque em Tentar'; return '<div class="aviso" role="alert">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar(true)">Tentar</button></div>'; };
   /** Última resposta guardada no aparelho: a tela abre na hora com ela e se atualiza sozinha. */
   X.cache = function (k, v) {
     try {
@@ -159,7 +160,7 @@ var Dash = (function () {
   X.modal = function (titulo, sub, corpo, botoes) {
     X.fechar();
     var el = document.createElement('div'); el.className = 'mfundo'; el.id = 'mfundo';
-    el.innerHTML = '<div class="mcaixa" role="dialog"><p class="ct" style="font-size:16px">' + titulo + '</p>' + (sub ? '<p class="cs">' + sub + '</p>' : '') +
+    el.innerHTML = '<div class="mcaixa" role="dialog" aria-modal="true"><p class="ct" style="font-size:16px">' + titulo + '</p>' + (sub ? '<p class="cs">' + sub + '</p>' : '') +
       '<div id="mcorpo">' + corpo + '</div><div class="merro" id="merro"></div><div class="acoes">' +
       (botoes || []).map(function (b) { return '<button class="btn ' + (b[2] || 'cl') + '" data-m="' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div></div>';
     el.addEventListener('click', function (ev) { if (ev.target === el) X.fechar(); });
@@ -197,5 +198,6 @@ var Dash = (function () {
     fn(); window.scrollTo(0, y);
     if (id) { var n = document.getElementById(id); if (n && n !== document.activeElement) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) { } } }
   };
+  X.acessivel = function (r) { if (window.F && F.acessivel) F.acessivel(r); };
   return X;
 })();
