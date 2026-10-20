@@ -313,7 +313,7 @@ async function run(f, stateJson, notifyOwn, deadline, force = new Set()) {
   }
 
   // mantém chamados antigos que saíram das listas (limitado)
-  if (Object.keys(newKnown).length < 800) for (const k of Object.keys(known)) if (!(k in newKnown)) newKnown[k] = known[k];
+  if (Object.keys(newKnown).length < 800) for (const k of Object.keys(known)) if (!(k in newKnown)) newKnown[k] = known[k] && typeof known[k] === 'object' ? Object.assign({}, known[k], { fora: true }) : known[k];
 
   // 5) alertas do resumo
   if (summary) {
@@ -348,9 +348,19 @@ async function avaliacoes(f, state, outc, deadline) {
   if (agora - (Number(state.rt_at) || 0) < 4 * 60000 || agora > deadline) return;
   try {
     state.rt_at = agora;
-    const r = await f(API + '/ratings?page=1&page_size=20');
-    if (r.status !== 200) return;
-    const items = (JSON.parse(r.body) || {}).items || [];
+    // só as avaliações dos MEUS setores
+    const ra = await f(API + '/workspace/access');
+    if (ra.status !== 200) return;
+    const acc = JSON.parse(ra.body) || {}, qs = Array.isArray(acc.queues) ? acc.queues : [];
+    if (acc.can_access === false || !qs.length) return;
+    const items = [];
+    for (const qo of qs.slice(0, 8)) {
+      const qid = qo && typeof qo === 'object' ? qo.id : qo;
+      if (qid == null || qid === '' || Date.now() > deadline) continue;
+      const r = await f(API + '/ratings?page=1&page_size=20&queue_id=' + qid);
+      if (r.status !== 200) continue;
+      for (const it of ((JSON.parse(r.body) || {}).items || [])) items.push(it);
+    }
     const antes = state.rt_max == null ? -1 : Number(state.rt_max); let maior = Math.max(antes, 0), avisadas = 0;
     for (const it of items) {
       if (!it) continue;

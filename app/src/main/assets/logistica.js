@@ -397,7 +397,8 @@ var LG = (function () {
         ['Regras ativas', X.int(d.active_exclusion_rules), 'só deste indicador'], ['Pedidos excluídos', X.int(d.excluded_orders_count)]]);
       var ult = dias.slice(-30);
       if (ult.length) r += X.card('Faturamento diário (R$)', 'Últimos ' + ult.length + ' dias com faturamento · toque num dia abaixo para ver o detalhe', X.colunas(ult.map(function (x) { return F.n(x.total_value); }), function (i) { return i % 5 === 0 || i === ult.length - 1 ? X.dm(ult[i].invoice_date) : ''; },
-        F.n(d.daily_average), 'média ' + X.k(d.daily_average) + '/dia', ult.map(function (x) { return dia && x.invoice_date === dia.invoice_date ? 'var(--rosa)' : 'var(--azul)'; })));
+        F.n(d.daily_average), 'média ' + X.k(d.daily_average) + '/dia', ult.map(function (x) { return dia && x.invoice_date === dia.invoice_date ? 'var(--rosa)' : 'var(--azul)'; }),
+        ult.map(function (x) { return '<b>' + F.dataBR(x.invoice_date) + '</b><br>' + F.brl(x.total_value) + (x.order_count != null ? '<br>' + X.int(x.order_count) + ' pedidos' : ''); })));
       if (dia) {
         var idx = dias.map(function (x) { return x.invoice_date; }).indexOf(dia.invoice_date);
         r += '<div class="card"><div style="display:flex;gap:8px;align-items:center"><button class="btn cl mini" data-act="diaIr" data-v="' + (idx > 0 ? dias[idx - 1].invoice_date : '') + '"' + (idx > 0 ? '' : ' disabled') + '>‹</button>' +

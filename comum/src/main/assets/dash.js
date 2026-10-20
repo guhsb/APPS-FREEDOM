@@ -104,30 +104,34 @@ var Dash = (function () {
   X.ligarGraficos = function (raiz) {
     [].forEach.call((raiz || document).querySelectorAll('svg[data-graf]'), function (svg) {
       var cfg = X._dicas[svg.getAttribute('data-graf')]; if (!cfg || !cfg.dicas.length) return;
-      var box = svg.parentNode, tip = box.querySelector('.tip'), cur = svg.querySelector('.cursor');
+      if (svg._lig) return; svg._lig = 1; var box = svg.parentNode, tip = box.querySelector('.tip'), cur = svg.querySelector('.cursor');
       function mostrar(ev) {
         var r = svg.getBoundingClientRect(), cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
-        var vx = cx / r.width * cfg.W, i = Math.round((vx - cfg.L) / ((cfg.W - 2 * cfg.L) / Math.max(1, cfg.n - 1)));
+        var vx = cx / r.width * cfg.W, i = cfg.col ? Math.floor((vx - cfg.L) / cfg.bw) : Math.round((vx - cfg.L) / ((cfg.W - 2 * cfg.L) / Math.max(1, cfg.n - 1)));
         i = Math.max(0, Math.min(cfg.n - 1, i)); var d = cfg.dicas[i]; if (!d) { tip.style.display = 'none'; cur.style.display = 'none'; return; }
-        var px = cfg.L + i * (cfg.W - 2 * cfg.L) / Math.max(1, cfg.n - 1);
-        cur.setAttribute('x1', px); cur.setAttribute('x2', px); cur.style.display = '';
+        var px = cfg.col ? cfg.L + (i + .5) * cfg.bw : cfg.L + i * (cfg.W - 2 * cfg.L) / Math.max(1, cfg.n - 1);
+        if (cfg.col) cur.setAttribute('x', cfg.L + i * cfg.bw); else { cur.setAttribute('x1', px); cur.setAttribute('x2', px); } cur.style.display = '';
         tip.innerHTML = d; tip.style.display = 'block';
         var left = px / cfg.W * r.width; tip.style.left = Math.max(0, Math.min(r.width - tip.offsetWidth, left - tip.offsetWidth / 2)) + 'px'; tip.style.top = '0px';
       }
       svg.addEventListener('touchstart', mostrar, { passive: true }); svg.addEventListener('touchmove', mostrar, { passive: true });
-      svg.addEventListener('mousemove', mostrar);
+      svg.addEventListener('mousemove', mostrar); svg.addEventListener('click', mostrar);
       svg.addEventListener('mouseleave', function () { tip.style.display = 'none'; cur.style.display = 'none'; });
     });
   };
   /** Barras verticais por posição: valores [v..], rótulos de x, destaque do maior, linha de média opcional. */
-  X.colunas = function (vals, rotulo, media, txtMedia, cores) {
-    var W = 330, H = 130, n = vals.length || 1, bw = (W - 12) / n, mx = Math.max.apply(null, vals.concat([media || 0, 1])) * 1.15;
-    var s = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '">';
+  X._ncol = 0;
+  X.colunas = function (vals, rotulo, media, txtMedia, cores, dicas) {
+    var W = 330, H = 130, n = vals.length || 1, bw = (W - 12) / n, mx = Math.max.apply(null, vals.concat([media || 0, 1])) * 1.15, id = 'col' + (++X._ncol);
+    if (!dicas) dicas = vals.map(function (v, i) { var t = rotulo(i); return (t ? '<b>' + t + '</b><br>' : '') + F.brl(v); });
+    var s = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" data-graf="' + id + '" style="cursor:pointer">';
     vals.forEach(function (v, i) { var hh = F.n(v) / mx * 92, xx = 6 + i * bw;
-      s += v > 0 ? '<rect x="' + (xx + 2) + '" y="' + (104 - hh) + '" width="' + Math.max(2, bw - 4) + '" height="' + hh + '" rx="3" fill="' + (cores ? cores[i] : 'var(--azul)') + '"/>' : '<rect x="' + (xx + 2) + '" y="102" width="' + Math.max(2, bw - 4) + '" height="2" fill="var(--ln2)"/>';
+      s += v > 0 ? '<rect data-i="' + i + '" x="' + (xx + 2) + '" y="' + (104 - hh) + '" width="' + Math.max(2, bw - 4) + '" height="' + hh + '" rx="3" fill="' + (cores ? cores[i] : 'var(--azul)') + '"/>' : '<rect data-i="' + i + '" x="' + (xx + 2) + '" y="102" width="' + Math.max(2, bw - 4) + '" height="2" fill="var(--ln2)"/>';
       var t = rotulo(i); if (t) s += '<text x="' + (xx + bw / 2) + '" y="122" font-size="10" fill="var(--tx3)" text-anchor="middle">' + t + '</text>'; });
     if (media) { var ya = 104 - media / mx * 92; s += '<line x1="6" x2="' + (W - 6) + '" y1="' + ya + '" y2="' + ya + '" stroke="var(--tx2)" stroke-dasharray="4 4"/><text x="8" y="11" font-size="10.5" fill="var(--tx2)">- - ' + F.esc(txtMedia || '') + '</text>'; }
-    return s + '</svg>';
+    s += '<rect class="cursor" x="0" y="4" width="' + bw + '" height="104" rx="4" fill="var(--tx3)" opacity=".14" style="display:none;pointer-events:none"/>';
+    X._dicas[id] = { dicas: dicas, n: n, W: W, L: 6, col: true, bw: bw };
+    return '<div class="graf">' + s + '</svg><div class="tip" style="display:none"></div></div>';
   };
 
   // ---- abas e estado ----

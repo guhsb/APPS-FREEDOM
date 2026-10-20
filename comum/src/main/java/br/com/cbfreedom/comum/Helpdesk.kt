@@ -436,7 +436,7 @@ object Helpdesk {
             while (it.hasNext()) {
                 val id = it.next()
                 val t = ts.optJSONObject(id) ?: continue
-                if (Engine.isActive(t.optString("status"))) abertos.add(JSONObject(t.toString()).put("id", id))
+                if (Engine.isActive(t.optString("status")) && !t.optBoolean("fora", false)) abertos.add(JSONObject(t.toString()).put("id", id))
             }
         }
         abertos.sortByDescending { it.optString("updated") }

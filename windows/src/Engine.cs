@@ -321,7 +321,7 @@ namespace Freedom
             // mantém chamados antigos que saíram das listas (limitado)
             if (newKnown.Length < 800)
                 foreach (var k in known.Keys)
-                    if (!newKnown.Has(k)) newKnown.Put(k, known.Opt(k));
+                    if (!newKnown.Has(k)) { var velho = known.OptJSONObject(k); if (velho != null) velho.Put("fora", true); newKnown.Put(k, velho != null ? (object)velho : known.Opt(k)); }
 
             // 5) alertas do resumo
             if (summary != null)
@@ -570,9 +570,23 @@ namespace Freedom
             try
             {
                 state.Put("rt_at", agora);
-                var r = f(API + "/ratings?page=1&page_size=20");
-                if (r.Status != 200) return;
-                var items = new JSONObject(r.Body).OptJSONArray("items");
+                // só as avaliações dos MEUS setores
+                var ra = f(API + "/workspace/access");
+                if (ra.Status != 200) return;
+                var acc = new JSONObject(ra.Body);
+                var qs = acc.OptJSONArray("queues");
+                if (!acc.OptBoolean("can_access", true) || qs == null || qs.Length == 0) return;
+                var items = new JSONArray();
+                for (int q = 0; q < qs.Length && q < 8; q++)
+                {
+                    var qo = qs.OptJSONObject(q);
+                    var qid = qo != null ? qo.OptString("id", "") : "";
+                    if (qid.Length == 0 || Agora() > deadline) continue;
+                    var r = f(API + "/ratings?page=1&page_size=20&queue_id=" + qid);
+                    if (r.Status != 200) continue;
+                    var its = new JSONObject(r.Body).OptJSONArray("items");
+                    if (its != null) for (int k = 0; k < its.Length; k++) items.Put(its.Opt(k));
+                }
                 long antes = state.OptLong("rt_max", -1), maior = Math.Max(antes, 0);
                 int avisadas = 0;
                 if (items != null) for (int i = 0; i < items.Length; i++)

@@ -444,12 +444,19 @@ function carregar(silencioso) {
   try { App.carregarChamado(ID); } catch (e) { carregando = false; }
 }
 function carregarAnexos() { try { App.anexosChamado(ID); } catch (e) {} }
+/** Chamado sem acesso some da lista "Chamados em aberto" da tela inicial. */
+function semAcesso(sim) {
+  try { var l = JSON.parse(localStorage.getItem('hd_semacesso') || '[]'), k = String(ID), i = l.indexOf(k);
+    if (sim && i < 0) l.push(k); else if (!sim && i >= 0) l.splice(i, 1); else return;
+    localStorage.setItem('hd_semacesso', JSON.stringify(l.slice(-200))); } catch (e) {}
+}
 window.chamadoCarregado = function (id, ok, msg, d) {
   if (id !== ID) return;                 // resposta atrasada de outro chamado
   carregando = false;
   if (deNovo) { deNovo = false; setTimeout(function () { carregar(true); }, 0); }
   document.getElementById('btAt').classList.remove('gira');
   var av = document.getElementById('aviso');
+  semAcesso(!ok && /acesso|não encontrad|nao encontrad/i.test(String(msg || '')));
   if (!ok) {
     av.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar()">Tentar</button></div>';
     if (!dados) document.getElementById('conteudo').innerHTML = '';

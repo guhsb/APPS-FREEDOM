@@ -500,7 +500,7 @@ function telaEvolucao() {
     ['Variação 1ª → 2ª metade', v == null ? 'Não comparável' : (F.n(v) >= 0 ? '+' : '') + Math.round(F.n(v)) + '%', X.k(sm.first_half_revenue) + ' → ' + X.k(sm.second_half_revenue), v == null ? '' : F.n(v) >= 0 ? 'pos' : 'neg']]);
   var porDia = {}; (dv.daily_revenue || []).forEach(function (x) { porDia[String(x.sale_date).slice(0, 10)] = F.n(x.revenue); });
   var dias = X.dias(d.ini, (X.hoje() < d.fim ? X.hoje() : d.fim)), vals = dias.map(function (x) { return porDia[x] || 0; });
-  if (dias.length) h += X.card('Faturamento por dia', 'Dias sem movimento aparecem zerados', X.colunas(vals, function (i) { return i % 5 === 0 || i === dias.length - 1 ? X.dm(dias[i]) : ''; }, F.n(sm.daily_average), 'média ' + X.k(sm.daily_average)));
+  if (dias.length) h += X.card('Faturamento por dia', 'Dias sem movimento aparecem zerados', X.colunas(vals, function (i) { return i % 5 === 0 || i === dias.length - 1 ? X.dm(dias[i]) : ''; }, F.n(sm.daily_average), 'média ' + X.k(sm.daily_average), null, dias.map(function (x, i) { return '<b>' + F.dataBR(x) + '</b><br>' + F.brl(vals[i]); })));
   var wd = (dv.weekday_revenue || []).slice().sort(function (a, b) { return ((a.weekday_number + 6) % 7) - ((b.weekday_number + 6) % 7); });
   if (wd.length) h += X.card('Por dia da semana', 'Média por ocorrência', X.barras(wd.map(function (w) { return [w.weekday_label, w.average_revenue, null, X.int(w.occurrence_count) + 'x · total ' + X.k(w.revenue)]; }), 'var(--violeta)'));
   h += X.card('Primeira vs. segunda metade', '', X.barras([['1ª metade', sm.first_half_revenue], ['2ª metade', sm.second_half_revenue]], 'var(--azul)'));
@@ -514,7 +514,7 @@ function telaFaturamento() {
     h += X.k4([['Faturamento líquido', X.k(sm.net_revenue), X.int(sm.movement_count) + ' movimentos'], ['Quantidade líquida', X.int(sm.net_quantity) + ' un', ''], ['Devoluções', X.k(sm.return_value), '', F.n(sm.return_value) ? 'neg' : ''],
       ['Custo médio ponderado', sm.weighted_average_cost != null ? F.brl(sm.weighted_average_cost) : '—', 'só quantidades positivas']]);
     var dl = (f.daily || []).slice().sort(function (a, b) { return a.movement_date < b.movement_date ? -1 : 1; });
-    if (dl.length) h += X.card('Faturamento diário', 'Líquido por dia · devoluções e bonificação na lista', X.colunas(dl.map(function (x) { return F.n(x.net_revenue); }), function (i) { return i % 5 === 0 || i === dl.length - 1 ? X.dm(dl[i].movement_date) : ''; }) +
+    if (dl.length) h += X.card('Faturamento diário', 'Líquido por dia · devoluções e bonificação na lista', X.colunas(dl.map(function (x) { return F.n(x.net_revenue); }), function (i) { return i % 5 === 0 || i === dl.length - 1 ? X.dm(dl[i].movement_date) : ''; }, 0, '', null, dl.map(function (x) { return '<b>' + F.dataBR(x.movement_date) + '</b><br>Líquido ' + F.brl(x.net_revenue) + '<br>Devoluções ' + F.brl(x.return_value) + '<br>Bonificação ' + F.brl(x.bonus_value); })) +
       dl.slice(-5).reverse().map(function (x) { return '<div class="row"><span>' + F.dataBR(x.movement_date) + ' · dev. ' + X.k(x.return_value) + ' · bonif. ' + X.k(x.bonus_value) + '</span><b>' + X.k(x.net_revenue) + '</b></div>'; }).join(''));
     [['sellers', 'Faturamento por vendedor', 'var(--azul)'], ['families', 'Faturamento por família', 'var(--violeta)'], ['products', 'Produtos faturados', 'var(--verde)']].forEach(function (g) {
       var l = f[g[0]] || []; if (!l.length) return; var n = verFat[g[0]] ? 60 : 8;

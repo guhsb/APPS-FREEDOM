@@ -59,7 +59,8 @@ function montar() {
   var h = '<div class="form">' +
     '<div class="campo"><label for="setor">Setor <em>*</em></label><select id="setor"><option value="">Escolha o setor…</option>' +
     setores.map(function (q) { return '<option value="' + q.id + '">' + F.esc(q.name) + '</option>'; }).join('') + '</select><div class="dica" id="descSetor"></div></div>' +
-    '<div class="campo"><label for="titulo">Título <em>*</em><span class="cont" id="cTit"></span></label><input id="titulo" maxlength="200" placeholder="Resumo do problema ou pedido"></div>' +
+    '<div class="campo" id="campoTit"><label for="titulo">Título <em>*</em><span class="cont" id="cTit"></span></label><input id="titulo" maxlength="160" placeholder="Resumo do problema ou pedido"></div>' +
+    '<div class="campo" id="campoTipo" style="display:none"><label for="tipo">Tipo de solicitação <em>*</em></label><select id="tipo"><option value="">Selecione o tipo…</option></select><div class="dica" id="dTipo">Este setor usa títulos pré-definidos.</div></div>' +
     '<div class="campo"><label>Prioridade</label><div class="prios" id="prios">' + Object.keys(F.PRIO).map(function (k) {
       return '<button type="button" data-p="' + k + '" class="' + (k === prio ? 'on' : '') + '"><i style="background:' + F.PRIO[k][1] + '"></i>' + F.PRIO[k][0] + '</button>'; }).join('') + '</div></div>' +
     '<div class="campo"><label for="desc">Descrição <em>*</em></label><textarea id="desc" maxlength="10000" placeholder="Explique o que aconteceu, números de pedido, nota, cliente…"></textarea></div>' +
@@ -76,6 +77,7 @@ function montar() {
     var q = setores.filter(function (x) { return String(x.id) === sel.value; })[0];
     document.getElementById('descSetor').textContent = q && q.description ? q.description : '';
     carregarResponsaveis(sel.value);
+    carregarTipos(q);
   };
   document.getElementById('prios').onclick = function (ev) {
     var b = ev.target.closest('[data-p]'); if (!b) return;
@@ -83,7 +85,7 @@ function montar() {
     Array.prototype.forEach.call(document.querySelectorAll('#prios button'), function (x) { x.classList.toggle('on', x === b); });
   };
   var tit = document.getElementById('titulo');
-  tit.oninput = function () { document.getElementById('cTit').textContent = tit.value.length ? tit.value.length + '/200' : ''; };
+  tit.oninput = function () { document.getElementById('cTit').textContent = tit.value.length ? tit.value.length + '/160' : ''; };
   document.getElementById('btEnviar').onclick = enviar;
   var arq = document.getElementById('arq');
   if (arq) {
@@ -157,6 +159,27 @@ function enviarAnexos(id) {
   });
 }
 
+/** Setor com "tipos obrigatórios": o título vem de uma lista pronta (igual ao site). */
+function tiposObrig() { var q = setores.filter(function (x) { return String(x.id) === document.getElementById('setor').value; })[0]; return !!(q && q.request_types_required); }
+function carregarTipos(q) {
+  var obr = !!(q && q.request_types_required), sel = document.getElementById('tipo'), dica = document.getElementById('dTipo');
+  document.getElementById('campoTit').style.display = obr ? 'none' : '';
+  document.getElementById('campoTipo').style.display = obr ? '' : 'none';
+  sel.innerHTML = '<option value="">' + (obr ? 'Carregando os tipos…' : 'Selecione o tipo…') + '</option>'; sel.disabled = true;
+  dica.textContent = 'Este setor usa títulos pré-definidos.';
+  if (!obr) return;
+  var id = String(q.id);
+  F.api('GET', '/helpdesk/queues/' + encodeURIComponent(id) + '/request-types').then(function (r) {
+    if (document.getElementById('setor').value !== id) return;
+    var l = r.status === 200 ? (Array.isArray(r.json) ? r.json : (r.json && r.json.items) || []) : null;
+    if (l) l = l.filter(function (t) { return t.is_active !== false; });
+    if (!l) { sel.innerHTML = '<option value="">Não carregou</option>'; dica.textContent = F.erroApi(r, 'Não foi possível carregar os tipos de solicitação.'); return; }
+    if (!l.length) { sel.innerHTML = '<option value="">Nenhum tipo ativo</option>'; dica.textContent = 'Este setor não possui tipos ativos. Solicite o cadastro ao responsável da área.'; return; }
+    sel.innerHTML = '<option value="">Selecione o tipo…</option>' + l.map(function (t) { return '<option value="' + F.esc(t.id) + '">' + F.esc(t.name) + '</option>'; }).join('');
+    sel.disabled = false;
+  });
+}
+
 function carregarResponsaveis(q) {
   var campo = document.getElementById('campoResp'), sel = document.getElementById('resp');
   campo.style.display = 'none'; sel.innerHTML = '<option value="">Deixar para o setor</option>';
@@ -174,13 +197,15 @@ function enviar() {
   if (enviando) return;
   var q = document.getElementById('setor').value, t = document.getElementById('titulo').value.trim(),
     d = document.getElementById('desc').value.trim(), resp = document.getElementById('resp').value;
-  if (!q || t.length < 3 || d.length < 3) {
-    F.toast(!q ? 'Escolha o setor.' : t.length < 3 ? 'Escreva o título (pelo menos 3 letras).' : 'Escreva a descrição (pelo menos 3 letras).');
+  var obr = q && tiposObrig(), tp = document.getElementById('tipo').value;
+  if (!q || (obr ? !tp : t.length < 3) || d.length < 3) {
+    F.toast(!q ? 'Escolha o setor.' : obr && !tp ? 'Escolha o tipo de solicitação.' : !obr && t.length < 3 ? 'Escreva o título (pelo menos 3 letras).' : 'Escreva a descrição (pelo menos 3 letras).');
     return;
   }
   enviando = true;
   var b = document.getElementById('btEnviar'); b.disabled = true; b.lastChild.textContent = 'Abrindo…';
-  var corpo = { queue_id: Number(q), title: t, priority: prio, description: d };
+  var corpo = { queue_id: Number(q), priority: prio, description: d };
+  if (obr) corpo.request_type_id = Number(tp); else corpo.title = t;
   if (resp) corpo.assignee_user_id = Number(resp);
   F.api('POST', '/helpdesk/tickets', corpo).then(function (r) {
     if (r.status >= 200 && r.status < 300 && !r.fila && r.json && r.json.id && anexos.length) {

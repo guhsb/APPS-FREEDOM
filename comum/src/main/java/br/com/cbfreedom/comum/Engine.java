@@ -383,7 +383,10 @@ public final class Engine {
                 String k = keys.next();
                 if (!newKnown.has(k)) {
                     try {
-                        newKnown.put(k, known.get(k));
+                        // saiu das minhas listas (transferido/sem acesso): guarda, mas não mostra em "Chamados em aberto"
+                        JSONObject velho = known.optJSONObject(k);
+                        if (velho != null) velho.put("fora", true);
+                        newKnown.put(k, velho != null ? velho : known.get(k));
                     } catch (JSONException ignored) {
                     }
                 }
@@ -647,9 +650,22 @@ public final class Engine {
         if (agora - state.optLong("rt_at", 0) < 4 * 60_000L || agora > deadline) return;
         try {
             state.put("rt_at", agora);
-            Resp r = f.get(API + "/ratings?page=1&page_size=20");
-            if (r.status != 200) return;
-            JSONArray items = new JSONObject(r.body).optJSONArray("items");
+            // só as avaliações dos MEUS setores (o site pode devolver outras dentro do escopo amplo)
+            Resp ra = f.get(API + "/workspace/access");
+            if (ra.status != 200) return;
+            JSONObject acc = new JSONObject(ra.body);
+            JSONArray qs = acc.optJSONArray("queues");
+            if (acc.optBoolean("can_access", true) == false || qs == null || qs.length() == 0) return;
+            JSONArray items = new JSONArray();
+            for (int q = 0; q < qs.length() && q < 8; q++) {
+                JSONObject qo = qs.optJSONObject(q);
+                String qid = qo != null ? qo.optString("id", "") : qs.optString(q, "");
+                if (qid.length() == 0 || System.currentTimeMillis() > deadline) continue;
+                Resp r = f.get(API + "/ratings?page=1&page_size=20&queue_id=" + qid);
+                if (r.status != 200) continue;
+                JSONArray its = new JSONObject(r.body).optJSONArray("items");
+                if (its != null) for (int k = 0; k < its.length(); k++) items.put(its.opt(k));
+            }
             long antes = state.optLong("rt_max", -1), maior = Math.max(antes, 0);
             int avisadas = 0;
             if (items != null) for (int i = 0; i < items.length(); i++) {

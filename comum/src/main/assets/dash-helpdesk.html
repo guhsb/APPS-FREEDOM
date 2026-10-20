@@ -160,14 +160,48 @@ function atendentes() {
 }
 // ---------- Avaliações (mesma página do site: notas que os solicitantes deram) ----------
 var AV = { pag: 1, resp: '', nota: '', tipo: '', d: null, chave: '' }, NOTAS = ['', 'Péssimo', 'Ruim', 'Regular', 'Bom', 'Excelente'];
-function urlAval() { var dt = datas(); return '/helpdesk/ratings' + X.q({ page: AV.pag, page_size: 20, start_date: dt[0], end_date: dt[1], queue_id: setor, assignee_user_id: AV.resp, rating: AV.nota, request_type_id: AV.tipo }); }
+// Só os MEUS setores: o site pode devolver avaliações de outros setores no escopo amplo, então busca setor por setor.
+function filasAval() { return setor ? [String(setor)] : (acesso && acesso.queues || []).map(function (q) { return String(q && typeof q === 'object' ? q.id : q); }); }
+function urlAval(q, pag) { var dt = datas(); return '/helpdesk/ratings' + X.q({ page: pag, page_size: 20, start_date: dt[0], end_date: dt[1], queue_id: q, assignee_user_id: AV.resp, rating: AV.nota, request_type_id: AV.tipo }); }
+function chaveAval() { var qs = filasAval(); return qs.join(',') + '|' + urlAval('', qs.length === 1 ? AV.pag : 0); }
+function vazioAval() { return { count: 0, average: null, distribution: [], items: [], total: 0, page_size: 20, filters: (AV.ult && AV.ult.filters) || {} }; }
+/** 403/404 do site = setor sem avaliação (ou fora do escopo de avaliações): vira lista vazia, não erro. */
+function buscarAval(q, pag) { return X.get(urlAval(q, pag)).catch(function (e) { if (e.status === 403 || e.status === 404 || /acesso/i.test(e.message || '')) return null; throw e; }); }
+function juntarAval(lista) {
+  var r = vazioAval(), soma = 0, dist = {}, ass = {}, tps = {}, vistos = {};
+  r.filters = { assignees: [], request_types: [] };
+  lista.forEach(function (j) {
+    if (!j) return; var c = F.n(j.count); r.count += c; if (j.average != null) soma += F.n(j.average) * c;
+    (j.distribution || []).forEach(function (x) { dist[x.rating] = (dist[x.rating] || 0) + F.n(x.count); });
+    var fl = j.filters || {};
+    (fl.assignees || []).forEach(function (x) { if (!ass[x.id]) { ass[x.id] = 1; r.filters.assignees.push(x); } });
+    (fl.request_types || []).forEach(function (x) { if (!tps[x.id]) { tps[x.id] = 1; r.filters.request_types.push(x); } });
+    (j.items || []).forEach(function (x) { if (!vistos[x.id]) { vistos[x.id] = 1; r.items.push(x); } });
+  });
+  r.average = r.count ? soma / r.count : null;
+  r.distribution = Object.keys(dist).map(function (k) { return { rating: F.n(k), count: dist[k], percentage: r.count ? dist[k] * 100 / r.count : 0 }; });
+  r.items.sort(function (x, y) { return String(y.created_at || '') < String(x.created_at || '') ? -1 : 1; });
+  r.total = r.items.length; r.local = true;
+  return r;
+}
 function carregarAval() {
-  var u = urlAval(); AV.chave = u; AV.erro = '';
-  X.get(u).then(function (j) { if (AV.chave === u) { AV.d = j; if (aba === 'aval') X.manter(desenhar); } }).catch(function (e) { if (AV.chave === u) { AV.erro = e.message; if (aba === 'aval') desenhar(); } });
+  var k = chaveAval(), qs = filasAval(); AV.chave = k; AV.erro = '';
+  function pronto(j) { if (AV.chave !== k) return; AV.d = j; if (j && j.filters && (j.filters.assignees || []).length) AV.ult = j; if (aba === 'aval') X.manter(desenhar); }
+  function falhou(e) { if (AV.chave !== k) return; AV.erro = e.message; if (aba === 'aval') desenhar(); }
+  if (!qs.length) { pronto(vazioAval()); return; }
+  if (qs.length === 1) { buscarAval(qs[0], AV.pag).then(function (j) { pronto(j || vazioAval()); }).catch(falhou); return; }
+  Promise.all(qs.map(function (q) {
+    return buscarAval(q, 1).then(function (j) {
+      if (!j) return [];
+      var pags = Math.min(5, Math.ceil(F.n(j.total) / (F.n(j.page_size) || 20))), mais = [];
+      for (var p = 2; p <= pags; p++) mais.push(buscarAval(q, p));
+      return Promise.all(mais).then(function (rs) { var it = (j.items || []).slice(); rs.forEach(function (x) { if (x) it = it.concat(x.items || []); }); return [Object.assign({}, j, { items: it })]; });
+    });
+  })).then(function (rs) { pronto(juntarAval([].concat.apply([], rs))); }).catch(falhou);
 }
 function estrelas(n) { n = Math.round(F.n(n)); return '<span style="color:#f5a524;letter-spacing:1px">' + '★'.repeat(n) + '<span style="color:var(--ln2)">' + '★'.repeat(Math.max(0, 5 - n)) + '</span></span>'; }
 function avaliacoes() {
-  if (AV.chave !== urlAval()) { AV.d = null; carregarAval(); }
+  if (AV.chave !== chaveAval()) { AV.d = null; carregarAval(); }
   if (AV.erro) return '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(AV.erro) + '</span></div>';
   var a = AV.d; if (!a) return X.carregando('Carregando as avaliações…');
   var fl = a.filters || {}, h = '', dist = (a.distribution || []).slice().sort(function (x, y) { return y.rating - x.rating; });
@@ -179,12 +213,12 @@ function avaliacoes() {
     '<div class="s">' + (media != null ? estrelas(media) + ' · ' : '') + '<b>' + X.int(a.count) + '</b> avaliaç' + (F.n(a.count) === 1 ? 'ão' : 'ões') + '</div></div>';
   if (dist.length) h += X.card('Distribuição das notas', '', dist.map(function (x) {
     return '<div class="hb"><span class="n">' + estrelas(x.rating) + ' ' + NOTAS[x.rating] + '</span><span class="p"><b>' + X.int(x.count) + '</b> · ' + Math.round(F.n(x.percentage)) + '%</span><div class="t"><i style="width:' + F.n(x.percentage) + '%;background:' + (x.rating >= 4 ? 'var(--verde)' : x.rating === 3 ? 'var(--laranja)' : 'var(--rosa)') + '"></i></div></div>'; }).join(''));
-  var it = a.items || [];
+  var it = a.local ? (a.items || []).slice((AV.pag - 1) * 20, AV.pag * 20) : (a.items || []);
   h += X.card('Avaliações', 'Toque para abrir o chamado', it.map(function (r) {
     var tid = r.ticket_id || (r.ticket && r.ticket.id) || '';
     return '<div class="tk"' + (tid ? ' data-t="' + F.esc(tid) + '"' : '') + '><div class="c"><b>' + estrelas(r.rating) + ' <span style="font-weight:700">' + NOTAS[r.rating] + '</span> · ' + F.esc(r.protocol || '') + '</b>' +
       '<span>' + F.esc(r.assignee_name || 'Não atribuído') + ' · ' + F.esc(X.cap(r.queue_name || '')) + (r.request_type_name ? ' · ' + F.esc(r.request_type_name) : '') + ' · ' + quando(r.created_at) + '</span>' +
-      (r.comment ? '<div class="det" style="margin:6px 0 0">' + F.esc(r.comment) + '</div>' : '') + '</div></div>'; }).join('') || '<div class="vazio">Nenhuma avaliação encontrada.</div>');
+      (r.comment ? '<div class="det" style="margin:6px 0 0">' + F.esc(r.comment) + '</div>' : '') + '</div></div>'; }).join('') || '<div class="vazio">Nenhuma avaliação ' + (setor ? 'neste setor ' : '') + 'no período.</div>');
   var tot = F.n(a.total), ps = F.n(a.page_size) || 20;
   if (tot > ps) h += X.pag('av', AV.pag, Math.ceil(tot / ps));
   return h;
@@ -208,7 +242,7 @@ function carregarSetoresPessoa() {
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest ? ev.target.closest('[data-aba],[data-setor],[data-t]') : null; if (!t) return;
   if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('hd_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
-  if (t.hasAttribute('data-setor')) { setor = t.getAttribute('data-setor'); carregar(true); return; }
+  if (t.hasAttribute('data-setor')) { setor = t.getAttribute('data-setor'); AV.pag = 1; carregar(true); return; }
   if (t.hasAttribute('data-t')) { try { App.abrirSite('/helpdesk/tickets/' + t.getAttribute('data-t')); } catch (e) { } }
 });
 document.addEventListener('change', function (ev) { if (ev.target.id === 'selPer') { periodo = ev.target.value; X.lembrar('hd_per', periodo); setoresPessoa = null; carregar(true); } });

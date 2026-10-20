@@ -101,7 +101,7 @@ function chave(id, on) { return '<span class="sw"><input type="checkbox" id="' +
 
 function render() {
   var e = est();
-  var k = JSON.stringify(e) + Math.floor(Date.now() / 30000);
+  var k = JSON.stringify(e) + Math.floor(Date.now() / 30000); try { k += localStorage.getItem('hd_semacesso') || ''; } catch (x) {}
   document.getElementById('btAt').classList.toggle('gira', !!e.verificando);
   if (k === ultimo) return;
   ultimo = k;
@@ -170,7 +170,8 @@ function render() {
   }
 
   // chamados em aberto
-  var ab = e.abertos || [];
+  var semAc = []; try { semAc = JSON.parse(localStorage.getItem('hd_semacesso') || '[]'); } catch (x) {}
+  var ab = (e.abertos || []).filter(function (t) { return semAc.indexOf(String(t.id)) < 0; });
   h += '<div class="sec"><h2>Chamados em aberto</h2><span>' + ab.length + '</span></div>';
   if (!ab.length) h += '<div class="vazio">' + (e.ultima ? 'Nenhum chamado em aberto que você acompanha.' : 'Buscando os chamados…') + '</div>';
   else {

@@ -274,7 +274,7 @@ namespace Freedom
                 foreach (var id in ts.Keys)
                 {
                     var t = ts.OptJSONObject(id);
-                    if (t != null && Engine.IsActive(t.OptString("status"))) abertos.Add(new JSONObject(t.ToString()).Put("id", id));
+                    if (t != null && Engine.IsActive(t.OptString("status")) && !t.OptBoolean("fora", false)) abertos.Add(new JSONObject(t.ToString()).Put("id", id));
                 }
             var arr = new JSONArray();
             foreach (var t in abertos.OrderByDescending(x => x.OptString("updated"), StringComparer.Ordinal).Take(40)) arr.Put(t);

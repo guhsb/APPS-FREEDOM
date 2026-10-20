@@ -188,7 +188,7 @@ const H = {
     try { estado = JSON.parse(p.getStr('estado', '{}')) || {}; } catch (e) { }
     if (estado.summary) o.resumo = estado.summary;
     const ts = estado.tickets || {};
-    o.abertos = Object.keys(ts).filter(id => ts[id] && Engine.isActive(String(ts[id].status || '')))
+    o.abertos = Object.keys(ts).filter(id => ts[id] && !ts[id].fora && Engine.isActive(String(ts[id].status || '')))
       .map(id => Object.assign({}, ts[id], { id })).sort((a, b) => (String(b.updated) > String(a.updated) ? 1 : String(b.updated) < String(a.updated) ? -1 : 0)).slice(0, 40);
     return o;
   },
