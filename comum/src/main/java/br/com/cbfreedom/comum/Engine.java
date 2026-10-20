@@ -415,6 +415,9 @@ public final class Engine {
             }
         }
 
+        // 6) Avaliações novas: quem atende recebe a nota que o solicitante deu (a cada 4 min, no máximo) ----
+        avaliacoes(f, state, out, deadline);
+
         try {
             state.put("tickets", newKnown);
             state.put("wm_created", maxCreated);
@@ -633,6 +636,44 @@ public final class Engine {
             case "CRITICAL": return "Crítica";
             case "": return "—";
             default: return s;
+        }
+    }
+
+    static final String[] NOTAS = {"", "Péssimo", "Ruim", "Regular", "Bom", "Excelente"};
+
+    /** Busca /helpdesk/ratings (só funciona para quem atende/administra) e avisa as avaliações novas. */
+    static void avaliacoes(Fetcher f, JSONObject state, Outcome out, long deadline) {
+        long agora = System.currentTimeMillis();
+        if (agora - state.optLong("rt_at", 0) < 4 * 60_000L || agora > deadline) return;
+        try {
+            state.put("rt_at", agora);
+            Resp r = f.get(API + "/ratings?page=1&page_size=20");
+            if (r.status != 200) return;
+            JSONArray items = new JSONObject(r.body).optJSONArray("items");
+            long antes = state.optLong("rt_max", -1), maior = Math.max(antes, 0);
+            int avisadas = 0;
+            if (items != null) for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it == null) continue;
+                long id = it.optLong("id", 0);
+                if (id > maior) maior = id;
+                if (antes < 0 || id <= antes || avisadas >= 5) continue;
+                int nota = Math.max(0, Math.min(5, it.optInt("rating", 0)));
+                StringBuilder est = new StringBuilder();
+                for (int k = 0; k < 5; k++) est.append(k < nota ? "★" : "☆");
+                Note n = new Note();
+                n.ticketId = it.optInt("ticket_id", 0);
+                n.title = "Avaliação " + est + " " + NOTAS[nota] + " · " + it.optString("protocol", "");
+                String quem = it.isNull("assignee_name") ? "Não atribuído" : it.optString("assignee_name", "Não atribuído");
+                String com = it.isNull("comment") ? "" : it.optString("comment", "").trim();
+                n.text = quem + (com.isEmpty() ? "" : " · “" + com + "”");
+                n.lines.add(n.text);
+                n.path = n.ticketId > 0 ? "/helpdesk/tickets/" + n.ticketId : "/helpdesk/ratings";
+                out.notes.add(n);
+                avisadas++;
+            }
+            state.put("rt_max", maior);
+        } catch (Exception ignored) {
         }
     }
 }

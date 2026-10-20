@@ -347,6 +347,9 @@ namespace Freedom
                 }
             }
 
+            // 6) avaliações novas: quem atende recebe a nota que o solicitante deu (a cada 4 min, no máximo)
+            Avaliacoes(f, state, outc, deadline);
+
             state.Put("tickets", newKnown).Put("wm_created", maxCreated).Put("wm_updated", maxUpdated).Put("rr", (long)rr);
             if (summary != null) state.Put("summary", summary);
             outc.NewState = state.ToString();
@@ -556,6 +559,45 @@ namespace Freedom
                 case "": return "—";
                 default: return s;
             }
+        }
+            static readonly string[] NOTAS = { "", "Péssimo", "Ruim", "Regular", "Bom", "Excelente" };
+
+        /// <summary>Busca /helpdesk/ratings (só funciona para quem atende/administra) e avisa as avaliações novas.</summary>
+        static void Avaliacoes(Fetcher f, JSONObject state, Outcome outc, long deadline)
+        {
+            long agora = Agora();
+            if (agora - state.OptLong("rt_at", 0) < 4 * 60000L || agora > deadline) return;
+            try
+            {
+                state.Put("rt_at", agora);
+                var r = f(API + "/ratings?page=1&page_size=20");
+                if (r.Status != 200) return;
+                var items = new JSONObject(r.Body).OptJSONArray("items");
+                long antes = state.OptLong("rt_max", -1), maior = Math.Max(antes, 0);
+                int avisadas = 0;
+                if (items != null) for (int i = 0; i < items.Length; i++)
+                {
+                    var it = items.OptJSONObject(i);
+                    if (it == null) continue;
+                    long id = it.OptLong("id", 0);
+                    if (id > maior) maior = id;
+                    if (antes < 0 || id <= antes || avisadas >= 5) continue;
+                    int nota = Math.Max(0, Math.Min(5, it.OptInt("rating")));
+                    var est = new string('★', nota) + new string('☆', 5 - nota);
+                    var n = new Note();
+                    n.TicketId = it.OptInt("ticket_id");
+                    n.Title = "Avaliação " + est + " " + NOTAS[nota] + " · " + it.OptString("protocol", "");
+                    var quem = it.OptString("assignee_name", ""); if (string.IsNullOrEmpty(quem) || quem == "null") quem = "Não atribuído";
+                    var com = it.OptString("comment", ""); if (com == "null") com = ""; com = com.Trim();
+                    n.Text = quem + (com.Length == 0 ? "" : " · “" + com + "”");
+                    n.Lines.Add(n.Text);
+                    n.Path = n.TicketId > 0 ? "/helpdesk/tickets/" + n.TicketId : "/helpdesk/ratings";
+                    outc.Notes.Add(n);
+                    avisadas++;
+                }
+                state.Put("rt_max", maior);
+            }
+            catch (Exception) { }
         }
     }
 }

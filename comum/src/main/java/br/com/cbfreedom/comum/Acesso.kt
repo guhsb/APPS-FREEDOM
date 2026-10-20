@@ -23,6 +23,7 @@ object Acesso {
         val arr = me.optJSONArray("modules") ?: return
         p(c).edit()
             .putString("modulos", arr.toString())
+            .putString("permissoes", (me.optJSONArray("permissions") ?: JSONArray()).toString())
             .putString("perfil", me.optString("role"))
             .putString("nome", me.optString("display_name"))
             .commit()
@@ -45,6 +46,17 @@ object Acesso {
     fun tem(c: Context, modulo: String): Boolean = modulos(c)?.contains(modulo.lowercase()) ?: true
 
     fun helpdesk(c: Context): Boolean = tem(c, HELPDESK)
+    fun comercial(c: Context): Boolean = tem(c, "commercial")
+    fun logistica(c: Context): Boolean = tem(c, "logistics")
+
+    /** Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra). */
+    fun admin(c: Context): Boolean {
+        val s = p(c).getString("permissoes", null) ?: return false
+        return try {
+            val a = JSONArray(s)
+            (0 until a.length()).any { a.optString(it) in setOf("users:manage", "audit:view", "firebird_mappings:view") }
+        } catch (_: Exception) { false }
+    }
 
     /** Tem pelo menos um painel liberado. */
     fun painel(c: Context): Boolean = Freedom.paraAbaPainel(c).isNotEmpty()

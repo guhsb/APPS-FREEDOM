@@ -217,6 +217,7 @@ namespace Freedom
                 r.ContentLength = corpo.Length;
                 using (var s = r.GetRequestStream()) s.Write(corpo, 0, corpo.Length);
             }
+            else if (r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH") r.ContentLength = 0;
             HttpWebResponse resp;
             try { resp = (HttpWebResponse)r.GetResponse(); }
             catch (WebException e)
@@ -315,7 +316,8 @@ namespace Freedom
         {
             var arr = me.OptJSONArray("modules");
             if (arr == null) return;
-            P.Edit().Put("modulos", arr.ToString()).Put("perfil", me.OptString("role")).Put("nome", me.OptString("display_name")).Commit();
+            var pm = me.OptJSONArray("permissions");
+            P.Edit().Put("modulos", arr.ToString()).Put("permissoes", pm != null ? pm.ToString() : "[]").Put("perfil", me.OptString("role")).Put("nome", me.OptString("display_name")).Commit();
         }
 
         public static void Atualizar(Api api) { try { Salvar(api.Get("/auth/me")); } catch (Exception) { } }
@@ -336,6 +338,21 @@ namespace Freedom
 
         public static bool Tem(string modulo) { var m = Modulos(); return m == null || m.Contains(modulo.ToLowerInvariant()); }
         public static bool Helpdesk() { return Tem(HELPDESK); }
+        public static bool Comercial() { return Tem("commercial"); }
+        public static bool Logistica() { return Tem("logistics"); }
+        /// <summary>Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra).</summary>
+        public static bool Admin()
+        {
+            var s = P.GetString("permissoes");
+            if (s == null) return false;
+            try
+            {
+                var a = new JSONArray(s);
+                for (int i = 0; i < a.Length; i++) { var x = a.OptString(i); if (x == "users:manage" || x == "audit:view" || x == "firebird_mappings:view") return true; }
+            }
+            catch (Exception) { }
+            return false;
+        }
         public static bool Painel() { return Paineis.ParaAbaPainel().Count > 0; }
         public static string Perfil() { return P.GetString("perfil", ""); }
         public static string Nome() { return P.GetString("nome", ""); }

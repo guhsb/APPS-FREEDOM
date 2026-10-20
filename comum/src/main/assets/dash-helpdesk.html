@@ -58,7 +58,7 @@ function quando(iso) { if (!iso) return ''; var dt = new Date(iso), agora = new 
 function desenhar() {
   var qs = acesso.queues || [], o = d.o;
   document.getElementById('sub').innerHTML = (qs.length === 1 ? F.esc(qs[0].name) : 'Seus ' + qs.length + ' setores') + ' · ' + (periodo === 'hoje' ? 'hoje' : X.dm(d.ini) + '–' + X.dm(d.fim));
-  var h = X.abas([['resumo', 'Resumo'], ['filas', 'Filas'], ['atend', 'Atendentes']], aba);
+  var h = X.abas([['resumo', 'Resumo'], ['filas', 'Filas'], ['atend', 'Atendentes'], ['aval', 'Avaliações']], aba);
   if (qs.length > 1) {
     var venc = {}; (o.queues || []).forEach(function (q) { venc[q.queue_id] = F.n(q.breached); });
     h += X.abas([['', 'Todos os meus setores · ' + qs.length]].concat(qs.map(function (q) { return [String(q.id), F.esc(X.cap(q.name)) + (venc[q.id] ? '<small>' + venc[q.id] + '</small>' : '')]; })), setor, 'setor').replace('class="tabs"', 'class="tabs" style="margin-top:-4px"');
@@ -68,6 +68,7 @@ function desenhar() {
   if (aba === 'resumo') h += resumo();
   if (aba === 'filas') h += filas();
   if (aba === 'atend') h += atendentes();
+  if (aba === 'aval') h += avaliacoes();
   var c = document.getElementById('c'); c.innerHTML = h; X.ligarGraficos(c);
 }
 
@@ -157,6 +158,46 @@ function atendentes() {
   if (ins.length) h += '<div class="card">' + ins.join('') + '</div>';
   return h;
 }
+// ---------- Avaliações (mesma página do site: notas que os solicitantes deram) ----------
+var AV = { pag: 1, resp: '', nota: '', tipo: '', d: null, chave: '' }, NOTAS = ['', 'Péssimo', 'Ruim', 'Regular', 'Bom', 'Excelente'];
+function urlAval() { var dt = datas(); return '/helpdesk/ratings' + X.q({ page: AV.pag, page_size: 20, start_date: dt[0], end_date: dt[1], queue_id: setor, assignee_user_id: AV.resp, rating: AV.nota, request_type_id: AV.tipo }); }
+function carregarAval() {
+  var u = urlAval(); AV.chave = u; AV.erro = '';
+  X.get(u).then(function (j) { if (AV.chave === u) { AV.d = j; if (aba === 'aval') X.manter(desenhar); } }).catch(function (e) { if (AV.chave === u) { AV.erro = e.message; if (aba === 'aval') desenhar(); } });
+}
+function estrelas(n) { n = Math.round(F.n(n)); return '<span style="color:#f5a524;letter-spacing:1px">' + '★'.repeat(n) + '<span style="color:var(--ln2)">' + '★'.repeat(Math.max(0, 5 - n)) + '</span></span>'; }
+function avaliacoes() {
+  if (AV.chave !== urlAval()) { AV.d = null; carregarAval(); }
+  if (AV.erro) return '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(AV.erro) + '</span></div>';
+  var a = AV.d; if (!a) return X.carregando('Carregando as avaliações…');
+  var fl = a.filters || {}, h = '', dist = (a.distribution || []).slice().sort(function (x, y) { return y.rating - x.rating; });
+  h += '<div class="sub2"><select class="sel" id="avResp">' + X.opcoes((fl.assignees || []).map(function (x) { return [x.id, x.name]; }), AV.resp, 'Todos os responsáveis') + '</select>' +
+    '<select class="sel" id="avNota">' + X.opcoes([5, 4, 3, 2, 1].map(function (n) { return [n, n + ' estrela' + (n > 1 ? 's' : '') + ' · ' + NOTAS[n]]; }), AV.nota, 'Todas as notas') + '</select></div>' +
+    '<div style="margin:-2px 0 10px"><select class="sel" id="avTipo">' + X.opcoes((fl.request_types || []).map(function (x) { return [x.id, x.name]; }), AV.tipo, 'Todos os tipos') + '</select></div>';
+  var media = a.average != null ? F.n(a.average) : null;
+  h += '<div class="card hero"><div class="lb">Satisfação no período</div><div class="v">' + (media != null ? media.toFixed(2).replace('.', ',') : '—') + ' <span style="font-size:16px;font-weight:600;color:var(--tx2)">de 5</span></div>' +
+    '<div class="s">' + (media != null ? estrelas(media) + ' · ' : '') + '<b>' + X.int(a.count) + '</b> avaliaç' + (F.n(a.count) === 1 ? 'ão' : 'ões') + '</div></div>';
+  if (dist.length) h += X.card('Distribuição das notas', '', dist.map(function (x) {
+    return '<div class="hb"><span class="n">' + estrelas(x.rating) + ' ' + NOTAS[x.rating] + '</span><span class="p"><b>' + X.int(x.count) + '</b> · ' + Math.round(F.n(x.percentage)) + '%</span><div class="t"><i style="width:' + F.n(x.percentage) + '%;background:' + (x.rating >= 4 ? 'var(--verde)' : x.rating === 3 ? 'var(--laranja)' : 'var(--rosa)') + '"></i></div></div>'; }).join(''));
+  var it = a.items || [];
+  h += X.card('Avaliações', 'Toque para abrir o chamado', it.map(function (r) {
+    var tid = r.ticket_id || (r.ticket && r.ticket.id) || '';
+    return '<div class="tk"' + (tid ? ' data-t="' + F.esc(tid) + '"' : '') + '><div class="c"><b>' + estrelas(r.rating) + ' <span style="font-weight:700">' + NOTAS[r.rating] + '</span> · ' + F.esc(r.protocol || '') + '</b>' +
+      '<span>' + F.esc(r.assignee_name || 'Não atribuído') + ' · ' + F.esc(X.cap(r.queue_name || '')) + (r.request_type_name ? ' · ' + F.esc(r.request_type_name) : '') + ' · ' + quando(r.created_at) + '</span>' +
+      (r.comment ? '<div class="det" style="margin:6px 0 0">' + F.esc(r.comment) + '</div>' : '') + '</div></div>'; }).join('') || '<div class="vazio">Nenhuma avaliação encontrada.</div>');
+  var tot = F.n(a.total), ps = F.n(a.page_size) || 20;
+  if (tot > ps) h += X.pag('av', AV.pag, Math.ceil(tot / ps));
+  return h;
+}
+document.addEventListener('change', function (ev) {
+  var m = { avResp: 'resp', avNota: 'nota', avTipo: 'tipo' }[ev.target.id]; if (!m) return;
+  AV[m] = ev.target.value; AV.pag = 1; desenhar();
+});
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-pag="av"]') : null; if (!t || t.disabled) return;
+  AV.pag = F.n(t.getAttribute('data-ir')); desenhar(); window.scrollTo(0, 0);
+});
+
 /** Em quais dos seus setores cada atendente está (uma consulta por setor, só quando abre a aba). */
 function carregarSetoresPessoa() {
   setoresPessoa = {}; var qs = acesso.queues || [], dt = datas();
@@ -174,7 +215,7 @@ document.addEventListener('change', function (ev) { if (ev.target.id === 'selPer
 document.getElementById('btVoltar').innerHTML = F.ic('seta');
 document.getElementById('btAt').innerHTML = F.ic('atualizar');
 document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
-document.getElementById('btAt').onclick = function () { setoresPessoa = null; carregar(true); };
+document.getElementById('btAt').onclick = function () { setoresPessoa = null; AV.chave = ''; carregar(true); };
 window.recebidoHelpdesk = function () { carregar(true); };
 window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t); };
 F.topoSombra();

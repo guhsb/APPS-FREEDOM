@@ -330,12 +330,42 @@ async function run(f, stateJson, notifyOwn, deadline, force = new Set()) {
     }
   }
 
+  // 6) avaliações novas: quem atende recebe a nota que o solicitante deu (a cada 4 min, no máximo)
+  await avaliacoes(f, state, outc, deadline);
+
   state.tickets = newKnown; state.wm_created = maxCreated; state.wm_updated = maxUpdated; state.rr = rr;
   if (summary) state.summary = summary;
   outc.newState = JSON.stringify(state);
   outc.monitored = current.length;
   outc.ok = true;
   return outc;
+}
+
+const NOTAS = ['', 'Péssimo', 'Ruim', 'Regular', 'Bom', 'Excelente'];
+/** Busca /helpdesk/ratings (só funciona para quem atende/administra) e avisa as avaliações novas. */
+async function avaliacoes(f, state, outc, deadline) {
+  const agora = Date.now();
+  if (agora - (Number(state.rt_at) || 0) < 4 * 60000 || agora > deadline) return;
+  try {
+    state.rt_at = agora;
+    const r = await f(API + '/ratings?page=1&page_size=20');
+    if (r.status !== 200) return;
+    const items = (JSON.parse(r.body) || {}).items || [];
+    const antes = state.rt_max == null ? -1 : Number(state.rt_max); let maior = Math.max(antes, 0), avisadas = 0;
+    for (const it of items) {
+      if (!it) continue;
+      const id = Number(it.id) || 0;
+      if (id > maior) maior = id;
+      if (antes < 0 || id <= antes || avisadas >= 5) continue;
+      const nota = Math.max(0, Math.min(5, Number(it.rating) || 0));
+      const tid = Number(it.ticket_id) || 0, com = String(it.comment || '').trim();
+      const text = (it.assignee_name || 'Não atribuído') + (com ? ' · “' + com + '”' : '');
+      outc.notes.push({ ticketId: tid, title: 'Avaliação ' + '★'.repeat(nota) + '☆'.repeat(5 - nota) + ' ' + NOTAS[nota] + ' · ' + (it.protocol || ''), text, lines: [text],
+        path: tid > 0 ? '/helpdesk/tickets/' + tid : '/helpdesk/ratings', isNew: false, silent: false });
+      avisadas++;
+    }
+    state.rt_max = maior;
+  } catch (e) { }
 }
 
 module.exports = { run, probeOrder, watermarks, isFresh, baselined, timelineHasNew, isActive, ts, clean, describe, eventText,

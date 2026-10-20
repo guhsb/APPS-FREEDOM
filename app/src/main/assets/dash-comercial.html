@@ -100,6 +100,9 @@ function desenhar() {
   var tabs = P.tipo === 'dir' ? [['resumo', 'Resumo'], ['vendedores', 'Vendedores'], ['clientes', 'Clientes'], ['produtos', 'Produtos'], ['redes', 'Redes']]
     : P.tipo === 'ger' ? [['resumo', 'Resumo'], ['vendedores', 'Equipe'], ['clientes', 'Clientes'], ['produtos', 'Produtos'], ['redes', 'Redes']]
     : [['resumo', 'Resumo'], ['clientes', 'Clientes'], ['produtos', 'Produtos'], ['redes', 'Redes']];
+  var perms = (me && Array.isArray(me.permissions)) ? me.permissions : [];
+  if (perms.indexOf('managers:view') >= 0 || perms.indexOf('managers:view_own') >= 0) tabs.splice(P.tipo === 'ven' ? 1 : 2, 0, ['gestores', 'Gestores']);
+  tabs = tabs.concat([['evolucao', 'Evolução'], ['faturamento', 'Faturamento'], ['bonif', 'Bonificações']]);
   if (vendSel && aba === 'vendedores') aba = 'resumo';
   if (!tabs.some(function (t) { return t[0] === aba; })) aba = 'resumo';
   var h = X.abas(vendSel ? tabs.filter(function (t) { return t[0] !== 'vendedores'; }) : tabs, aba);
@@ -116,6 +119,10 @@ function desenhar() {
   if (aba === 'clientes') h += clientes();
   if (aba === 'produtos') h += produtos();
   if (aba === 'redes') h += redes();
+  if (aba === 'gestores') h += telaGestores(b);
+  if (aba === 'evolucao') h += telaEvolucao();
+  if (aba === 'faturamento') h += telaFaturamento();
+  if (aba === 'bonif') h += telaBonif();
   var c = document.getElementById('c'); c.innerHTML = h;
   X.ligarGraficos(c);
 }
@@ -270,8 +277,11 @@ function clientes() {
 }
 
 var buscaProd = '';
+var subProd = 'top';
 function produtos() {
-  var h = '', s = d.pr.summary || {};
+  var h = X.abas([['top', 'Ranking'], ['inf', 'Infalíveis']], subProd, 'sub').replace(/data-sub=/g, 'data-psub=');
+  if (subProd === 'inf') return h + telaInfal();
+  var s = d.pr.summary || {};
   h += X.k4([['Produtos vendidos', X.int(s.unique_products), 'itens diferentes'], ['Unidades', X.int(s.total_quantity), 'no período']]);
   var fam = Array.isArray(d.c.families) ? d.c.families.slice(0, 8) : [];
   if (fam.length) h += X.card('Famílias', 'Participação no faturamento', X.barras(fam.map(function (f) { return [X.cap(f.name), f.revenue, f.share_percentage]; })));
@@ -295,9 +305,98 @@ function redes() {
   return h;
 }
 
+
+// ---------- telas que buscam na hora (Gestores, Evolução, Faturamento, Bonificações, Infalíveis) ----------
+var EX = {};
+function qAtual() { return '?start_date=' + d.ini + '&end_date=' + d.fim + fx(); }
+function extra(nome, url) {
+  var k = mostrado + '|' + nome, e = EX[k];
+  if (!e) { EX[k] = e = {}; X.get(url).then(function (j) { e.d = j || {}; }).catch(function (er) { e.e = er.message || 'Não consegui carregar'; }).then(desenharMantendo); }
+  return e;
+}
+function blocoEx(e, fn) { if (e.e) return '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(e.e) + '</span></div>'; if (!e.d) return X.carregando(); return fn(e.d); }
+var RITMO = { above_pace: ['▲ Acima do ritmo', 'ok'], on_pace: ['● No ritmo', 'ok'], below_pace: ['▼ Abaixo do ritmo', 'ba'], no_target: ['Sem meta', 'sm'] };
+var buscaGer = '';
+function telaGestores(b) {
+  var e = extra('ger', '/dashboard/managers' + qAtual());
+  return blocoEx(e, function (g) {
+    var cal = g.calendar || {}, ideal = F.n(cal.ideal_pace_percentage) / 100, h = '';
+    var ls = (Array.isArray(g.managers) ? g.managers : []).filter(function (m) { return !buscaGer || X.nome(m.manager_name).toLowerCase().indexOf(buscaGer.toLowerCase()) >= 0; });
+    var com = ls.filter(function (m) { return m.pace_status !== 'no_target'; }), no = com.filter(function (m) { return m.pace_status === 'above_pace' || m.pace_status === 'on_pace'; }).length;
+    h += X.k4([['No ritmo', no, 'de ' + com.length + ' com meta', 'pos'], ['Abaixo do ritmo', com.length - no, cal.ideal_pace_percentage != null ? 'ideal hoje ' + Math.round(F.n(cal.ideal_pace_percentage)) + '%' : '', 'lar'],
+      ['Dias úteis', X.int(cal.elapsed_business_days) + ' de ' + X.int(cal.total_business_days), X.int(cal.remaining_business_days) + ' restantes'],
+      ['Total', g.total ? X.k(g.total.realized_revenue) : '—', g.total && g.total.meta_revenue ? 'de ' + X.k(g.total.meta_revenue) + ' · ' + Math.round(F.n(g.total.achievement_percentage)) + '%' : '']]);
+    h += '<input class="busca" id="buscaGer" placeholder="Buscar gestor..." value="' + F.esc(buscaGer) + '">';
+    h += X.card('Ritmo de meta por gestor', '% da meta × ritmo ideal' + (P.tipo === 'dir' ? ' · toque para ver a equipe' : ''), ls.map(function (m) {
+      var r = RITMO[m.pace_status] || ['', 'sm'], semMeta = m.pace_status === 'no_target';
+      return X.meta(X.nome(m.manager_name), X.k(m.realized_revenue) + (m.meta_revenue ? ' de ' + X.k(m.meta_revenue) : '') + (m.remaining_to_target_revenue && F.n(m.remaining_to_target_revenue) > 0 ? ' · faltam ' + X.k(m.remaining_to_target_revenue) : ''),
+        F.n(m.achievement_percentage) / 100, F.n(m.ideal_pace_percentage != null ? m.ideal_pace_percentage : cal.ideal_pace_percentage) / 100, P.tipo === 'dir' ? 'g:' + m.manager_name : '', semMeta) +
+        '<div class="det" style="margin-top:-2px">Positivação <b>' + X.int(m.positivity_realized) + (m.positivity_target != null ? ' / ' + X.int(m.positivity_target) : '') + '</b>' + (m.positivity_percentage != null ? ' (' + Math.round(F.n(m.positivity_percentage)) + '%)' : '') +
+        (m.projected_revenue != null ? ' · Projeção <b>' + X.k(m.projected_revenue) + '</b>' : '') + ' · Bonificação <b>' + X.k(m.bonus_value) + '</b> · <span class="st2 ' + r[1] + '">' + r[0] + '</span></div>';
+    }).join('') || '<div class="vazio">Nenhum gestor no filtro.</div>');
+    return h;
+  });
+}
+function telaEvolucao() {
+  var dv = d.dv || {}, sm = dv.summary;
+  if (!sm) return X.carregando('Carregando a evolução…');
+  var h = '', v = sm.half_variation_percentage;
+  h += X.k4([['Faturamento no período', X.k(sm.period_revenue), X.int(sm.sales_day_count) + ' dias com venda'], ['Média diária', X.k(sm.daily_average), 'por dia com venda'],
+    ['Variação 1ª → 2ª metade', v == null ? 'Não comparável' : (F.n(v) >= 0 ? '+' : '') + Math.round(F.n(v)) + '%', X.k(sm.first_half_revenue) + ' → ' + X.k(sm.second_half_revenue), v == null ? '' : F.n(v) >= 0 ? 'pos' : 'neg']]);
+  var porDia = {}; (dv.daily_revenue || []).forEach(function (x) { porDia[String(x.sale_date).slice(0, 10)] = F.n(x.revenue); });
+  var dias = X.dias(d.ini, (X.hoje() < d.fim ? X.hoje() : d.fim)), vals = dias.map(function (x) { return porDia[x] || 0; });
+  if (dias.length) h += X.card('Faturamento por dia', 'Dias sem movimento aparecem zerados', X.colunas(vals, function (i) { return i % 5 === 0 || i === dias.length - 1 ? X.dm(dias[i]) : ''; }, F.n(sm.daily_average), 'média ' + X.k(sm.daily_average)));
+  var wd = (dv.weekday_revenue || []).slice().sort(function (a, b) { return ((a.weekday_number + 6) % 7) - ((b.weekday_number + 6) % 7); });
+  if (wd.length) h += X.card('Por dia da semana', 'Média por ocorrência', X.barras(wd.map(function (w) { return [w.weekday_label, w.average_revenue, null, X.int(w.occurrence_count) + 'x · total ' + X.k(w.revenue)]; }), 'var(--violeta)'));
+  h += X.card('Primeira vs. segunda metade', '', X.barras([['1ª metade', sm.first_half_revenue], ['2ª metade', sm.second_half_revenue]], 'var(--azul)'));
+  return h;
+}
+var verFat = {};
+function telaFaturamento() {
+  var e = extra('fat', '/dashboard/billing?start_date=' + d.ini + '&end_date=' + d.fim + fx());
+  return blocoEx(e, function (f) {
+    var sm = f.summary || {}, h = '';
+    h += X.k4([['Faturamento líquido', X.k(sm.net_revenue), X.int(sm.movement_count) + ' movimentos'], ['Quantidade líquida', X.int(sm.net_quantity) + ' un', ''], ['Devoluções', X.k(sm.return_value), '', F.n(sm.return_value) ? 'neg' : ''],
+      ['Custo médio ponderado', sm.weighted_average_cost != null ? F.brl(sm.weighted_average_cost) : '—', 'só quantidades positivas']]);
+    var dl = (f.daily || []).slice().sort(function (a, b) { return a.movement_date < b.movement_date ? -1 : 1; });
+    if (dl.length) h += X.card('Faturamento diário', 'Líquido por dia · devoluções e bonificação na lista', X.colunas(dl.map(function (x) { return F.n(x.net_revenue); }), function (i) { return i % 5 === 0 || i === dl.length - 1 ? X.dm(dl[i].movement_date) : ''; }) +
+      dl.slice(-5).reverse().map(function (x) { return '<div class="row"><span>' + F.dataBR(x.movement_date) + ' · dev. ' + X.k(x.return_value) + ' · bonif. ' + X.k(x.bonus_value) + '</span><b>' + X.k(x.net_revenue) + '</b></div>'; }).join(''));
+    [['sellers', 'Faturamento por vendedor', 'var(--azul)'], ['families', 'Faturamento por família', 'var(--violeta)'], ['products', 'Produtos faturados', 'var(--verde)']].forEach(function (g) {
+      var l = f[g[0]] || []; if (!l.length) return; var n = verFat[g[0]] ? 60 : 8;
+      h += X.card(g[1], 'Faturamento líquido e % do total', X.barras(l.slice(0, n).map(function (x) { return [x.name, x.net_revenue, x.percentage, X.int(x.net_quantity) + ' un']; }), g[2]) +
+        (l.length > n ? '<button class="mais" data-fmais="' + g[0] + '">Ver mais (' + l.length + ')</button>' : ''));
+    });
+    return h;
+  });
+}
+function telaBonif() {
+  var e = extra('bon', '/dashboard/bonuses?start_date=' + d.ini + '&end_date=' + d.fim + fx());
+  return blocoEx(e, function (bn) {
+    var sm = bn.summary || {}, h = '';
+    h += X.k4([['Total bonificado', X.k(sm.total_bonified), ''], ['% sobre o faturamento', sm.bonus_revenue_percentage != null ? F.pct(sm.bonus_revenue_percentage) : '—', 'de ' + X.k(sm.revenue_total)],
+      ['Vendedores bonificados', X.int(sm.bonified_sellers), 'com valor positivo']]);
+    var vs = bn.by_seller || [], cs = bn.by_category || [];
+    if (vs.length) h += X.card('Bonificação por vendedor', 'Top ' + Math.min(12, vs.length), X.barras(vs.slice(0, 12).map(function (x) { return [X.nome(x.seller_name), x.bonus_amount, x.percentage]; }), 'var(--laranja)'));
+    if (cs.length) h += X.card('Bonificação por categoria', 'Top ' + Math.min(12, cs.length), X.barras(cs.slice(0, 12).map(function (x) { return [x.category_name, x.bonus_amount, x.percentage]; }), 'var(--laranja)'));
+    if (!vs.length && !cs.length) h += '<div class="vazio">Nenhuma bonificação no período.</div>';
+    return h;
+  });
+}
+function telaInfal() {
+  var e = extra('inf', '/dashboard/products/infallibles');
+  return blocoEx(e, function (f) {
+    var it = f.items || [];
+    return X.card('Programa de produtos foco (Infalíveis)', 'Usa a base oficial completa e não responde aos filtros da página', it.map(function (x) {
+      return '<div class="row"><span><b style="color:var(--tx3);display:inline-block;width:24px">' + x.rank + '</b>' + F.esc(x.focus_name) + '<br><span style="font-size:11.5px;color:var(--tx3);padding-left:24px">' + X.int(x.positive_count) + ' positivações · ' + F.pct(x.revenue_percentage) + ' do total</span></span><b>' + X.k(x.revenue) + '</b></div>';
+    }).join('') || '<div class="vazio">Nenhum infalível cadastrado.</div>');
+  });
+}
+
 // ---------- toques ----------
 document.addEventListener('click', function (ev) {
-  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-sub],[data-v],[data-mais],#btTodos') : null; if (!t) return;
+  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-sub],[data-psub],[data-fmais],[data-v],[data-mais],#btTodos') : null; if (!t) return;
+  if (t.hasAttribute('data-psub')) { subProd = t.getAttribute('data-psub'); desenhar(); return; }
+  if (t.hasAttribute('data-fmais')) { verFat[t.getAttribute('data-fmais')] = true; desenharMantendo(); return; }
   if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('com_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
   if (t.hasAttribute('data-sub')) { filtroGer = t.getAttribute('data-sub'); desenhar(); return; }
   if (t.hasAttribute('data-mais')) { verTodos[t.getAttribute('data-mais')] = true; desenhar(); return; }
@@ -311,6 +410,7 @@ document.addEventListener('change', function (ev) {
   if (ev.target.id === 'selGer') { gestorSel = ev.target.value; vendSel = ''; filtroGer = ''; verTodos = {}; carregar(true); }
 });
 document.addEventListener('input', function (ev) {
+  if (ev.target.id === 'buscaGer') { buscaGer = ev.target.value; desenharMantendo(); return; }
   if (ev.target.id === 'buscaProd') { buscaProd = ev.target.value; var pos = ev.target.selectionStart; desenhar(); var el = document.getElementById('buscaProd'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { } } }
 });
 document.getElementById('btVoltar').innerHTML = F.ic('seta');
@@ -319,7 +419,7 @@ document.getElementById('btVoltar').onclick = function () {
   if (vendSel) { vendSel = ''; carregar(true); return; }
   if (history.length > 1) history.back(); else location.href = 'painel-comercial.html';
 };
-document.getElementById('btAt').onclick = function () { carregar(true); };
+document.getElementById('btAt').onclick = function () { EX = {}; carregar(true); };
 window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t); };
 F.topoSombra();
 carregar();

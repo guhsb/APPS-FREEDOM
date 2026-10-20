@@ -62,7 +62,7 @@
 <option value="ant">Mês passado</option><option value="dt">Escolher datas…</option></select>
 <div class="datas" id="perDatas" style="display:none"><input type="date" id="perIni"><span class="cinza">até</span><input type="date" id="perFim"><button id="perVer">Ver</button></div></div>
 <div id="faixaPer"></div>
-<a class="dashbt" href="dash-comercial.html" id="btDash"><span class="q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="tx"><b>Dashboard comercial completo</b><span>Resumo, vendedores, clientes, produtos e redes</span></span><span class="seta">›</span></a>
+<a class="dashbt" href="dash-comercial.html" id="btDash" onclick="try{if(window.App&&App.aba){App.aba('comercial');return false}}catch(e){}"><span class="q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="tx"><b>Dashboard comercial completo</b><span>Resumo, vendedores, clientes, produtos e redes</span></span><span class="seta">›</span></a>
 <div id="conteudo"></div>
 <script>var PAINEL_ID = 'comercial';</script>
 <script src="base.js"></script>

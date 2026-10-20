@@ -12,6 +12,25 @@ const { Pastas, Prefs, Store, Api, ErroLogin, agora } = require('./base');
 const Helpdesk = require('./helpdesk');
 const Engine = require('./engine');
 
+// Gravações que as telas do app podem fazer no site: só estas (as mesmas que o site faz na Logística e na Administração).
+const ESCRITAS = [
+  ['PUT', /^\/logistics\/pending\/orders\/[^/]+\/control$/],
+  ['POST', /^\/logistics\/standby\/selections$/], ['PUT', /^\/logistics\/standby\/selections\/\d+$/], ['DELETE', /^\/logistics\/standby\/selections\/\d+$/],
+  ['POST', /^\/logistics\/report\/snapshots$/],
+  ['POST', /^\/logistics\/report\/products$/], ['PUT', /^\/logistics\/report\/products\/\d+$/], ['DELETE', /^\/logistics\/report\/products\/\d+$/],
+  ['POST', /^\/logistics\/billing\/report\/exclusions\/(orders|customers|order-types)$/], ['DELETE', /^\/logistics\/billing\/report\/exclusions\/(orders|customers|order-types)\/[^/]+$/],
+  ['POST', /^\/logistics\/billing\/daily\/exclusions\/(customers|order-types)$/], ['DELETE', /^\/logistics\/billing\/daily\/exclusions\/(customers|order-types)\/[^/]+$/],
+  ['POST', /^\/admin\/users$/], ['PATCH', /^\/admin\/users\/[^/]+$/], ['POST', /^\/admin\/users\/[^/]+\/(activate|deactivate|reset-password)$/]
+];
+/** Helpdesk como antes; consultas de dashboards/Logística/Administração; e só as gravações da lista acima. */
+function permitido(m, caminho) {
+  if (!caminho || caminho.indexOf('..') >= 0 || caminho[0] !== '/') return false;
+  const p = caminho.split('?')[0];
+  if (p.startsWith('/helpdesk/')) return ['GET', 'POST', 'PATCH'].indexOf(m) >= 0;
+  if (m === 'GET') return p === '/auth/me' || p.startsWith('/dashboard/') || p.startsWith('/logistics/') || p.startsWith('/admin/users') || p.startsWith('/admin/audit') || p.startsWith('/admin/firebird-mappings');
+  return ESCRITAS.some(e => e[0] === m && e[1].test(p));
+}
+
 const ERROS = {
   helpdesk_ticket_already_assigned: 'Este chamado já foi assumido por outro atendente.',
   stale_ticket_version: 'O chamado foi alterado por outro usuário. Tente de novo.',
@@ -139,9 +158,8 @@ const Chamado = {
   /** Requisição genérica das telas (só endereços do Helpdesk). Status 0 = sem conexão. */
   async requisicao(metodo, caminho, corpo) {
     const m = String(metodo || '').toUpperCase();
-    if (['GET', 'POST', 'PATCH'].indexOf(m) < 0) return { status: 0, body: 'método não permitido' };
-    const leitura = m === 'GET' && caminho && (caminho.startsWith('/dashboard/') || caminho.startsWith('/logistics/'));   // dashboards: só consulta
-    if (!caminho || !(caminho.startsWith('/helpdesk/') || caminho === '/auth/me' || leitura) || caminho.indexOf('..') >= 0) return { status: 0, body: 'endereço não permitido' };
+    if (['GET', 'POST', 'PATCH', 'PUT', 'DELETE'].indexOf(m) < 0) return { status: 0, body: 'método não permitido' };
+    if (!permitido(m, caminho)) return { status: 0, body: 'endereço não permitido' };
     try {
       const r = await this.chamar(m, caminho, corpo && String(corpo).trim() ? JSON.parse(corpo) : null);
       if (m === 'GET' && r.status === 200) Fila.guardar('GET ' + caminho, r.body);

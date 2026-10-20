@@ -190,12 +190,16 @@ const Acesso = {
   get P() { return Prefs.de('acesso'); },
   salvar(me) {
     if (!Array.isArray(me.modules)) return;
-    this.P.editar().put('modulos', me.modules.map(x => String(x).toLowerCase())).put('perfil', me.role || '').put('nome', me.display_name || '').commit();
+    this.P.editar().put('modulos', me.modules.map(x => String(x).toLowerCase())).put('permissoes', Array.isArray(me.permissions) ? me.permissions.map(String) : []).put('perfil', me.role || '').put('nome', me.display_name || '').commit();
   },
   async atualizar(api) { try { this.salvar(await api.get('/auth/me')); } catch (e) { } },
   modulos() { const m = this.P.get('modulos'); return Array.isArray(m) ? m : null; },
   tem(modulo) { const m = this.modulos(); return m == null || m.indexOf(String(modulo).toLowerCase()) >= 0; },
   helpdesk() { return this.tem(this.HELPDESK); },
+  comercial() { return this.tem('commercial'); },
+  logistica() { return this.tem('logistics'); },
+  /** Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra). */
+  admin() { const p = this.P.get('permissoes'); return Array.isArray(p) && p.some(x => x === 'users:manage' || x === 'audit:view' || x === 'firebird_mappings:view'); },
   perfil() { return this.P.getStr('perfil', ''); },
   nome() { return this.P.getStr('nome', ''); },
   limpar() { this.P.editar().clear().commit(); }

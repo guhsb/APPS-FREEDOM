@@ -264,6 +264,7 @@ namespace Freedom
                 // a tela que pediu pode ser o Helpdesk ou o painel (dashboards): entrega para as duas, cada uma só pega o próprio número
                 j.JsApp(cod);
                 j.JsPainel(cod);
+                j.JsDash(cod);
             });
         }
 

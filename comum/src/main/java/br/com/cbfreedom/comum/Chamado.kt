@@ -49,9 +49,8 @@ object Chamado {
      */
     fun requisicao(c: Context, metodo: String, caminho: String, corpo: String): Pair<Int, String> {
         val m = metodo.uppercase()
-        if (m !in setOf("GET", "POST", "PATCH")) return Pair(0, "método não permitido")
-        val leitura = m == "GET" && (caminho.startsWith("/dashboard/") || caminho.startsWith("/logistics/"))   // dashboards: só consulta
-        if (!(caminho.startsWith("/helpdesk/") || caminho == "/auth/me" || leitura) || caminho.contains("..")) return Pair(0, "endereço não permitido")
+        if (m !in setOf("GET", "POST", "PATCH", "PUT", "DELETE")) return Pair(0, "método não permitido")
+        if (!permitido(m, caminho)) return Pair(0, "endereço não permitido")
         return try {
             val json = if (corpo.isBlank()) null else JSONObject(corpo)
             val r = chamar(c, m, caminho, json)
@@ -70,6 +69,35 @@ object Chamado {
             }
             Pair(0, "Sem conexão com o site: " + Api.mensagem(e))
         }
+    }
+
+    // Gravações que as telas do app podem fazer no site: só estas (as mesmas que o site faz na Logística e na Administração).
+    private val ESCRITAS = listOf(
+        "PUT" to Regex("^/logistics/pending/orders/[^/]+/control$"),
+        "POST" to Regex("^/logistics/standby/selections$"),
+        "PUT" to Regex("^/logistics/standby/selections/\\d+$"),
+        "DELETE" to Regex("^/logistics/standby/selections/\\d+$"),
+        "POST" to Regex("^/logistics/report/snapshots$"),
+        "POST" to Regex("^/logistics/report/products$"),
+        "PUT" to Regex("^/logistics/report/products/\\d+$"),
+        "DELETE" to Regex("^/logistics/report/products/\\d+$"),
+        "POST" to Regex("^/logistics/billing/report/exclusions/(orders|customers|order-types)$"),
+        "DELETE" to Regex("^/logistics/billing/report/exclusions/(orders|customers|order-types)/[^/]+$"),
+        "POST" to Regex("^/logistics/billing/daily/exclusions/(customers|order-types)$"),
+        "DELETE" to Regex("^/logistics/billing/daily/exclusions/(customers|order-types)/[^/]+$"),
+        "POST" to Regex("^/admin/users$"),
+        "PATCH" to Regex("^/admin/users/[^/]+$"),
+        "POST" to Regex("^/admin/users/[^/]+/(activate|deactivate|reset-password)$")
+    )
+
+    /** Helpdesk como antes; consultas de dashboards/Logística/Administração; e só as gravações da lista acima. */
+    fun permitido(m: String, caminho: String): Boolean {
+        if (caminho.contains("..") || !caminho.startsWith("/")) return false
+        val p = caminho.substringBefore('?')
+        if (p.startsWith("/helpdesk/")) return m in setOf("GET", "POST", "PATCH")
+        if (m == "GET") return p == "/auth/me" || p.startsWith("/dashboard/") || p.startsWith("/logistics/") ||
+            p.startsWith("/admin/users") || p.startsWith("/admin/audit") || p.startsWith("/admin/firebird-mappings")
+        return ESCRITAS.any { it.first == m && it.second.matches(p) }
     }
 
     /** Usado pela fila: (código, corpo) ou null se continua sem internet. */

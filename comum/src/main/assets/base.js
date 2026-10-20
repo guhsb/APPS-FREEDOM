@@ -127,6 +127,7 @@ F.erroApi = function (r, padrao) {
   var d = r.json && r.json.detail;
   var cod = typeof d === 'string' ? d : (d && d.code) || '';
   if (F.ERROS[cod]) return F.ERROS[cod];
+  if (d && typeof d === 'object' && !Array.isArray(d) && d.message) return d.message;
   if (r.status === 401) return 'A sessão expirou. Tente de novo.';
   if (r.status === 403 || r.status === 404) return 'Você não tem acesso a isso.';
   if (Array.isArray(d) && d.length && d[0].msg) return padrao + ' (' + d[0].msg + ')';

@@ -24,6 +24,8 @@ const NAV = 84;
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
 let janela = null, vApp = null, vSite = null, vPainel = null, tray = null;
+let vDash = null, dashAtual = null;
+const DASH = { comercial: 'dash-comercial.html', logistica: 'dash-logistica.html', admin: 'admin.html' };
 let aba = 'helpdesk', painelAtual = null, paginaApp = '', saindo = false, siteCarregado = false, ultimoLoginSite = 0;
 let monitor = null, timerPaineis = null;
 
@@ -78,7 +80,9 @@ function montarMenu() {
     { label: 'Editar', submenu: [{ role: 'undo', label: 'Desfazer' }, { role: 'redo', label: 'Refazer' }, { type: 'separator' }, { role: 'cut', label: 'Recortar' },
       { role: 'copy', label: 'Copiar' }, { role: 'paste', label: 'Colar' }, { role: 'selectAll', label: 'Selecionar tudo' }] },
     { label: 'Ver', submenu: [{ label: 'Helpdesk', accelerator: 'Cmd+1', click: () => selecionar('helpdesk') }, { label: 'Site', accelerator: 'Cmd+2', click: () => selecionar('site') },
-      { label: 'Painel', accelerator: 'Cmd+3', click: () => selecionar('painel') }, { type: 'separator' },
+      { label: 'Painel', accelerator: 'Cmd+3', click: () => selecionar('painel') },
+      { label: 'Comercial', accelerator: 'Cmd+4', click: () => selecionar('comercial') }, { label: 'Logística', accelerator: 'Cmd+5', click: () => selecionar('logistica') },
+      { label: 'Administração', accelerator: 'Cmd+6', click: () => selecionar('admin') }, { type: 'separator' },
       { label: 'Recarregar', accelerator: 'Cmd+R', click: () => { const v = vistaAtual(); if (v) v.webContents.reload(); } },
       { role: 'zoomIn', label: 'Aumentar' }, { role: 'zoomOut', label: 'Diminuir' }, { role: 'resetZoom', label: 'Tamanho normal' }] },
     { label: 'Janela', submenu: [{ role: 'minimize', label: 'Minimizar' }, { role: 'zoom', label: 'Zoom' }, { label: 'Fechar janela', accelerator: 'Cmd+W', click: () => janela && janela.hide() }] }
@@ -111,27 +115,30 @@ function criarJanela() {
   carregar(null);
 }
 
-function vistaAtual() { return aba === 'site' ? vSite : aba === 'painel' ? vPainel : vApp; }
+function vistaAtual() { return aba === 'site' ? vSite : aba === 'painel' ? vPainel : DASH[aba] ? vDash : vApp; }
 
 function posicionar() {
   if (!janela) return;
   const [w, h] = janela.getContentSize();
   const x = logado() ? NAV : 0;
   const chips = aba === 'painel' && Paineis.paraAba().length > 1 ? 52 : 0;
-  for (const v of [vApp, vSite, vPainel]) if (v) v.setBounds({ x, y: 0, width: Math.max(0, w - x), height: h });
+  for (const v of [vApp, vSite, vPainel, vDash]) if (v) v.setBounds({ x, y: 0, width: Math.max(0, w - x), height: h });
   if (vPainel) vPainel.setBounds({ x, y: chips, width: Math.max(0, w - x), height: h - chips });
 }
 
 function mostrarSo(v) {
-  for (const x of [vApp, vSite, vPainel]) if (x) x.setVisible(x === v);
+  for (const x of [vApp, vSite, vPainel, vDash]) if (x) x.setVisible(x === v);
   posicionar();
 }
 
 function abasDisponiveis() {
   const r = [];
   if (Acesso.helpdesk()) r.push('helpdesk');
-  r.push('site');
+  if (Acesso.comercial()) r.push('comercial');
+  if (Acesso.logistica()) r.push('logistica');
+  if (Acesso.admin()) r.push('admin');
   if (Paineis.paraAba().length > 0) r.push('painel');
+  r.push('site');
   return r;
 }
 
@@ -147,7 +154,7 @@ function atualizarBarra() {
 
 function carregar(caminho) {
   if (!logado()) {
-    for (const v of [vSite, vPainel]) if (v) v.setVisible(false);
+    for (const v of [vSite, vPainel, vDash]) if (v) v.setVisible(false);
     vApp.setVisible(true);
     if (paginaApp !== 'login') { vApp.webContents.loadURL(url('login.html')); paginaApp = 'login'; }
     posicionar(); atualizarBarra();
@@ -160,11 +167,12 @@ function carregar(caminho) {
 function selecionar(nova) {
   if (!logado()) return carregar(null);
   const disp = abasDisponiveis();
-  if (disp.indexOf(nova) < 0) nova = ['helpdesk', 'painel', 'site'].find(x => disp.indexOf(x) >= 0);
+  if (disp.indexOf(nova) < 0) nova = ['helpdesk', 'comercial', 'logistica', 'painel', 'site'].find(x => disp.indexOf(x) >= 0);
   aba = nova;
   if (nova === 'site') garantirSite(null);
   if (nova === 'painel') garantirPainel();
-  mostrarSo(nova === 'site' ? vSite : nova === 'painel' ? vPainel : vApp);
+  if (DASH[nova]) garantirDash(nova);
+  mostrarSo(nova === 'site' ? vSite : nova === 'painel' ? vPainel : DASH[nova] ? vDash : vApp);
   if (nova === 'helpdesk') { Helpdesk.marcarVisto(); avisarHelpdesk(); }
   if (nova === 'painel' && Paineis.velho(2)) Paineis.atualizar();
   atualizarBarra();
@@ -270,6 +278,19 @@ function criarBandeja() {
     { type: 'separator' },
     { label: 'Sair do Freedom', click: () => { saindo = true; app.quit(); } }
   ]));
+}
+
+// ---------------- Comercial, Logística e Administração (telas completas, iguais ao site) ----------------
+function garantirDash(id) {
+  if (!vDash) {
+    vDash = new WebContentsView(opcoesTela('preload.js'));
+    vDash.setBackgroundColor(corFundo());
+    vDash.setVisible(false);
+    janela.contentView.addChildView(vDash);
+    protegerNavegacao(vDash.webContents, true);
+  }
+  if (dashAtual !== id) { dashAtual = id; vDash.webContents.loadURL(url(DASH[id]) + '#aba=1'); }
+  posicionar();
 }
 
 // ---------------- painel ----------------
@@ -407,6 +428,7 @@ const ponte = {
     Store.sair(); Helpdesk.sair(); Acesso.limpar();
     if (vSite) { session.fromPartition('persist:site').clearStorageData().catch(() => null); janela.contentView.removeChildView(vSite); vSite.webContents.close(); vSite = null; }
     if (vPainel) { janela.contentView.removeChildView(vPainel); vPainel.webContents.close(); vPainel = null; }
+    if (vDash) { janela.contentView.removeChildView(vDash); vDash.webContents.close(); vDash = null; dashAtual = null; }
     aba = 'helpdesk'; paginaApp = '';
     carregar(null);
   },

@@ -141,5 +141,61 @@ var Dash = (function () {
     } catch (e) { try { localStorage.removeItem('dc_' + k); } catch (x) { } return null; }
   };
   X.lembrar = function (k, v) { try { if (v === undefined) return localStorage.getItem('dash_' + k); localStorage.setItem('dash_' + k, v); } catch (e) { return null; } };
+  // ---- gravar no site (Logística, Administração): mesmos endereços e regras do site ----
+  /** Envia uma alteração; 2xx devolve o JSON (ou null), erro vira Error com a mensagem certa. */
+  X.enviar = function (metodo, caminho, corpo, msg409) {
+    return F.api(metodo, caminho, corpo).then(function (r) {
+      if (r.status >= 200 && r.status < 300) return r.json;
+      var det = r.json && r.json.detail, m;
+      if (r.status === 409) m = msg409 || 'O registro foi alterado por outra pessoa. Atualize a tela.';
+      else if (det && typeof det === 'object' && !Array.isArray(det) && det.message) m = det.message;
+      else if (r.status === 403) m = 'Seu login não tem permissão para esta alteração no site.';
+      else if (r.status === 0) m = r.texto || 'Sem conexão com o site.';
+      else m = F.erroApi ? F.erroApi(r, 'Não foi possível concluir a operação') : 'Não foi possível concluir a operação (erro ' + r.status + ')';
+      var e = new Error(m); e.status = r.status; throw e;
+    });
+  };
+  /** Janela por cima (embaixo no celular, no meio no computador). botoes: [[id, texto, classe]]. */
+  X.modal = function (titulo, sub, corpo, botoes) {
+    X.fechar();
+    var el = document.createElement('div'); el.className = 'mfundo'; el.id = 'mfundo';
+    el.innerHTML = '<div class="mcaixa" role="dialog"><p class="ct" style="font-size:16px">' + titulo + '</p>' + (sub ? '<p class="cs">' + sub + '</p>' : '') +
+      '<div id="mcorpo">' + corpo + '</div><div class="merro" id="merro"></div><div class="acoes">' +
+      (botoes || []).map(function (b) { return '<button class="btn ' + (b[2] || 'cl') + '" data-m="' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div></div>';
+    el.addEventListener('click', function (ev) { if (ev.target === el) X.fechar(); });
+    document.body.appendChild(el);
+    var f = el.querySelector('input,select,textarea'); if (f && window.innerWidth > 560) try { f.focus(); } catch (e) { }
+    return el;
+  };
+  X.fechar = function () { var m = document.getElementById('mfundo'); if (m) m.parentNode.removeChild(m); };
+  X.erroModal = function (t) { var e = document.getElementById('merro'); if (e) e.innerHTML = t ? F.esc(t) : ''; };
+  /** Botão "Salvar" ocupado enquanto grava. */
+  X.ocupado = function (id, sim, txt) { var b = document.querySelector('[data-m="' + id + '"]'); if (!b) return; if (sim) { b.setAttribute('data-txt', b.innerHTML); b.innerHTML = txt || 'Salvando…'; b.disabled = true; } else { b.innerHTML = b.getAttribute('data-txt') || b.innerHTML; b.disabled = false; } };
+  X.campo = function (rot, html) { return '<label class="campo"><span>' + rot + '</span>' + html + '</label>'; };
+  X.opcoes = function (lista, atual, vazio) {
+    return (vazio != null ? '<option value="">' + F.esc(vazio) + '</option>' : '') + lista.map(function (o) { var v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o;
+      return '<option value="' + F.esc(v) + '"' + (String(v) === String(atual == null ? '' : atual) ? ' selected' : '') + '>' + F.esc(t) + '</option>'; }).join('');
+  };
+  X.val = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+  /** Paginação do site: "Página X de Y" com Anterior/Próxima. */
+  X.pag = function (chave, pag, tot, extra) {
+    pag = F.n(pag) || 1; tot = F.n(tot) || 1; if (tot <= 1 && !extra) return '';
+    return '<div class="pag"><button class="btn cl" data-pag="' + chave + '" data-ir="' + (pag - 1) + '"' + (pag <= 1 ? ' disabled' : '') + '>‹ Anterior</button><span>Página ' + pag + ' de ' + tot + (extra ? ' · ' + extra : '') + '</span>' +
+      '<button class="btn cl" data-pag="' + chave + '" data-ir="' + (pag + 1) + '"' + (pag >= tot ? ' disabled' : '') + '>Próxima ›</button></div>';
+  };
+  /** Espera parar de digitar (300 ms, como o site). */
+  X.espera = function (fn, ms) { var t; return function () { var a = arguments, self = this; clearTimeout(t); t = setTimeout(function () { fn.apply(self, a); }, ms || 300); }; };
+  X.q = function (o) { var p = []; Object.keys(o).forEach(function (k) { var v = o[k]; if (v == null || v === '') return; (Array.isArray(v) ? v : [v]).forEach(function (x) { if (x !== '' && x != null) p.push(encodeURIComponent(k) + '=' + encodeURIComponent(x)); }); }); return p.length ? '?' + p.join('&') : ''; };
+  X.dh = function (s) { if (!s) return '—'; try { return new Date(s).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(s); } };
+  X.tempo = function (seg) { if (seg == null || seg === '') return '—'; seg = F.n(seg); if (seg < 60) return Math.round(seg) + 's'; var h = Math.floor(seg / 3600), m = Math.round((seg % 3600) / 60); return h ? h + 'h ' + m + 'min' : m + 'min'; };
+  /** Aberto direto pela barra do app (Comercial, Logística, Admin): sem botão voltar. */
+  X.raiz = /[?&#]aba=1/.test(location.search + location.hash);
+  if (X.raiz) document.documentElement.classList.add('raiz');
+  /** Guarda o que estava digitando e a rolagem ao redesenhar. */
+  X.manter = function (fn) {
+    var y = window.scrollY, el = document.activeElement, id = el && el.id, pos = null; try { pos = el && el.selectionStart; } catch (e) { }
+    fn(); window.scrollTo(0, y);
+    if (id) { var n = document.getElementById(id); if (n && n !== document.activeElement) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) { } } }
+  };
   return X;
 })();

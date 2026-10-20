@@ -44,13 +44,36 @@ namespace Freedom
             return r;
         }
 
+        // Gravações que as telas do app podem fazer no site: só estas (as mesmas que o site faz na Logística e na Administração).
+        static readonly KeyValuePair<string, System.Text.RegularExpressions.Regex>[] ESCRITAS = new[] {
+            E("PUT", @"^/logistics/pending/orders/[^/]+/control$"),
+            E("POST", @"^/logistics/standby/selections$"), E("PUT", @"^/logistics/standby/selections/\d+$"), E("DELETE", @"^/logistics/standby/selections/\d+$"),
+            E("POST", @"^/logistics/report/snapshots$"),
+            E("POST", @"^/logistics/report/products$"), E("PUT", @"^/logistics/report/products/\d+$"), E("DELETE", @"^/logistics/report/products/\d+$"),
+            E("POST", @"^/logistics/billing/report/exclusions/(orders|customers|order-types)$"), E("DELETE", @"^/logistics/billing/report/exclusions/(orders|customers|order-types)/[^/]+$"),
+            E("POST", @"^/logistics/billing/daily/exclusions/(customers|order-types)$"), E("DELETE", @"^/logistics/billing/daily/exclusions/(customers|order-types)/[^/]+$"),
+            E("POST", @"^/admin/users$"), E("PATCH", @"^/admin/users/[^/]+$"), E("POST", @"^/admin/users/[^/]+/(activate|deactivate|reset-password)$")
+        };
+        static KeyValuePair<string, System.Text.RegularExpressions.Regex> E(string m, string re) { return new KeyValuePair<string, System.Text.RegularExpressions.Regex>(m, new System.Text.RegularExpressions.Regex(re)); }
+
+        /// <summary>Helpdesk como antes; consultas de dashboards/Logística/Administração; e só as gravações da lista acima.</summary>
+        public static bool Permitido(string m, string caminho)
+        {
+            if (caminho == null || caminho.Contains("..") || !caminho.StartsWith("/")) return false;
+            var p = caminho.Split('?')[0];
+            if (p.StartsWith("/helpdesk/")) return m == "GET" || m == "POST" || m == "PATCH";
+            if (m == "GET") return p == "/auth/me" || p.StartsWith("/dashboard/") || p.StartsWith("/logistics/") ||
+                p.StartsWith("/admin/users") || p.StartsWith("/admin/audit") || p.StartsWith("/admin/firebird-mappings");
+            foreach (var e in ESCRITAS) if (e.Key == m && e.Value.IsMatch(p)) return true;
+            return false;
+        }
+
         /// <summary>Requisição genérica das telas (só endereços do Helpdesk). Status 0 = sem conexão.</summary>
         public static Engine.Resp Requisicao(string metodo, string caminho, string corpo)
         {
             var m = (metodo ?? "").ToUpperInvariant();
-            if (m != "GET" && m != "POST" && m != "PATCH") return new Engine.Resp(0, "método não permitido");
-            bool leitura = m == "GET" && caminho != null && (caminho.StartsWith("/dashboard/") || caminho.StartsWith("/logistics/"));   // dashboards: só consulta
-            if (caminho == null || !(caminho.StartsWith("/helpdesk/") || caminho == "/auth/me" || leitura) || caminho.Contains("..")) return new Engine.Resp(0, "endereço não permitido");
+            if (m != "GET" && m != "POST" && m != "PATCH" && m != "PUT" && m != "DELETE") return new Engine.Resp(0, "método não permitido");
+            if (!Permitido(m, caminho)) return new Engine.Resp(0, "endereço não permitido");
             try
             {
                 var r = Chamar(m, caminho, string.IsNullOrWhiteSpace(corpo) ? null : new JSONObject(corpo));

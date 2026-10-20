@@ -38,7 +38,9 @@ namespace Freedom
         readonly Panel nav = new Panel();
         readonly Panel conteudo = new Panel();
         readonly Dictionary<string, BotaoAba> abas = new Dictionary<string, BotaoAba>();
-        WebView2 webApp, webSite, webPainel;
+        WebView2 webApp, webSite, webPainel, webDash;
+        string dashAtual;   // aba (comercial/logistica/admin) que está aberta no webDash
+        static readonly Dictionary<string, string> DASH = new Dictionary<string, string> { { "comercial", "dash-comercial.html" }, { "logistica", "dash-logistica.html" }, { "admin", "admin.html" } };
         Panel caixaPainel;
         FlowLayoutPanel chips;
         CoreWebView2Environment env;
@@ -168,7 +170,7 @@ namespace Freedom
             BackColor = FUNDO; ForeColor = TEXTO; conteudo.BackColor = FUNDO; nav.BackColor = BARRA;
             if (caixaPainel != null) caixaPainel.BackColor = FUNDO;
             if (chips != null) chips.BackColor = FUNDO;
-            foreach (var w in new[] { webApp, webPainel }) if (w != null) { w.DefaultBackgroundColor = FUNDO; try { w.CoreWebView2.ExecuteScriptAsync("window.temaMudou&&temaMudou(" + "'" + t + "')"); } catch (Exception) { } }
+            foreach (var w in new[] { webApp, webPainel, webDash }) if (w != null) { w.DefaultBackgroundColor = FUNDO; try { w.CoreWebView2.ExecuteScriptAsync("window.temaMudou&&temaMudou(" + "'" + t + "')"); } catch (Exception) { } }
             BarraTitulo();
             MontarChips();
             foreach (var b in abas.Values) b.Invalidate();
@@ -262,6 +264,32 @@ namespace Freedom
                         g.DrawLine(pen, 3.4f, 9f, 20.6f, 9f);
                         g.DrawLine(pen, 3.4f, 15f, 20.6f, 15f);
                     }
+                    else if (id == "comercial")
+                    {
+                        // gráfico subindo com seta
+                        if (ativa) using (var area2 = new System.Drawing.Drawing2D.GraphicsPath()) { area2.AddLines(new[] { new PointF(3f, 17f), new PointF(9f, 11f), new PointF(13f, 15f), new PointF(21f, 7f), new PointF(21f, 20.5f), new PointF(3f, 20.5f) }); g.FillPath(leve, area2); }
+                        g.DrawLines(pen, new[] { new PointF(3f, 17f), new PointF(9f, 11f), new PointF(13f, 15f), new PointF(21f, 7f) });
+                        g.DrawLines(pen, new[] { new PointF(15f, 7f), new PointF(21f, 7f), new PointF(21f, 13f) });
+                    }
+                    else if (id == "logistica")
+                    {
+                        // caminhão
+                        using (var c = Arredondado(2.5f, 6f, 11.5f, 10f, 1.6f)) { if (ativa) g.FillPath(cheio, c); g.DrawPath(pen, c); }
+                        g.DrawLines(pen, new[] { new PointF(14f, 9.5f), new PointF(18f, 9.5f), new PointF(21.5f, 13f), new PointF(21.5f, 16f), new PointF(14f, 16f) });
+                        using (var fundo = new SolidBrush(BARRA)) foreach (var x in new[] { 7f, 17.5f }) { g.FillEllipse(fundo, x - 2.1f, 15.9f, 4.2f, 4.2f); g.DrawEllipse(pen, x - 2.1f, 15.9f, 4.2f, 4.2f); }
+                    }
+                    else if (id == "admin")
+                    {
+                        // pessoa com escudo
+                        if (ativa) g.FillEllipse(cheio, 5f, 3.5f, 8f, 8f);
+                        g.DrawEllipse(pen, 5f, 3.5f, 8f, 8f);
+                        using (var corpo = new System.Drawing.Drawing2D.GraphicsPath()) { corpo.AddArc(2.5f, 13.5f, 13f, 13f, 180f, 180f); g.DrawPath(pen, corpo); }
+                        using (var esc = new System.Drawing.Drawing2D.GraphicsPath())
+                        {
+                            esc.AddLines(new[] { new PointF(18f, 10.5f), new PointF(21.8f, 12f), new PointF(21.8f, 15.5f), new PointF(18f, 19.5f), new PointF(14.2f, 15.5f), new PointF(14.2f, 12f) }); esc.CloseFigure();
+                            if (ativa) g.FillPath(leve, esc); g.DrawPath(pen, esc);
+                        }
+                    }
                     else
                     {
                         var blocos = new[] { new[] { 3.5f, 3.5f, 7.2f, 9f }, new[] { 13.3f, 3.5f, 7.2f, 5.2f }, new[] { 13.3f, 11.3f, 7.2f, 9.2f }, new[] { 3.5f, 15.1f, 7.2f, 5.4f } };
@@ -303,7 +331,7 @@ namespace Freedom
             nav.Width = 84;
             nav.BackColor = BARRA;
             nav.Paint += (s, e) => { using (var p = new Pen(LINHA)) e.Graphics.DrawLine(p, nav.Width - 1, 0, nav.Width - 1, nav.Height); };
-            var itens = new[] { new[] { "helpdesk", "helpdesk", "Helpdesk" }, new[] { "site", "site", "Site" }, new[] { "painel", "painel", "Painel" } };
+            var itens = new[] { new[] { "helpdesk", "helpdesk", "Helpdesk" }, new[] { "comercial", "comercial", "Comercial" }, new[] { "logistica", "logistica", "Logística" }, new[] { "admin", "admin", "Admin" }, new[] { "painel", "painel", "Painel" }, new[] { "site", "site", "Site" } };
             int y = 12;
             foreach (var it in itens)
             {
@@ -325,6 +353,9 @@ namespace Freedom
         {
             if (id == "helpdesk") return Acesso.Helpdesk();
             if (id == "painel") return Acesso.Painel();
+            if (id == "comercial") return Acesso.Comercial();
+            if (id == "logistica") return Acesso.Logistica();
+            if (id == "admin") return Acesso.Admin();
             return true;
         }
 
@@ -340,7 +371,7 @@ namespace Freedom
                 kv.Value.Visible = v;
                 if (v) { kv.Value.Top = y; y += 72; }
             }
-            if (logado && !AbaDisponivel(aba)) Selecionar(new[] { "helpdesk", "painel", "site" }.First(AbaDisponivel));
+            if (logado && !AbaDisponivel(aba)) Selecionar(new[] { "helpdesk", "comercial", "logistica", "painel", "site" }.First(AbaDisponivel));
             if (caixaPainel != null) MontarChips();
         }
 
@@ -443,7 +474,7 @@ namespace Freedom
             if (webApp == null) return;
             if (!Store.Logado())
             {
-                foreach (var w in new[] { webSite, webPainel }) if (w != null) w.Visible = false;
+                foreach (var w in new[] { webSite, webPainel, webDash }) if (w != null) w.Visible = false;
                 if (caixaPainel != null) caixaPainel.Visible = false;
                 webApp.Visible = true;
                 if (paginaApp != "login") { webApp.CoreWebView2.Navigate(ASSET + "login.html"); paginaApp = "login"; }
@@ -458,13 +489,15 @@ namespace Freedom
         public void Selecionar(string nova)
         {
             if (webApp == null) { aba = nova; return; }
-            if (!AbaDisponivel(nova) && Store.Logado()) nova = new[] { "helpdesk", "painel", "site" }.First(AbaDisponivel);
+            if (!AbaDisponivel(nova) && Store.Logado()) nova = new[] { "helpdesk", "comercial", "logistica", "painel", "site" }.First(AbaDisponivel);
             aba = nova;
             webApp.Visible = nova == "helpdesk" || !Store.Logado();
             if (nova == "site") GarantirSite(null);
             if (webSite != null) webSite.Visible = nova == "site";
             if (nova == "painel") GarantirPainel();
             if (caixaPainel != null) caixaPainel.Visible = nova == "painel";
+            if (DASH.ContainsKey(nova)) GarantirDash(nova);
+            if (webDash != null) webDash.Visible = DASH.ContainsKey(nova);
             PintarAbas();
             if (nova == "helpdesk") { Helpdesk.MarcarVisto(); AvisarHelpdesk(); }
             if (nova == "painel" && Atualizador.Velho(2)) AtualizarPaineis();
@@ -522,6 +555,7 @@ namespace Freedom
 
         public void JsApp(string codigo) { Js(webApp, codigo); }
         public void JsPainel(string codigo) { Js(webPainel, codigo); }
+        public void JsDash(string codigo) { Js(webDash, codigo); }
 
         public void AvisarHelpdesk() { if (paginaApp != "login") Js(webApp, "window.recebidoHelpdesk && recebidoHelpdesk()"); }
         public void AvisarPainel() { Js(webPainel, "window.recebido && recebido()"); }
@@ -568,6 +602,26 @@ namespace Freedom
         {
             caminhoAviso = null;
             bandeja.ShowBalloonTip(6000, "Teste · Helpdesk Freedom", "Assim chegam os avisos: novo chamado, resposta, mudança de status…", ToolTipIcon.None);
+        }
+
+        // ---------------- Comercial, Logística e Administração (telas completas, iguais ao site) ----------------
+
+        async void GarantirDash(string id)
+        {
+            if (webDash == null)
+            {
+                var w = new WebView2 { DefaultBackgroundColor = FUNDO, Dock = DockStyle.Fill, Visible = false };
+                conteudo.Controls.Add(w);
+                w.BringToFront();
+                webDash = w;
+                await Preparar(w);
+                if (!DASH.ContainsKey(aba)) return;   // enquanto preparava, a pessoa foi para outra aba
+                id = aba;
+            }
+            if (webDash.CoreWebView2 == null) return;   // ainda preparando: quem criou abre a tela certa
+            webDash.BringToFront();
+            webDash.Visible = aba == id;
+            if (dashAtual != id) { dashAtual = id; webDash.CoreWebView2.Navigate(ASSET + DASH[id] + "#aba=1"); }
         }
 
         // ---------------- painel ----------------
@@ -709,6 +763,7 @@ namespace Freedom
             try { if (webSite != null && webSite.CoreWebView2 != null) webSite.CoreWebView2.CookieManager.DeleteAllCookies(); } catch (Exception) { }
             if (webSite != null) { conteudo.Controls.Remove(webSite); webSite.Dispose(); webSite = null; }
             if (caixaPainel != null) { conteudo.Controls.Remove(caixaPainel); caixaPainel.Dispose(); caixaPainel = null; webPainel = null; chips = null; }
+            if (webDash != null) { conteudo.Controls.Remove(webDash); webDash.Dispose(); webDash = null; dashAtual = null; }
             aba = "helpdesk";
             paginaApp = "";
             Carregar(null);

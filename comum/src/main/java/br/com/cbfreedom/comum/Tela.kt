@@ -58,6 +58,11 @@ class Tela : Activity() {
         const val ABA_HELPDESK = "helpdesk"
         const val ABA_SITE = "site"
         const val ABA_PAINEL = "painel"
+        const val ABA_COMERCIAL = "comercial"
+        const val ABA_LOGISTICA = "logistica"
+        const val ABA_ADMIN = "admin"
+        /** Telas completas (iguais ao site) de cada aba nova. */
+        private val DASH = mapOf(ABA_COMERCIAL to "dash-comercial.html", ABA_LOGISTICA to "dash-logistica.html", ABA_ADMIN to "admin.html")
         private const val ASSET = "file:///android_asset/"
         private const val REQ_ARQUIVO = 31
         private const val REQ_ANEXO = 33
@@ -116,6 +121,8 @@ class Tela : Activity() {
     private lateinit var barraAbas: LinearLayout
     private lateinit var webApp: WebView          // login e aba Helpdesk
     private var webSite: WebView? = null
+    private var webDash: WebView? = null          // Comercial, Logística e Administração
+    private var dashAtual: String? = null
     private var caixaPainel: LinearLayout? = null
     private var chipsPainel: LinearLayout? = null
     private var framePaineis: FrameLayout? = null
@@ -204,9 +211,15 @@ class Tela : Activity() {
         barra.setPadding(dp(8), dp(8), dp(8), dp(6))
         val itens = listOf(
             Triple(ABA_HELPDESK, "Helpdesk", R.drawable.ic_aba_helpdesk),
-            Triple(ABA_SITE, "Site", R.drawable.ic_aba_site),
-            Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel)
+            Triple(ABA_COMERCIAL, "Comercial", R.drawable.ic_aba_comercial),
+            Triple(ABA_LOGISTICA, "Logística", R.drawable.ic_aba_logistica),
+            Triple(ABA_ADMIN, "Admin", R.drawable.ic_aba_admin),
+            Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel),
+            Triple(ABA_SITE, "Site", R.drawable.ic_aba_site)
         )
+        iconesAba[ABA_COMERCIAL] = Pair(R.drawable.ic_aba_comercial, R.drawable.ic_aba_comercial_ativa)
+        iconesAba[ABA_LOGISTICA] = Pair(R.drawable.ic_aba_logistica, R.drawable.ic_aba_logistica_ativa)
+        iconesAba[ABA_ADMIN] = Pair(R.drawable.ic_aba_admin, R.drawable.ic_aba_admin_ativa)
         iconesAba[ABA_HELPDESK] = Pair(R.drawable.ic_aba_helpdesk, R.drawable.ic_aba_helpdesk_ativa)
         iconesAba[ABA_SITE] = Pair(R.drawable.ic_aba_site, R.drawable.ic_aba_site_ativa)
         iconesAba[ABA_PAINEL] = Pair(R.drawable.ic_aba_painel, R.drawable.ic_aba_painel_ativa)
@@ -239,10 +252,11 @@ class Tela : Activity() {
                 lp.topMargin = dp(1); lp.marginEnd = dp(10)
                 pilula.addView(selo, lp)
             }
-            item.addView(pilula, LinearLayout.LayoutParams(dp(60), dp(32)))
+            item.addView(pilula, LinearLayout.LayoutParams(dp(52), dp(32)))
             val txt = TextView(this)
             txt.text = rotulo
-            txt.textSize = 12f
+            txt.textSize = 11f
+            txt.maxLines = 1
             txt.gravity = Gravity.CENTER
             txt.letterSpacing = 0.01f
             val lpT = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -287,6 +301,9 @@ class Tela : Activity() {
     private fun abaDisponivel(id: String): Boolean = when (id) {
         ABA_HELPDESK -> Acesso.helpdesk(this)
         ABA_PAINEL -> Acesso.painel(this)
+        ABA_COMERCIAL -> Acesso.comercial(this)
+        ABA_LOGISTICA -> Acesso.logistica(this)
+        ABA_ADMIN -> Acesso.admin(this)
         else -> true
     }
 
@@ -294,7 +311,7 @@ class Tela : Activity() {
     private fun ajustarAbas() {
         for ((id, v) in itensAba) v.visibility = if (abaDisponivel(id)) View.VISIBLE else View.GONE
         if (Store.logado(this) && !abaDisponivel(aba)) {
-            selecionar(listOf(ABA_HELPDESK, ABA_PAINEL, ABA_SITE).first { abaDisponivel(it) })
+            selecionar(listOf(ABA_HELPDESK, ABA_COMERCIAL, ABA_LOGISTICA, ABA_PAINEL, ABA_SITE).first { abaDisponivel(it) })
         }
         if (caixaPainel != null) montarChips()
     }
@@ -317,6 +334,7 @@ class Tela : Activity() {
             webSite?.visibility = View.GONE
             caixaSite?.visibility = View.GONE
             caixaPainel?.visibility = View.GONE
+            webDash?.visibility = View.GONE
             webApp.visibility = View.VISIBLE
             if (paginaApp != "login") { webApp.loadUrl(ASSET + "login.html"); paginaApp = "login" }
             return
@@ -350,6 +368,8 @@ class Tela : Activity() {
         caixaSite?.visibility = if (nova == ABA_SITE) View.VISIBLE else View.GONE
         if (nova == ABA_PAINEL) garantirPainel()
         caixaPainel?.visibility = if (nova == ABA_PAINEL) View.VISIBLE else View.GONE
+        if (DASH.containsKey(nova)) garantirDash(nova)
+        webDash?.visibility = if (DASH.containsKey(nova)) View.VISIBLE else View.GONE
         pintarAbas()
         if (nova == ABA_HELPDESK) {
             Helpdesk.marcarVisto(this)
@@ -556,6 +576,7 @@ class Tela : Activity() {
         val s = webSite
         if (aba == ABA_HELPDESK && paginaApp == "sub") { voltarApp(); return }
         if (aba == ABA_PAINEL) painelAtual?.let { websPainel[it] }?.let { if (it.canGoBack()) { it.goBack(); return } }
+        if (DASH.containsKey(aba)) webDash?.let { w -> w.evaluateJavascript("(function(){var m=document.getElementById('mfundo');if(m){m.parentNode.removeChild(m);return 1}return 0})()") { r -> if (r != "1") runOnUiThread { selecionar(ABA_HELPDESK) } }; return }
         if (aba == ABA_SITE && s != null && avisoSite?.visibility == View.VISIBLE) {
             avisoSite?.visibility = View.GONE
             if (s.canGoBack()) { s.goBack(); return }
@@ -575,7 +596,7 @@ class Tela : Activity() {
 
     override fun onResume() {
         super.onResume()
-        webApp.onResume(); webSite?.onResume(); websPainel.values.forEach { it.onResume() }
+        webApp.onResume(); webSite?.onResume(); webDash?.onResume(); websPainel.values.forEach { it.onResume() }
         Atualizacao.telaAberta = true
         if (esperandoPermissaoInstalar) {
             esperandoPermissaoInstalar = false
@@ -605,7 +626,7 @@ class Tela : Activity() {
     override fun onPause() {
         Helpdesk.ouvinte = null
         Atualizacao.telaAberta = false
-        webApp.onPause(); webSite?.onPause(); websPainel.values.forEach { it.onPause() }
+        webApp.onPause(); webSite?.onPause(); webDash?.onPause(); websPainel.values.forEach { it.onPause() }
         try { CookieManager.getInstance().flush() } catch (_: Exception) { }
         super.onPause()
     }
@@ -690,6 +711,13 @@ class Tela : Activity() {
     }
 
     /** Aba Painel: seletor (se tiver mais de um painel liberado) + a tela de cada painel. */
+    /** Comercial, Logística e Administração: uma tela só (a mesma página que o Windows e o Mac abrem). */
+    private fun garantirDash(id: String) {
+        val w = webDash ?: novaWebLocal().also { webDash = it; conteudo.addView(it, cheio()) }
+        w.bringToFront()
+        if (dashAtual != id) { dashAtual = id; w.loadUrl(ASSET + DASH[id] + "#aba=1") }
+    }
+
     private fun garantirPainel() {
         if (caixaPainel == null) {
             val caixa = LinearLayout(this)
@@ -1182,6 +1210,8 @@ class Tela : Activity() {
                 webSite = null; caixaSite = null; progresso = null; avisoSite = null
                 websPainel.values.forEach { it.destroy() }
                 websPainel.clear()
+                webDash?.let { conteudo.removeView(it); it.destroy() }
+                webDash = null; dashAtual = null
                 caixaPainel?.let { conteudo.removeView(it) }
                 caixaPainel = null; chipsPainel = null; framePaineis = null; painelAtual = null
                 aba = ABA_HELPDESK
@@ -1346,7 +1376,7 @@ class Tela : Activity() {
                 val cod = "window.apiResposta && apiResposta(" + req + "," + r.first + "," + JSONObject.quote(r.second) + ")"
                 // a tela que pediu pode ser o Helpdesk ou um painel (dashboards): entrega para todas, cada uma só pega o próprio número
                 js(webApp, cod)
-                runOnUiThread { websPainel.values.toList().forEach { js(it, cod) } }
+                runOnUiThread { websPainel.values.toList().forEach { js(it, cod) }; js(webDash, cod) }
             }.start()
         }
 

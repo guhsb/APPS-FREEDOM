@@ -120,6 +120,7 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 c.outputStream.use { it.write(corpo.toString().toByteArray(Charsets.UTF_8)) }
             }
+            else if (metodo == "POST" || metodo == "PUT") { c.doOutput = true; c.setFixedLengthStreamingMode(0); c.outputStream.close() }
             val cod = c.responseCode
             val fluxo = if (cod >= 400) c.errorStream else c.inputStream
             val txt = fluxo?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
