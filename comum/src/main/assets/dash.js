@@ -203,5 +203,55 @@ var Dash = (function () {
     if (id) { var n = document.getElementById(id); if (n && n !== document.activeElement) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) { } } }
   };
   X.acessivel = function (r) { if (window.F && F.acessivel) F.acessivel(r); };
+
+  // ---- listas grandes viram campo de busca: digita parte do nome ou o código e vai filtrando ----
+  X._sa = function (t) { t = String(t || '').toLowerCase(); try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (e) { } return t; };
+  X.buscavel = function (sel) {
+    if (sel._busca || sel.multiple || sel.options.length <= 20) return;
+    sel._busca = 1;
+    var caixa = document.createElement('div'); caixa.className = 'lbusca';
+    var inp = document.createElement('input'); inp.className = 'inp'; inp.type = 'search'; inp.autocomplete = 'off';
+    inp.placeholder = 'Digite o nome ou o código…'; inp.setAttribute('aria-label', 'Buscar na lista');
+    var res = document.createElement('div'); res.className = 'bres'; res.setAttribute('role', 'listbox'); res.style.display = 'none';
+    sel.parentNode.insertBefore(caixa, sel); caixa.appendChild(inp); caixa.appendChild(res); caixa.appendChild(sel);
+    sel.style.display = 'none'; sel.tabIndex = -1;
+    var ops = [], ativo = -1, achados = [];
+    function ler() { ops = [].map.call(sel.options, function (o) { return { v: o.value, t: o.textContent, n: X._sa(o.textContent + ' ' + o.value) }; }).filter(function (o) { return o.v !== ''; }); }
+    function mostrarAtual() { var o = sel.options[sel.selectedIndex]; inp.value = o && o.value !== '' ? o.textContent : ''; }
+    function desenhar() {
+      var q = X._sa(inp.value).trim(), partes = q.split(/\s+/).filter(Boolean);
+      achados = ops.filter(function (o) { return partes.every(function (p) { return o.n.indexOf(p) >= 0; }); });
+      // código exato primeiro
+      if (/^\d+$/.test(q)) achados.sort(function (a, b) { return (String(b.v) === q) - (String(a.v) === q); });
+      var mx = achados.slice(0, 60);
+      res.innerHTML = mx.length ? mx.map(function (o, i) { return '<div class="bit' + (i === ativo ? ' on' : '') + '" role="option" data-i="' + i + '">' + F.esc(o.t) + '</div>'; }).join('') +
+        (achados.length > 60 ? '<div class="bmais">+' + (achados.length - 60) + ' · continue digitando para achar</div>' : '') : '<div class="bmais">Nada encontrado</div>';
+      res.style.display = 'block';
+    }
+    function escolher(o) {
+      sel.value = o.v; mostrarAtual(); res.style.display = 'none'; ativo = -1;
+      var ev; try { ev = new Event('change', { bubbles: true }); } catch (e) { ev = document.createEvent('Event'); ev.initEvent('change', true, true); }
+      sel.dispatchEvent(ev);
+    }
+    ler(); mostrarAtual();
+    inp.addEventListener('focus', function () { ler(); inp.select(); ativo = -1; var v = inp.value; inp.value = ''; desenhar(); inp.value = v; inp.select(); });
+    inp.addEventListener('input', function () { ativo = -1; desenhar(); if (!inp.value && sel.value) { sel.value = ''; sel.dispatchEvent(new Event('change', { bubbles: true })); } });
+    inp.addEventListener('keydown', function (ev) {
+      var n = Math.min(achados.length, 60);
+      if (ev.key === 'ArrowDown') { ev.preventDefault(); ativo = Math.min(n - 1, ativo + 1); desenhar(); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); ativo = Math.max(0, ativo - 1); desenhar(); }
+      else if (ev.key === 'Enter') { ev.preventDefault(); var o = achados[ativo >= 0 ? ativo : 0]; if (o) escolher(o); }
+      else if (ev.key === 'Escape') { res.style.display = 'none'; mostrarAtual(); ev.stopPropagation(); }
+    });
+    res.addEventListener('mousedown', function (ev) { ev.preventDefault(); var b = ev.target.closest('[data-i]'); if (b) escolher(achados[F.n(b.getAttribute('data-i'))]); });
+    inp.addEventListener('blur', function () { setTimeout(function () { res.style.display = 'none'; mostrarAtual(); }, 120); });
+  };
+  X.buscaveis = function (r) { [].forEach.call((r || document).querySelectorAll('select.sel, .campo select'), X.buscavel); };
+  (function () {
+    var pend = 0;
+    function rodar() { pend = 0; X.buscaveis(document); }
+    function ligar() { rodar(); try { new MutationObserver(function () { if (!pend) { pend = 1; setTimeout(rodar, 0); } }).observe(document.body, { childList: true, subtree: true }); } catch (e) { } }
+    if (document.body) ligar(); else document.addEventListener('DOMContentLoaded', ligar);
+  })();
   return X;
 })();
