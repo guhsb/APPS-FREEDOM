@@ -431,7 +431,8 @@ namespace Freedom
             }
             var w = new WebView2 { DefaultBackgroundColor = FUNDO, Dock = DockStyle.Fill };
             conteudo.Controls.Add(w);
-            await Preparar(w);
+            try { await Preparar(w); }
+            catch (Exception) { try { conteudo.Controls.Remove(w); w.Dispose(); } catch (Exception) { } Reiniciar(); return; }
             webApp = w;
             var pend = caminhoPendente; caminhoPendente = null;
             Carregar(pend);
@@ -439,8 +440,39 @@ namespace Freedom
 
         async Task Preparar(WebView2 w)
         {
+            await PrepararTela(w);
+        }
+
+        /// <summary>Fecha e abre o Freedom de novo (no máximo 1 vez a cada 3 min, para não ficar em laço).</summary>
+        public void Reiniciar()
+        {
+            if (InvokeRequired) { try { BeginInvoke((Action)Reiniciar); } catch (Exception) { } return; }
+            if (saindo) return;
+            var marca = Path.Combine(Pastas.Raiz, "reinicio.txt");
+            try
+            {
+                long ult; if (File.Exists(marca) && long.TryParse(File.ReadAllText(marca), out ult) && DateTime.UtcNow.Ticks - ult < TimeSpan.FromMinutes(3).Ticks)
+                {
+                    Balao(10000, "Freedom", "A tela não carregou. Feche o Freedom pelo ícone perto do relógio (Sair) e abra de novo.");
+                    return;
+                }
+                File.WriteAllText(marca, DateTime.UtcNow.Ticks.ToString());
+                Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--atualizado") { UseShellExecute = false });
+            }
+            catch (Exception) { return; }
+            EncerrarParaAtualizar();
+        }
+
+        async Task PrepararTela(WebView2 w)
+        {
             await w.EnsureCoreWebView2Async(env);
             var c = w.CoreWebView2;
+            c.ProcessFailed += (s, e) =>
+            {
+                if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited) Reiniciar();
+                else if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessExited || e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessUnresponsive)
+                    try { BeginInvoke((Action)(() => { try { c.Reload(); } catch (Exception) { } })); } catch (Exception) { }
+            };
             c.SetVirtualHostNameToFolderMapping(HOST, Pastas.Sub("www"), CoreWebView2HostResourceAccessKind.Allow);
             c.AddHostObjectToScript("App", ponte);
             await c.AddScriptToExecuteOnDocumentCreatedAsync(
@@ -606,15 +638,32 @@ namespace Freedom
 
         // ---------------- Comercial, Logística e Administração (telas completas, iguais ao site) ----------------
 
+        bool preparandoDash; int falhasDash;
         async void GarantirDash(string id)
         {
+            // tela que falhou ao preparar (motor do WebView2 caiu): descarta e cria de novo, em vez de ficar em branco para sempre
+            if (webDash != null && webDash.CoreWebView2 == null && !preparandoDash)
+            {
+                try { conteudo.Controls.Remove(webDash); webDash.Dispose(); } catch (Exception) { }
+                webDash = null; dashAtual = null;
+            }
             if (webDash == null)
             {
                 var w = new WebView2 { DefaultBackgroundColor = FUNDO, Dock = DockStyle.Fill, Visible = false };
                 conteudo.Controls.Add(w);
                 w.BringToFront();
-                webDash = w;
-                await Preparar(w);
+                webDash = w; preparandoDash = true;
+                try { await Preparar(w); falhasDash = 0; }
+                catch (Exception)
+                {
+                    preparandoDash = false;
+                    try { conteudo.Controls.Remove(w); w.Dispose(); } catch (Exception) { }
+                    if (webDash == w) { webDash = null; dashAtual = null; }
+                    if (++falhasDash <= 1) { await Task.Delay(800); if (DASH.ContainsKey(aba)) GarantirDash(aba); }
+                    else Reiniciar();   // falhou de novo: reabre o app sozinho
+                    return;
+                }
+                preparandoDash = false;
                 if (!DASH.ContainsKey(aba)) return;   // enquanto preparava, a pessoa foi para outra aba
                 id = aba;
             }
@@ -638,7 +687,8 @@ namespace Freedom
                 var w = new WebView2 { DefaultBackgroundColor = FUNDO, Dock = DockStyle.Fill };
                 caixaPainel.Controls.Add(w);
                 w.BringToFront();
-                await Preparar(w);
+                try { await Preparar(w); }
+                catch (Exception) { try { conteudo.Controls.Remove(caixaPainel); caixaPainel.Dispose(); } catch (Exception) { } caixaPainel = null; chips = null; Reiniciar(); return; }
                 webPainel = w;
                 MontarChips();
             }
