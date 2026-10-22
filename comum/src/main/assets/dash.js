@@ -199,7 +199,7 @@ var Dash = (function () {
   /** Guarda o que estava digitando e a rolagem ao redesenhar. */
   X.manter = function (fn) {
     var y = window.scrollY, el = document.activeElement, id = el && el.id, pos = null; try { pos = el && el.selectionStart; } catch (e) { }
-    fn(); window.scrollTo(0, y);
+    fn(); try { X.buscaveis(document); } catch (e) { } window.scrollTo(0, y);
     if (id) { var n = document.getElementById(id); if (n && n !== document.activeElement) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch (e) { } } }
   };
   X.acessivel = function (r) { if (window.F && F.acessivel) F.acessivel(r); };
@@ -211,7 +211,7 @@ var Dash = (function () {
     sel._busca = 1;
     var caixa = document.createElement('div'); caixa.className = 'lbusca';
     var inp = document.createElement('input'); inp.className = 'inp'; inp.type = 'search'; inp.autocomplete = 'off';
-    inp.placeholder = 'Digite o nome ou o código…'; inp.setAttribute('aria-label', 'Buscar na lista');
+    inp.placeholder = 'Digite o nome ou o código…'; if (sel.id) inp.id = sel.id + '_q'; inp.setAttribute('aria-label', 'Buscar na lista');
     var res = document.createElement('div'); res.className = 'bres'; res.setAttribute('role', 'listbox'); res.style.display = 'none';
     sel.parentNode.insertBefore(caixa, sel); caixa.appendChild(inp); caixa.appendChild(res); caixa.appendChild(sel);
     sel.style.display = 'none'; sel.tabIndex = -1;
@@ -240,7 +240,13 @@ var Dash = (function () {
       var n = Math.min(achados.length, 60);
       if (ev.key === 'ArrowDown') { ev.preventDefault(); ativo = Math.min(n - 1, ativo + 1); desenhar(); }
       else if (ev.key === 'ArrowUp') { ev.preventDefault(); ativo = Math.max(0, ativo - 1); desenhar(); }
-      else if (ev.key === 'Enter') { ev.preventDefault(); var o = achados[ativo >= 0 ? ativo : 0]; if (o) escolher(o); }
+      else if (ev.key === 'Enter') {
+        ev.preventDefault(); if (!res.style.display || res.style.display === 'none') desenhar();
+        var q = inp.value.trim(), o = achados[ativo >= 0 ? ativo : 0];
+        // só número: tem que ser o código exato (não pega um nome que por acaso tem esses dígitos)
+        if (ativo < 0 && /^\d+$/.test(q)) { o = ops.filter(function (x) { return String(x.v) === q; })[0]; if (!o) { F.toast('Código ' + q + ' não está na lista'); inp.select(); return; } }
+        if (o) escolher(o);
+      }
       else if (ev.key === 'Escape') { res.style.display = 'none'; mostrarAtual(); ev.stopPropagation(); }
     });
     res.addEventListener('mousedown', function (ev) { ev.preventDefault(); var b = ev.target.closest('[data-i]'); if (b) escolher(achados[F.n(b.getAttribute('data-i'))]); });

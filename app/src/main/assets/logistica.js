@@ -35,6 +35,43 @@ var LG = (function () {
   function inp(id, valor, ph, tipo) { return '<input class="inp" id="' + id + '" type="' + (tipo || 'text') + '" value="' + F.esc(valor || '') + '" placeholder="' + F.esc(ph || '') + '">'; }
   function falhou(e) { F.toast(e.message || 'Não foi possível concluir a operação.'); }
 
+  // ---- escolher vários de uma vez (adicionar) e marcar vários para remover ----
+  var MULTI = { nfExCli: 'nf', nfExTipo: 'nf', diaAddCli: 'dia', diaAddTipo: 'dia' };
+  function marcados(sx, id) { sx.mc = sx.mc || {}; return (sx.mc[id] = sx.mc[id] || []); }
+  /** Seleção da lista vai para os "escolhidos" (chips) e o campo limpa para escolher o próximo. */
+  function escolheu(id, v) {
+    if (!v) return; var sx = st(MULTI[id]), l = marcados(sx, id), el = document.getElementById(id);
+    var txt = el && el.selectedOptions && el.selectedOptions[0] ? el.selectedOptions[0].textContent : v;
+    if (!l.some(function (x) { return x[0] === v; })) l.push([v, txt]);
+    redesenhar();
+    var foco = function () { var i = document.getElementById(id + '_q'); if (i && i !== document.activeElement) i.focus(); };
+    foco(); setTimeout(foco, 30);
+  }
+  function chipsMulti(sx, id) {
+    var l = marcados(sx, id); if (!l.length) return '';
+    return '<div class="escolhidos">' + l.map(function (x) { return '<span class="chip ro">' + F.esc(x[1]) + '<button class="lnk" data-act="desmarcar" data-v="' + F.esc(id + '|' + x[0]) + '" aria-label="Tirar">×</button></span>'; }).join('') +
+      '<button class="lnk" data-act="desmarcarTodos" data-v="' + id + '">Limpar</button></div>';
+  }
+  function rotMulti(sx, id, um, varios) { var n = marcados(sx, id).length; return n > 1 ? varios + ' (' + n + ')' : um; }
+  /** Valores a enviar: os escolhidos ou, se nenhum, o que está na lista. */
+  function valoresMulti(id) { var l = marcados(st(MULTI[id]), id); if (l.length) return l.map(function (x) { return x[0]; }); var v = X.val(id); return v ? [v] : []; }
+  /** Envia um por um (o site recebe um item por vez) e conta as falhas. */
+  function emSerie(vals, fn) {
+    var ok = 0, erros = [];
+    return vals.reduce(function (p, v) { return p.then(function () { return fn(v).then(function () { ok++; }, function (e) { erros.push(v + ': ' + (e.message || 'falhou')); }); }); }, Promise.resolve())
+      .then(function () { return { ok: ok, erros: erros }; });
+  }
+  function msgSerie(r, feito) { return r.erros.length ? r.ok + ' ' + feito + ', ' + r.erros.length + ' com erro (' + r.erros.slice(0, 2).join(' · ') + ')' : (r.ok === 1 ? '1 item ' : r.ok + ' itens ') + feito; }
+  // remover vários: chave = 'nf:customers', 'dia:order-types'…
+  function mr(sx, k) { sx.mr = sx.mr || {}; return (sx.mr[k] = sx.mr[k] || {}); }
+  function ckRem(sx, k, v) { if (((sx.mrAll || {})[k] || []).length < 2) return ''; return '<input type="checkbox" class="ckRem" data-act="mrMarca" data-v="' + F.esc(k + '|' + v) + '"' + (mr(sx, k)[v] ? ' checked' : '') + ' aria-label="Marcar para remover">'; }
+  function barraRem(sx, k, vals) {
+    sx.mrAll = sx.mrAll || {}; sx.mrAll[k] = vals; if (vals.length < 2) return '';
+    var m = mr(sx, k), n = vals.filter(function (v) { return m[v]; }).length;
+    return '<div class="barraRem"><button class="lnk" data-act="mrTodos" data-v="' + k + '">' + (n === vals.length ? 'Desmarcar todos' : 'Marcar todos') + '</button>' +
+      (n ? '<button class="btn ro" data-act="mrRem" data-v="' + k + '">Remover selecionados (' + n + ')</button>' : '<span class="cs">marque para remover vários</span>') + '</div>';
+  }
+
   // =====================================================================
   // Pedidos (Controle de Pedidos)
   // =====================================================================
@@ -420,18 +457,21 @@ var LG = (function () {
       var buscaC = (s.buscaCli || '').trim().toLowerCase(), clis = lista(op.customers).filter(function (c) { return !buscaC || ((c.customer_name || '') + ' ' + c.customer_code).toLowerCase().indexOf(buscaC) >= 0; }).slice(0, 80);
       return X.card('Regras de inclusão/exclusão', 'Só deste indicador (não mexe no Relatório Faturamento)',
         '<p class="ct" style="font-size:13.5px;margin-top:6px">Clientes excluídos aqui</p><input class="inp" id="diaBuscaCli" placeholder="Busque por nome ou código" value="' + F.esc(s.buscaCli || '') + '" style="margin:6px 0">' +
-        '<div style="display:flex;gap:8px">' + sel('diaAddCli', clis.map(function (c) { return [c.customer_code, (c.customer_name || 'Sem nome') + ' · cód. ' + c.customer_code]; }), '', 'Selecione...') + '<button class="btn ro" data-act="diaAddCli">Adicionar</button></div>' +
-        lista(ex.excluded_customers).map(function (c) { return '<div class="x" style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--ln);font-size:13px"><span>' + F.esc(c.customer_name || 'Sem nome') + ' · cód. ' + F.esc(c.customer_code) + '</span><button class="lnk ro" data-act="diaRem" data-t="customers" data-v="' + F.esc(c.customer_code) + '">Remover</button></div>'; }).join('') +
+        '<div style="display:flex;gap:8px">' + sel('diaAddCli', clis.map(function (c) { return [c.customer_code, (c.customer_name || 'Sem nome') + ' · cód. ' + c.customer_code]; }), '', 'Selecione...') + '<button class="btn ro" data-act="diaAddCli">' + rotMulti(s, 'diaAddCli', 'Adicionar', 'Adicionar') + '</button></div>' + chipsMulti(s, 'diaAddCli') +
+        barraRem(s, 'dia:customers', lista(ex.excluded_customers).map(function (c) { return String(c.customer_code); })) +
+        lista(ex.excluded_customers).map(function (c) { return '<div class="x" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--ln);font-size:13px">' + ckRem(s, 'dia:customers', c.customer_code) + '<span style="flex:1">' + F.esc(c.customer_name || 'Sem nome') + ' · cód. ' + F.esc(c.customer_code) + '</span><button class="lnk ro" data-act="diaRem" data-t="customers" data-v="' + F.esc(c.customer_code) + '">Remover</button></div>'; }).join('') +
         '<p class="ct" style="font-size:13.5px;margin-top:14px">Tipos incluídos/excluídos aqui</p>' +
-        '<div style="display:flex;gap:8px;margin-top:6px">' + sel('diaAddTipo', lista(op.exclusion_order_types).filter(function (t) { return !exc[t.order_type_code]; }).map(function (t) { return [t.order_type_code, t.order_type_label]; }), '', 'Selecione...') + '<button class="btn ro" data-act="diaAddTipo">Adicionar</button></div>' +
-        lista(ex.excluded_order_types).map(function (t) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--ln);font-size:13px"><span>' + F.esc(t.order_type_label) + '</span><button class="lnk ro" data-act="diaRem" data-t="order-types" data-v="' + F.esc(t.order_type_code) + '">Remover</button></div>'; }).join(''));
+        '<div style="display:flex;gap:8px;margin-top:6px">' + sel('diaAddTipo', lista(op.exclusion_order_types).filter(function (t) { return !exc[t.order_type_code]; }).map(function (t) { return [t.order_type_code, t.order_type_label]; }), '', 'Selecione...') + '<button class="btn ro" data-act="diaAddTipo">' + rotMulti(s, 'diaAddTipo', 'Adicionar', 'Adicionar') + '</button></div>' + chipsMulti(s, 'diaAddTipo') +
+        barraRem(s, 'dia:order-types', lista(ex.excluded_order_types).map(function (t) { return String(t.order_type_code); })) +
+        lista(ex.excluded_order_types).map(function (t) { return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--ln);font-size:13px">' + ckRem(s, 'dia:order-types', t.order_type_code) + '<span style="flex:1">' + F.esc(t.order_type_label) + '</span><button class="lnk ro" data-act="diaRem" data-t="order-types" data-v="' + F.esc(t.order_type_code) + '">Remover</button></div>'; }).join(''));
     });
     return h;
   }
   function diaDepois(m) { var s = st('dia'); F.toast(m); buscar(s, 'ex', '/logistics/billing/daily/exclusions'); carregarDia(); }
   function diaAdd(tipo) {
-    var v = X.val(tipo === 'customers' ? 'diaAddCli' : 'diaAddTipo'); if (!v) { F.toast('Escolha na lista primeiro'); return; }
-    X.enviar('POST', '/logistics/billing/daily/exclusions/' + tipo, tipo === 'customers' ? { customer_code: v } : { order_type_code: v }).then(function () { diaDepois('Regra adicionada'); }).catch(falhou);
+    var id = tipo === 'customers' ? 'diaAddCli' : 'diaAddTipo', vals = valoresMulti(id); if (!vals.length) { F.toast('Escolha na lista primeiro'); return; }
+    emSerie(vals, function (v) { return X.enviar('POST', '/logistics/billing/daily/exclusions/' + tipo, tipo === 'customers' ? { customer_code: v } : { order_type_code: v }); })
+      .then(function (r) { st('dia').mc[id] = []; diaDepois(vals.length === 1 && r.ok ? 'Regra adicionada' : msgSerie(r, 'adicionados')); });
   }
   function diaRem(tipo, v) { X.enviar('DELETE', '/logistics/billing/daily/exclusions/' + tipo + '/' + encodeURIComponent(v)).then(function () { diaDepois('Regra removida'); }).catch(falhou); }
   function diaFiltro() {
@@ -465,11 +505,11 @@ var LG = (function () {
         '<p class="ct" style="font-size:13.5px;margin-top:10px">Pedido específico</p><input class="inp" id="nfPedBusca" placeholder="Digite o pedido" value="' + F.esc(s.pedBusca || '') + '" style="margin:6px 0">' +
         (sug.length ? sel('nfPedSel', sug.map(function (o) { return [o.order_number, o.order_number + (o.customer_name ? ' · ' + o.customer_name : '')]; }), s.pedSel, 'Escolha o pedido') : (s.pedBusca ? '<div class="vazio2">Nenhum pedido encontrado.</div>' : '')) +
         '<input class="inp" id="nfPedMot" placeholder="Motivo" value="' + F.esc(s.pedMot || '') + '" style="margin:6px 0"><button class="btn ro" data-act="nfExPed">Excluir pedido</button>' +
-        '<p class="ct" style="font-size:13.5px;margin-top:14px">Cliente</p><div style="display:flex;gap:8px;margin-top:6px">' + sel('nfExCli', lista(op.exclusion_customers).map(function (c) { return [c.customer_code, (c.customer_name || 'Sem nome') + ' · cód. ' + c.customer_code]; }), '', 'Selecione') + '<button class="btn ro" data-act="nfExCli">Excluir cliente</button></div>' +
-        '<p class="ct" style="font-size:13.5px;margin-top:14px">Tipo de operação</p><div style="display:flex;gap:8px;margin-top:6px">' + sel('nfExTipo', lista(op.exclusion_order_types).map(function (t) { return [t.order_type_code, t.order_type_label]; }), '', 'Selecione') + '<button class="btn ro" data-act="nfExTipo">Excluir tipo</button></div>' +
-        '<p class="ct" style="font-size:13.5px;margin-top:16px">Pedidos excluídos</p>' + (lista(ex.excluded_orders).map(function (o) { return '<div class="lin"><div class="c"><b>' + F.esc(o.order_number) + ' · ' + F.esc(o.customer_name || '—') + '</b><span>' + F.esc(o.reason) + ' · Atualizado em ' + X.dh(o.updated_at) + '</span></div><button class="lnk ro" data-act="nfRem" data-t="orders" data-v="' + F.esc(o.order_number) + '">Remover</button></div>'; }).join('') || '<div class="vazio2">Nenhum.</div>') +
-        '<p class="ct" style="font-size:13.5px;margin-top:12px">Clientes excluídos</p>' + (lista(ex.excluded_customers).map(function (c) { return '<div class="lin"><div class="c"><b>' + F.esc(c.customer_name || 'Sem nome') + '</b><span>cód. ' + F.esc(c.customer_code) + '</span></div><button class="lnk ro" data-act="nfRem" data-t="customers" data-v="' + F.esc(c.customer_code) + '">Remover</button></div>'; }).join('') || '<div class="vazio2">Nenhum.</div>') +
-        '<p class="ct" style="font-size:13.5px;margin-top:12px">Tipos excluídos</p>' + (lista(ex.excluded_order_types).map(function (t) { return '<div class="lin"><div class="c"><b>' + F.esc(t.order_type_label) + '</b></div><button class="lnk ro" data-act="nfRem" data-t="order-types" data-v="' + F.esc(t.order_type_code) + '">Remover</button></div>'; }).join('') || '<div class="vazio2">Nenhum.</div>') +
+        '<p class="ct" style="font-size:13.5px;margin-top:14px">Cliente</p><div style="display:flex;gap:8px;margin-top:6px">' + sel('nfExCli', lista(op.exclusion_customers).map(function (c) { return [c.customer_code, (c.customer_name || 'Sem nome') + ' · cód. ' + c.customer_code]; }), '', 'Selecione') + '<button class="btn ro" data-act="nfExCli">' + rotMulti(s, 'nfExCli', 'Excluir cliente', 'Excluir clientes') + '</button></div>' + chipsMulti(s, 'nfExCli') +
+        '<p class="ct" style="font-size:13.5px;margin-top:14px">Tipo de operação</p><div style="display:flex;gap:8px;margin-top:6px">' + sel('nfExTipo', lista(op.exclusion_order_types).map(function (t) { return [t.order_type_code, t.order_type_label]; }), '', 'Selecione') + '<button class="btn ro" data-act="nfExTipo">' + rotMulti(s, 'nfExTipo', 'Excluir tipo', 'Excluir tipos') + '</button></div>' + chipsMulti(s, 'nfExTipo') +
+        '<p class="ct" style="font-size:13.5px;margin-top:16px">Pedidos excluídos</p>' + barraRem(s, 'nf:orders', lista(ex.excluded_orders).map(function (o) { return String(o.order_number); })) + (lista(ex.excluded_orders).map(function (o) { return '<div class="lin">' + ckRem(s, 'nf:orders', o.order_number) + '<div class="c"><b>' + F.esc(o.order_number) + ' · ' + F.esc(o.customer_name || '—') + '</b><span>' + F.esc(o.reason) + ' · Atualizado em ' + X.dh(o.updated_at) + '</span></div><button class="lnk ro" data-act="nfRem" data-t="orders" data-v="' + F.esc(o.order_number) + '">Remover</button></div>'; }).join('') || '<div class="vazio2">Nenhum.</div>') +
+        '<p class="ct" style="font-size:13.5px;margin-top:12px">Clientes excluídos</p>' + barraRem(s, 'nf:customers', lista(ex.excluded_customers).map(function (c) { return String(c.customer_code); })) + (lista(ex.excluded_customers).map(function (c) { return '<div class="lin">' + ckRem(s, 'nf:customers', c.customer_code) + '<div class="c"><b>' + F.esc(c.customer_name || 'Sem nome') + '</b><span>cód. ' + F.esc(c.customer_code) + '</span></div><button class="lnk ro" data-act="nfRem" data-t="customers" data-v="' + F.esc(c.customer_code) + '">Remover</button></div>'; }).join('') || '<div class="vazio2">Nenhum.</div>') +
+        '<p class="ct" style="font-size:13.5px;margin-top:12px">Tipos excluídos</p>' + barraRem(s, 'nf:order-types', lista(ex.excluded_order_types).map(function (t) { return String(t.order_type_code); })) + (lista(ex.excluded_order_types).map(function (t) { return '<div class="lin">' + ckRem(s, 'nf:order-types', t.order_type_code) + '<div class="c"><b>' + F.esc(t.order_type_label) + '</b></div><button class="lnk ro" data-act="nfRem" data-t="order-types" data-v="' + F.esc(t.order_type_code) + '">Remover</button></div>'; }).join('') || '<div class="vazio2">Nenhum.</div>') +
         '</details>';
     });
     h += bloco(s, 'd', function (d) {
@@ -495,8 +535,13 @@ var LG = (function () {
       var n = X.val('nfPedSel'), mot = X.val('nfPedMot').trim();
       if (!n) { F.toast('Escolha o pedido na lista'); return; } if (!mot) { F.toast('Informe o motivo da exclusão do pedido.'); return; }
       corpo = { order_number: n, reason: mot };
-    } else if (tipo === 'customers') { var c = X.val('nfExCli'); if (!c) { F.toast('Escolha o cliente'); return; } corpo = { customer_code: c }; }
-    else { var t = X.val('nfExTipo'); if (!t) { F.toast('Escolha o tipo'); return; } corpo = { order_type_code: t }; }
+    } else {
+      var id = tipo === 'customers' ? 'nfExCli' : 'nfExTipo', vals = valoresMulti(id);
+      if (!vals.length) { F.toast(tipo === 'customers' ? 'Escolha o cliente' : 'Escolha o tipo'); return; }
+      emSerie(vals, function (v) { return X.enviar('POST', '/logistics/billing/report/exclusions/' + tipo, tipo === 'customers' ? { customer_code: v } : { order_type_code: v }); })
+        .then(function (r) { s.mc[id] = []; nfDepois(vals.length === 1 && r.ok ? 'Exclusão salva no site' : msgSerie(r, 'excluídos')); });
+      return;
+    }
     X.enviar('POST', '/logistics/billing/report/exclusions/' + tipo, corpo).then(function () { if (tipo === 'orders') { s.pedBusca = ''; s.pedMot = ''; s.pedSel = ''; s.sug = null; } nfDepois('Exclusão salva no site'); }).catch(falhou);
   }
   function nfRem(tipo, v) { X.enviar('DELETE', '/logistics/billing/report/exclusions/' + tipo + '/' + encodeURIComponent(v)).then(function () { nfDepois('Exclusão removida'); }).catch(falhou); }
@@ -591,6 +636,19 @@ var LG = (function () {
     diaTipoAb: function (v) { var s = st('dia'); s.abT = s.abT || {}; s.abT[v] = !s.abT[v]; redesenhar(); },
     diaAddCli: function () { diaAdd('customers'); }, diaAddTipo: function () { diaAdd('order-types'); },
     nfLimpar: function () { var s = st('nf'); s.f = {}; s.pag = 1; carregarNf(); },
+    desmarcar: function (v) { var i = v.indexOf('|'), id = v.slice(0, i), val = v.slice(i + 1), sx = st(MULTI[id]); sx.mc[id] = marcados(sx, id).filter(function (x) { return x[0] !== val; }); redesenhar(); },
+    desmarcarTodos: function (id) { st(MULTI[id]).mc[id] = []; redesenhar(); },
+    mrMarca: function (v, t) { var i = v.indexOf('|'), k = v.slice(0, i); mr(st(k.split(':')[0]), k)[v.slice(i + 1)] = !!t.checked; redesenhar(); },
+    mrTodos: function (k) { var sx = st(k.split(':')[0]), vals = (sx.mrAll || {})[k] || [], m = mr(sx, k), todos = vals.every(function (v) { return m[v]; }); vals.forEach(function (v) { m[v] = !todos; }); redesenhar(); },
+    mrRem: function (k, b) {
+      var tela = k.split(':')[0], tipo = k.split(':')[1], sx = st(tela), m = mr(sx, k), vals = ((sx.mrAll || {})[k] || []).filter(function (v) { return m[v]; });
+      if (!vals.length) return;
+      if (b) { b.disabled = true; b.textContent = 'Removendo…'; }
+      var base = tela === 'nf' ? '/logistics/billing/report/exclusions/' : '/logistics/billing/daily/exclusions/';
+      emSerie(vals, function (v) { return X.enviar('DELETE', base + tipo + '/' + encodeURIComponent(v)); }).then(function (r) {
+        sx.mr[k] = {}; (tela === 'nf' ? nfDepois : diaDepois)(msgSerie(r, 'removidos'));
+      });
+    },
     nfExPed: function () { nfEx('orders'); }, nfExCli: function () { nfEx('customers'); }, nfExTipo: function () { nfEx('order-types'); },
     cfLimpar: function () { var s = st('conf'); s.f = {}; s.pag = 1; carregarConf(); }
   };
@@ -636,6 +694,8 @@ var LG = (function () {
     nfIni: nfFiltro, nfFim: nfFiltro, nfCli: nfFiltro, nfCid: nfFiltro, nfVen: nfFiltro, nfTipo: nfFiltro, nfSt: nfFiltro,
     nfOrd: function (v) { var s = st('nf'); s.ord = v; s.pag = 1; carregarNf(); }, nfDir: function (v) { var s = st('nf'); s.dir = v; s.pag = 1; carregarNf(); },
     nfPedSel: function (v) { st('nf').pedSel = v; },
+    nfExCli: function (v) { escolheu('nfExCli', v); }, nfExTipo: function (v) { escolheu('nfExTipo', v); },
+    diaAddCli: function (v) { escolheu('diaAddCli', v); }, diaAddTipo: function (v) { escolheu('diaAddTipo', v); },
     cfIni: confFiltro, cfFim: confFiltro, cfUs: confFiltro, cfCs: confFiltro, cfBs: confFiltro
   };
   function confFiltro() { var s = st('conf'); s.f = { ini: X.val('cfIni'), fim: X.val('cfFim'), us: X.val('cfUs'), cs: X.val('cfCs'), bs: X.val('cfBs') }; s.pag = 1; s.abreF = true; carregarConf(); }
