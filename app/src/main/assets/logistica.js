@@ -95,6 +95,29 @@ var LG = (function () {
     if (!m) return;
     try { var l = JSON.parse(localStorage.getItem('log_motivos') || '[]').filter(function (x) { return x !== m; }); l.unshift(m); localStorage.setItem('log_motivos', JSON.stringify(l.slice(0, 20))); } catch (e) { }
   }
+  /** Filtros a mais do app (data, motivo, conferência, valor): aplicados nos pedidos que o site devolveu. */
+  function fxAtivo(fx) { return Object.keys(fx || {}).some(function (k) { return fx[k] !== '' && fx[k] != null; }); }
+  function filtraPed(items) {
+    var fx = st('ped').fx || {}, vmin = fx.vmin !== '' && fx.vmin != null ? F.n(fx.vmin) : null, vmax = fx.vmax !== '' && fx.vmax != null ? F.n(fx.vmax) : null;
+    return lista(items).filter(function (p) {
+      var dt = String(p.order_date || '').slice(0, 10), m = (p.reason || '').trim(), v = F.n(p.value);
+      if (fx.ini && dt < fx.ini) return false; if (fx.fim && dt > fx.fim) return false;
+      if (fx.mot === 'com' && !m) return false; if (fx.mot === 'sem' && m) return false;
+      if (fx.mot && fx.mot !== 'com' && fx.mot !== 'sem' && m.toLowerCase() !== fx.mot.toLowerCase()) return false;
+      if (fx.conf === 'nenhuma' && p.conference_status) return false; if (fx.conf && fx.conf !== 'nenhuma' && p.conference_status !== fx.conf) return false;
+      if (vmin != null && v < vmin) return false; if (vmax != null && v > vmax) return false;
+      return true;
+    });
+  }
+  function filtrosPed(s) {
+    var fx = s.fx || {}, ativo = fxAtivo(fx);
+    return '<details class="card"' + (s.abreF || ativo ? ' open' : '') + ' id="pedFx"><summary class="ct" style="cursor:pointer">Mais filtros' + (ativo ? ' <span class="chip ro" style="display:inline-flex;margin-left:6px">ativos</span>' : '') + '</summary>' +
+      '<div class="sub2" style="margin-top:10px">' + X.campo('Data inicial', '<input type="date" id="pedFxIni" value="' + F.esc(fx.ini || '') + '">') + X.campo('Data final', '<input type="date" id="pedFxFim" value="' + F.esc(fx.fim || '') + '">') + '</div>' +
+      '<div class="sub2">' + X.campo('Motivo', '<select id="pedFxMot">' + X.opcoes([['com', 'Com motivo'], ['sem', 'Sem motivo']].concat(motivosUsados().map(function (m) { return [m, m]; })), fx.mot, 'Todos') + '</select>') +
+      X.campo('Conferência', '<select id="pedFxConf">' + X.opcoes(Object.keys(CONF).map(function (k) { return [k, CONF[k]]; }).concat([['nenhuma', 'Sem conferência']]), fx.conf, 'Todas') + '</select>') + '</div>' +
+      '<div class="sub2">' + X.campo('Valor mínimo (R$)', '<input type="number" inputmode="decimal" id="pedFxMin" value="' + F.esc(fx.vmin || '') + '" placeholder="0">') + X.campo('Valor máximo (R$)', '<input type="number" inputmode="decimal" id="pedFxMax" value="' + F.esc(fx.vmax || '') + '" placeholder="sem limite">') + '</div>' +
+      '<div class="acoes" style="justify-content:flex-start;margin-top:4px"><button class="btn cl mini" data-act="pedFxLimpar">Limpar filtros</button></div></details>';
+  }
   function telaPed() {
     var s = st('ped'); if (s.d == null && !s._cd) carregarPed();
     s.marc = s.marc || {};
@@ -106,13 +129,14 @@ var LG = (function () {
     var redes = Object.keys(s.redes || {}).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
     h += '<input class="busca" id="pedBusca" placeholder="Buscar cliente, rede ou pedido" value="' + F.esc(s.busca || '') + '">';
     h += '<div class="sub2">' + sel('pedRede', redes, s.rede, 'Todas as redes') + sel('pedCls', opcoesCls().concat(['FINALIZADO']).map(function (c) { return [c, nomeCls(c)]; }), s.cls, 'Todas as classificações') + '</div>';
+    h += filtrosPed(s);
     var nMarc = Object.keys(s.marc).length;
-    h += '<div style="display:flex;gap:8px;align-items:center;margin:-2px 0 10px">' + (s.varios ? '<button class="btn cl mini" data-act="pedVarios">Cancelar seleção</button><button class="btn az mini" data-act="pedTodos">Marcar os mostrados</button>' :
+    h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px"><button class="btn cl mini" data-act="pedPng">' + F.ic('imagem') + ' Gerar imagem (PNG)</button>' + (s.varios ? '<button class="btn cl mini" data-act="pedVarios">Cancelar seleção</button><button class="btn az mini" data-act="pedTodos">Marcar os mostrados</button>' :
       '<button class="btn az mini" data-act="pedVarios">☑ Selecionar vários</button>') + '<span class="cs" style="margin:0">Toque em Pendência/Equipe no pedido para trocar na hora</span></div>';
     h += bloco(s, 'd', function (d) {
-      var it = lista(d.items), n = s.n || 40;
-      if (!it.length) return '<div class="vazio">Nenhum pedido encontrado.</div>';
-      return X.card(it.length + ' pedido(s)', s.varios ? 'Marque os pedidos e use a barra de baixo para classificar todos de uma vez' : 'Classificação e motivo gravam direto no site', it.slice(0, n).map(linhaPed).join('') +
+      var it = filtraPed(d.items), n = s.n || 40;
+      if (!it.length) return '<div class="vazio">Nenhum pedido encontrado' + (fxAtivo(s.fx) ? ' com esses filtros' : '') + '.</div>';
+      return X.card(it.length + ' pedido(s)' + (fxAtivo(s.fx) ? ' · ' + X.k(it.reduce(function (a, p) { return a + F.n(p.value); }, 0)) : ''), s.varios ? 'Marque os pedidos e use a barra de baixo para classificar todos de uma vez' : 'Classificação e motivo gravam direto no site', it.slice(0, n).map(linhaPed).join('') +
         (it.length > n ? '<button class="mais" data-act="pedMais">Ver mais (' + (it.length - n) + ')</button>' : ''));
     });
     if (s.varios && nMarc) h += '<div style="height:70px"></div><div class="barraLote"><span><b>' + nMarc + '</b> pedido' + (nMarc > 1 ? 's' : '') + ' marcado' + (nMarc > 1 ? 's' : '') + '</span><button class="btn ro" data-act="pedLote">Classificar / motivo</button></div>';
@@ -233,16 +257,51 @@ var LG = (function () {
   // =====================================================================
   // Valor Pedido
   // =====================================================================
-  function carregarVp() { var s = st('vp'); return buscar(s, 'd', '/logistics/pending/order-values' + X.q({ page: s.pag || 1, page_size: 50, sort_by: s.ord || 'order_date', sort_direction: s.dir || 'desc', search: (s.busca || '').trim() })); }
+  /** Todos os pedidos (todas as páginas) da busca/ordem atual: para filtrar por data/valor e para a imagem. */
+  function vpTodos() {
+    var s = st('vp'), ch = JSON.stringify([s.busca || '', s.ord || 'order_date', s.dir || 'desc']);
+    if (s.todos && s.todosCh === ch) return Promise.resolve(s.todos);
+    if (s.todosP && s.todosCh === ch) return s.todosP;
+    s.todosCh = ch;
+    var url = function (p) { return '/logistics/pending/order-values' + X.q({ page: p, page_size: 50, sort_by: s.ord || 'order_date', sort_direction: s.dir || 'desc', search: (s.busca || '').trim() }); };
+    s.todosP = X.get(url(1)).then(function (j) {
+      var tot = Math.min(60, F.n(j.total_pages) || 1), pags = [], itens = lista(j.items);
+      for (var p = 2; p <= tot; p++) pags.push(p);
+      var lote = function () { if (!pags.length) return Promise.resolve(); return Promise.all(pags.splice(0, 4).map(function (p) { return X.get(url(p)).then(function (r) { return lista(r.items); }); })).then(function (rs) { rs.forEach(function (l) { itens = itens.concat(l); }); return lote(); }); };
+      return lote().then(function () { if (s.todosCh === ch) { s.todos = itens; s.todosP = null; } return itens; });
+    }).catch(function (e) { s.todosP = null; s.todosCh = ''; throw e; });
+    return s.todosP;
+  }
+  function filtraVp(items) {
+    var fx = st('vp').fx || {}, vmin = fx.vmin !== '' && fx.vmin != null ? F.n(fx.vmin) : null, vmax = fx.vmax !== '' && fx.vmax != null ? F.n(fx.vmax) : null;
+    return lista(items).filter(function (i) { var dt = String(i.order_date || '').slice(0, 10), v = F.n(i.value);
+      return !(fx.ini && dt < fx.ini) && !(fx.fim && dt > fx.fim) && !(vmin != null && v < vmin) && !(vmax != null && v > vmax); });
+  }
+  function carregarVp() { var s = st('vp'); s.todos = null; if (fxAtivo(s.fx)) vpTodos().then(redesenhar, falhou); return buscar(s, 'd', '/logistics/pending/order-values' + X.q({ page: s.pag || 1, page_size: 50, sort_by: s.ord || 'order_date', sort_direction: s.dir || 'desc', search: (s.busca || '').trim() })); }
+  function linhaVp(i) { return '<div class="lin"><div class="c"><b>' + F.esc(i.customer || '—') + '</b><span>Pedido ' + F.esc(i.order_number) + ' · ' + F.dataBR(i.order_date) + '</span><span class="bdg la">Pendente</span></div><div class="v">' + brl(i.value) + '</div></div>'; }
   function telaVp() {
     var s = st('vp'); if (s.d == null && !s._cd) carregarVp();
     var sm = s.d && s.d.summary || {}, h = '';
     h += '<div class="k4" style="grid-template-columns:1fr 1fr 1fr">' + [['Valor total', X.k(sm.total_value)], ['Nº de pedidos', X.int(sm.order_count)], ['Ticket médio', X.k(sm.average_ticket)]].map(function (k) { return '<div class="k"><span>' + k[0] + '</span><b style="font-size:16px">' + (s.d ? k[1] : '…') + '</b></div>'; }).join('') + '</div>';
     h += '<input class="busca" id="vpBusca" placeholder="Buscar pedido ou cliente" value="' + F.esc(s.busca || '') + '">';
     h += '<div class="sub2">' + sel('vpOrd', [['order_date', 'Data'], ['order_number', 'Pedido'], ['customer', 'Cliente'], ['value', 'Valor']], s.ord || 'order_date') + sel('vpDir', [['desc', 'Decrescente'], ['asc', 'Crescente']], s.dir || 'desc') + '</div>';
+    var fx = s.fx || {}, ativo = fxAtivo(fx);
+    h += '<details class="card"' + (s.abreF || ativo ? ' open' : '') + ' id="vpFx"><summary class="ct" style="cursor:pointer">Filtros' + (ativo ? ' <span class="chip ro" style="display:inline-flex;margin-left:6px">ativos</span>' : '') + '</summary>' +
+      '<div class="sub2" style="margin-top:10px">' + X.campo('Data inicial', '<input type="date" id="vpFxIni" value="' + F.esc(fx.ini || '') + '">') + X.campo('Data final', '<input type="date" id="vpFxFim" value="' + F.esc(fx.fim || '') + '">') + '</div>' +
+      '<div class="sub2">' + X.campo('Valor mínimo (R$)', '<input type="number" inputmode="decimal" id="vpFxMin" value="' + F.esc(fx.vmin || '') + '" placeholder="0">') + X.campo('Valor máximo (R$)', '<input type="number" inputmode="decimal" id="vpFxMax" value="' + F.esc(fx.vmax || '') + '" placeholder="sem limite">') + '</div>' +
+      '<div class="acoes" style="justify-content:flex-start;margin-top:4px"><button class="btn cl mini" data-act="vpFxLimpar">Limpar filtros</button></div></details>';
+    h += '<div style="margin:-2px 0 10px"><button class="btn cl mini" data-act="vpPng">' + F.ic('imagem') + ' Gerar imagem (PNG)</button></div>';
+    if (ativo) {
+      if (!s.todos) return h + X.carregando('Juntando todos os pedidos para filtrar…');
+      var fl = filtraVp(s.todos), pg = s.pagF || 1, tp = Math.max(1, Math.ceil(fl.length / 50)), soma = fl.reduce(function (a, i) { return a + F.n(i.value); }, 0);
+      if (pg > tp) pg = tp;
+      h = h.replace(/<div class="k4"[\s\S]*?<\/div><\/div>/, '<div class="k4" style="grid-template-columns:1fr 1fr 1fr">' + [['Valor filtrado', X.k(soma)], ['Nº de pedidos', X.int(fl.length)], ['Ticket médio', fl.length ? X.k(soma / fl.length) : '—']].map(function (k) { return '<div class="k"><span>' + k[0] + '</span><b style="font-size:16px">' + k[1] + '</b></div>'; }).join('') + '</div>');
+      if (!fl.length) return h + '<div class="vazio">Nenhum pedido com esses filtros.</div>';
+      return h + X.card('', '', fl.slice((pg - 1) * 50, pg * 50).map(linhaVp).join('') + X.pag('vpF', pg, tp, X.int(fl.length) + ' pedidos'));
+    }
     h += bloco(s, 'd', function (d) {
       var it = lista(d.items); if (!it.length) return '<div class="vazio">Nenhum pedido encontrado.</div>';
-      return X.card('', '', it.map(function (i) { return '<div class="lin"><div class="c"><b>' + F.esc(i.customer || '—') + '</b><span>Pedido ' + F.esc(i.order_number) + ' · ' + F.dataBR(i.order_date) + '</span><span class="bdg la">Pendente</span></div><div class="v">' + brl(i.value) + '</div></div>'; }).join('') +
+      return X.card('', '', it.map(linhaVp).join('') +
         X.pag('vp', d.page, d.total_pages, X.int(d.total_items) + ' pedidos'));
     });
     return h;
@@ -413,7 +472,7 @@ var LG = (function () {
     var s = st('dia'), f = s.f || {};
     return '/logistics/billing/daily' + X.q({ start_date: f.ini, end_date: f.fim, customer_code: f.cli, city: f.cid, seller: f.ven, order_type: f.tipo, selected_date: s.dia });
   }
-  function carregarDia() { var s = st('dia'); buscar(s, 'd', urlDia()); }
+  function carregarDia() { var s = st('dia'); return buscar(s, 'd', urlDia()); }
   function telaDia() {
     var s = st('dia'); s.f = s.f || {};
     if (s.op == null && !s._cop) buscar(s, 'op', '/logistics/billing/daily/options');
@@ -421,7 +480,9 @@ var LG = (function () {
     if (s.ex == null && !s._cex) buscar(s, 'ex', '/logistics/billing/daily/exclusions');
     var h = '', op = s.op || {}, f = s.f;
     if (window.faturamentoHoje) h += faturamentoHoje();
-    h += '<details class="card"' + (s.abreF ? ' open' : '') + ' id="diaFiltros"><summary class="ct" style="cursor:pointer">Filtros</summary><div class="sub2" style="margin-top:10px">' +
+    if (!h) h += '<div class="acoes" style="justify-content:flex-start;margin:0 0 10px"><button class="btn ro" data-act="diaPng">' + F.ic('imagem') + ' Gerar imagem do faturamento (PNG)</button></div>';
+    h += '<details class="card"' + (s.abreF ? ' open' : '') + ' id="diaFiltros"><summary class="ct" style="cursor:pointer">Filtros</summary>' +
+      '<div class="sugs" style="margin-top:10px">' + [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['mes', 'Este mês'], ['ant', 'Mês passado']].map(function (p) { return '<button data-act="diaPer" data-v="' + p[0] + '"' + (s.per === p[0] ? ' class="on"' : '') + '>' + p[1] + '</button>'; }).join('') + '</div><div class="sub2">' +
       X.campo('Data inicial', '<input type="date" id="diaIni" value="' + F.esc(f.ini || '') + '"' + (op.minimum_date ? ' min="' + op.minimum_date + '"' : '') + (op.maximum_date ? ' max="' + op.maximum_date + '"' : '') + '>') +
       X.campo('Data final', '<input type="date" id="diaFim" value="' + F.esc(f.fim || '') + '"' + (op.minimum_date ? ' min="' + op.minimum_date + '"' : '') + (op.maximum_date ? ' max="' + op.maximum_date + '"' : '') + '>') + '</div>' +
       X.campo('Cliente', '<select id="diaCli">' + X.opcoes(lista(op.customers).map(function (c) { return [c.customer_code, (c.customer_name || 'Sem nome') + ' · cód. ' + c.customer_code]; }), f.cli, 'Todos') + '</select>') +
@@ -430,6 +491,10 @@ var LG = (function () {
       '<button class="btn cl mini" data-act="diaLimpar">Limpar filtros</button></details>';
     h += bloco(s, 'd', function (d) {
       var dias = lista(d.days).slice().sort(function (a, b) { return a.invoice_date < b.invoice_date ? -1 : 1; }), dia = d.selected_day || d.latest_day, r = '';
+      // quanto faturou nas datas escolhidas (soma dos dias do período filtrado)
+      var somaP = dias.reduce(function (a, x) { return a + F.n(x.total_value); }, 0), pedP = dias.reduce(function (a, x) { return a + F.n(x.order_count); }, 0), fp = s.f || {};
+      var ini = fp.ini || (dias[0] && dias[0].invoice_date), fim = fp.fim || (dias.length && dias[dias.length - 1].invoice_date);
+      r += '<div class="card hero"><div class="lb">Faturado no período' + (ini ? ' · ' + F.dataBR(ini) + ' a ' + F.dataBR(fim) : '') + '</div><div class="v">' + X.brl0(somaP) + '</div><div class="s"><b>' + X.int(pedP) + '</b> pedidos em <b>' + dias.length + '</b> dia' + (dias.length === 1 ? '' : 's') + ' com faturamento</div></div>';
       r += X.k4([['Média diária faturada', X.k(d.daily_average)], ['Dia mais recente', d.latest_day ? X.k(d.latest_day.total_value) : '—', d.latest_day ? F.dataBR(d.latest_day.invoice_date) + ' · ' + X.int(d.latest_day.order_count) + ' pedidos' : ''],
         ['Regras ativas', X.int(d.active_exclusion_rules), 'só deste indicador'], ['Pedidos excluídos', X.int(d.excluded_orders_count)]]);
       var ult = dias.slice(-30);
@@ -477,7 +542,7 @@ var LG = (function () {
   function diaFiltro() {
     var s = st('dia'); s.f = { ini: X.val('diaIni'), fim: X.val('diaFim'), cli: X.val('diaCli'), cid: X.val('diaCid'), ven: X.val('diaVen'), tipo: X.val('diaTipo') };
     if (s.f.ini && s.f.fim && s.f.ini > s.f.fim) { F.toast('A data inicial é depois da final'); return; }
-    s.dia = ''; s.abreF = true; carregarDia();
+    s.dia = ''; s.per = ''; s.abreF = true; carregarDia();
   }
   // ---- Relatório pedido → NF ----
   var ORD_NF = [['order_date', 'Data'], ['order_number', 'Pedido'], ['customer', 'Cliente'], ['city', 'Cidade'], ['order_type', 'Tipo'], ['order_value', 'Valor'], ['pending_days', 'Dias em pendência']];
@@ -613,6 +678,73 @@ var LG = (function () {
     F.gerarImagem({ titulo: 'Relatório de Pendências', sub: 'Painel de Pendências · snapshot #' + sn.id + ' de ' + X.dh(sn.created_at), arquivo: 'freedom-logistica-pendencias', blocos: bl });
   }
 
+  function descFiltros(partes) { partes = partes.filter(Boolean); return partes.length ? [{ tipo: 'nota', t: 'Filtros: ' + partes.join(' · ') }] : []; }
+  function faixa(fx) { return [fx.ini || fx.fim ? 'de ' + (fx.ini ? F.dataBR(fx.ini) : 'início') + ' até ' + (fx.fim ? F.dataBR(fx.fim) : 'hoje') : '', fx.vmin ? 'valor ≥ ' + F.brl(fx.vmin) : '', fx.vmax ? 'valor ≤ ' + F.brl(fx.vmax) : '']; }
+  function pngPed() {
+    var s = st('ped'); if (!s.d) { F.toast('Espere os pedidos carregarem'); return; }
+    var it = filtraPed(s.d.items), fx = s.fx || {}, tot = it.reduce(function (a, p) { return a + F.n(p.value); }, 0), por = {};
+    it.forEach(function (p) { var c = p.effective_classification || 'PENDENCIA'; por[c] = por[c] || [0, 0]; por[c][0] += F.n(p.value); por[c][1]++; });
+    var tiles = [['PENDENCIA', 'Pendência', 'laranja'], ['EQUIPE', 'Equipe', 'azul'], ['FINALIZADO', 'Finalizado', 'verde']].map(function (c) { var v = por[c[0]] || [0, 0]; return { r: c[1] + ' · ' + v[1] + ' ped.', v: F.brl(v[0]), c: c[2] }; });
+    var bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Pedidos pendentes', valor: tot, pill: it.length + (it.length === 1 ? ' pedido' : ' pedidos') }, { tipo: 'tiles', cols: 3, itens: tiles }] }];
+    bl = bl.concat(descFiltros([s.busca ? 'busca "' + s.busca.trim() + '"' : '', s.rede ? 'rede ' + s.rede : '', s.cls ? nomeCls(s.cls) : '', fx.mot === 'com' ? 'com motivo' : fx.mot === 'sem' ? 'sem motivo' : fx.mot ? 'motivo "' + fx.mot + '"' : '', fx.conf ? (fx.conf === 'nenhuma' ? 'sem conferência' : 'conferência ' + (CONF[fx.conf] || fx.conf)) : ''].concat(faixa(fx))));
+    bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.31], ['Pedido', 'l', 0.12], ['Data', 'l', 0.12], ['Class.', 'l', 0.13], ['Motivo', 'l', 0.14], ['Valor', 'r', 0.18, 1]],
+      linhas: it.map(function (p) { return [p.customer || '—', p.order_number, X.dm(p.order_date), nomeCls(p.effective_classification), (p.reason || '').trim() || '—', F.brl(p.value)]; }) });
+    F.gerarImagem({ titulo: 'Controle de Pedidos', sub: 'Logística · ' + quandoImg(), arquivo: 'freedom-logistica-pedidos', blocos: bl });
+  }
+  function pngVp(b) {
+    var s = st('vp'); if (b) { b.disabled = true; b.lastChild.textContent = ' Juntando os pedidos…'; }
+    vpTodos().then(function (todos) {
+      if (b) { b.disabled = false; b.lastChild.textContent = ' Gerar imagem (PNG)'; }
+      var it = filtraVp(todos), fx = s.fx || {}, tot = it.reduce(function (a, i) { return a + F.n(i.value); }, 0);
+      var bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Valor dos pedidos pendentes', valor: tot, pill: it.length + (it.length === 1 ? ' pedido' : ' pedidos'), sub: it.length ? 'Ticket médio ' + F.brl(tot / it.length) : '' }] }];
+      bl = bl.concat(descFiltros([s.busca ? 'busca "' + s.busca.trim() + '"' : ''].concat(faixa(fx))));
+      bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.42], ['Pedido', 'l', 0.14], ['Data', 'l', 0.19], ['Valor', 'r', 0.25, 1]],
+        linhas: it.map(function (i) { return [i.customer || '—', i.order_number, F.dataBR(i.order_date), F.brl(i.value)]; }) });
+      F.gerarImagem({ titulo: 'Valor Pedido', sub: 'Logística · ' + quandoImg(), arquivo: 'freedom-logistica-valor-pedido', blocos: bl });
+    }).catch(function (e) { if (b) { b.disabled = false; b.lastChild.textContent = ' Gerar imagem (PNG)'; } falhou(e); });
+  }
+  var CORES_TIPO = { V: '#1fbf8f', C: '#8b6cf0', '1': '#4f7cff', B: '#f0a53a', P: '#2bb673', O: '#e5484d', D: '#3b82f6', Q: '#f59e0b', M: '#10b981', T: '#f97316', '5': '#a855f7', '7': '#ef4444', '6': '#7c3aed', A: '#60a5fa' };
+  /** Imagem do Faturamento Diário (dia escolhido + período), sem sair da tela. */
+  function pngDia() {
+    var s = st('dia'), d = s.d;
+    if (!d) { F.toast('Carregando o faturamento…'); carregarDia().then(function () { if (st('dia').d) pngDia(); }); return; }
+    var dias = lista(d.days).slice().sort(function (a, b) { return a.invoice_date < b.invoice_date ? -1 : 1; }), dia = d.selected_day || d.latest_day;
+    if (!dia) { F.toast('Sem faturamento no período'); return; }
+    var tot = F.n(dia.total_value), tipos = lista(dia.types).slice().sort(function (a, b) { return F.n(b.value) - F.n(a.value); }), f = s.f || {};
+    var idx = dias.map(function (x) { return x.invoice_date; }).indexOf(dia.invoice_date), ant = idx > 0 ? dias[idx - 1] : null, cmp = [];
+    var pv = function (a, b) { if (!b) return ''; var v = a / b - 1; return (v >= 0 ? '+' : '') + F.um(v * 100, 1) + '%'; };
+    if (ant && F.n(ant.total_value)) cmp.push(pv(tot, F.n(ant.total_value)) + ' vs ' + X.dm(ant.invoice_date));
+    if (F.n(d.daily_average)) cmp.push(pv(tot, F.n(d.daily_average)) + ' vs média');
+    var PAL = ['#4f7cff', '#f0a53a', '#1fbf8f', '#8b6cf0', '#e84b8a', '#3b82f6', '#f97316', '#10b981'];
+    var cor = function (t) { return CORES_TIPO[t.order_type_code] || PAL[Math.max(0, tipos.indexOf(t)) % PAL.length]; };
+    var hero = [{ tipo: 'hero', rot: 'Faturamento do dia ' + F.dataBR(dia.invoice_date), valor: tot, pill: X.int(dia.order_count) + (F.n(dia.order_count) === 1 ? ' pedido' : ' pedidos'), sub: cmp.join('  ·  ') }];
+    if (tot > 0 && tipos.length) hero.push({ tipo: 'dist', partes: tipos.map(function (t) { return { frac: Math.max(0.005, F.n(t.value) / tot), cor: cor(t) }; }) });
+    var bl = [{ tipo: 'card', blocos: hero }];
+    if (tipos.length) { bl.push({ tipo: 'secao', t: 'Por tipo de operação', d: String(tipos.length) });
+      bl.push({ tipo: 'tipos', itens: tipos.map(function (t) { var np = F.n(t.order_count); return { nome: t.order_type_label, valor: F.brl(t.value), sub: np + (np === 1 ? ' pedido' : ' pedidos'), pct: F.um(F.n(t.day_percentage), 1) + '%', cor: cor(t) }; }) }); }
+    var ult = dias.slice(-22), somaP = dias.reduce(function (a, x) { return a + F.n(x.total_value); }, 0);
+    bl.push({ tipo: 'card', blocos: [{ tipo: 'colunas', titulo: 'Faturamento por dia', d: ult.length + ' dias', media: F.n(d.daily_average), txtMedia: 'média ' + X.k(d.daily_average),
+      dados: ult.map(function (x, i) { return { v: F.n(x.total_value), on: x.invoice_date === dia.invoice_date, r: i % 4 === 0 || i === ult.length - 1 ? X.dm(x.invoice_date) : '' }; }) },
+      { tipo: 'linha', r: 'Total no período (' + dias.length + ' dias)', v: F.brl(somaP) }, { tipo: 'linha', r: 'Média diária', v: F.brl(d.daily_average) }] });
+    var op = s.op || {}, nomeCli = '';
+    if (f.cli) lista(op.customers).forEach(function (c) { if (String(c.customer_code) === String(f.cli)) nomeCli = c.customer_name || f.cli; });
+    bl = bl.concat(descFiltros([f.ini || f.fim ? (f.ini ? F.dataBR(f.ini) : '…') + ' a ' + (f.fim ? F.dataBR(f.fim) : '…') : '', f.cli ? 'cliente ' + (nomeCli || f.cli) : '', f.cid ? 'cidade ' + f.cid : '', f.ven ? 'vendedor ' + f.ven : '', f.tipo ? 'tipo ' + f.tipo : '']));
+    tipos.forEach(function (t) {
+      var os = lista(t.orders); if (!os.length) return;
+      bl.push({ tipo: 'tabela', titulo: t.order_type_label, cor: cor(t), d: os.length + ' pedido(s) · ' + F.brl(t.value), lim: 120, cols: [['Cliente', 'l', 0.44], ['Pedido', 'l', 0.15], ['NF', 'l', 0.15], ['Valor', 'r', 0.26, 1]],
+        linhas: os.map(function (o) { return [o.customer_name || '—', o.order_number, o.invoice_number, F.brl(o.order_value)]; }) });
+    });
+    F.gerarImagem({ titulo: 'Faturamento Diário', sub: 'Dia ' + F.dataBR(dia.invoice_date) + ' · ' + quandoImg(), arquivo: 'Faturamento-' + X.dm(dia.invoice_date).replace('/', '-'), blocos: bl });
+  }
+  function periodoDia(v) {
+    var h = X.hoje(), s = st('dia'); s.f = s.f || {};
+    if (v === 'hoje') { s.f.ini = h; s.f.fim = h; }
+    else if (v === '7') { s.f.ini = X.iso(new Date(X.de(h).getTime() - 6 * 864e5)); s.f.fim = h; }
+    else if (v === 'mes') { s.f.ini = X.mes(h, 0)[0]; s.f.fim = h; }
+    else if (v === 'ant') { var m = X.mes(h, -1); s.f.ini = m[0]; s.f.fim = m[1]; }
+    s.per = v; s.dia = ''; s.abreF = true; carregarDia();
+  }
+
   // =====================================================================
   // Toques e campos
   // =====================================================================
@@ -623,7 +755,7 @@ var LG = (function () {
     pedTroca: function (v, t) { trocarPed(v, t.getAttribute('data-c')); },
     pedVarios: function () { var s = st('ped'); s.varios = !s.varios; s.marc = {}; redesenhar(); },
     pedMarca: function (v, t) { var s = st('ped'); if (t.checked) s.marc[v] = 1; else delete s.marc[v]; redesenhar(); },
-    pedTodos: function () { var s = st('ped'); lista(s.d && s.d.items).slice(0, s.n || 40).forEach(function (p) { if (p.effective_classification !== 'FINALIZADO') s.marc[p.order_number] = 1; }); redesenhar(); },
+    pedTodos: function () { var s = st('ped'); filtraPed(s.d && s.d.items).slice(0, s.n || 40).forEach(function (p) { if (p.effective_classification !== 'FINALIZADO') s.marc[p.order_number] = 1; }); redesenhar(); },
     pedLote: lotePed,
     consModo: function (v) { st('cons').modo = v; redesenhar(); },
     sbCat: function (v) { var s = st('sb'); s.cat = v; s.op = null; opcoesSb(); redesenhar(); },
@@ -631,7 +763,7 @@ var LG = (function () {
     relAdd: relAdd, relMover: relMover, relRem: relRem,
     irAba: function (v) { if (window.irAba) irAba(v); },
     fatSub: function (v) { st('fat').sub = v; redesenhar(); },
-    diaLimpar: function () { var s = st('dia'); s.f = {}; s.dia = ''; carregarDia(); },
+    diaLimpar: function () { var s = st('dia'); s.f = {}; s.dia = ''; s.per = ''; carregarDia(); },
     diaIr: function (v) { if (!v) return; st('dia').dia = v; carregarDia(); },
     diaTipoAb: function (v) { var s = st('dia'); s.abT = s.abT || {}; s.abT[v] = !s.abT[v]; redesenhar(); },
     diaAddCli: function () { diaAdd('customers'); }, diaAddTipo: function () { diaAdd('order-types'); },
@@ -649,11 +781,14 @@ var LG = (function () {
         sx.mr[k] = {}; (tela === 'nf' ? nfDepois : diaDepois)(msgSerie(r, 'removidos'));
       });
     },
+    pedPng: pngPed, vpPng: function (v, b) { pngVp(b); }, diaPng: pngDia, diaPer: periodoDia,
+    pedFxLimpar: function () { st('ped').fx = {}; redesenhar(); },
+    vpFxLimpar: function () { var s = st('vp'); s.fx = {}; s.pagF = 1; redesenhar(); },
     nfExPed: function () { nfEx('orders'); }, nfExCli: function () { nfEx('customers'); }, nfExTipo: function () { nfEx('order-types'); },
     cfLimpar: function () { var s = st('conf'); s.f = {}; s.pag = 1; carregarConf(); }
   };
   var MBOT = { cancelar: X.fechar, salvarPed: salvarPed, sbRemOk: sbRemOk, sbEnviarOk: sbEnviarOk, relRemOk: relRemOk };
-  var PAG = { pend: [st.bind(null, 'pend'), carregarPend], vp: [st.bind(null, 'vp'), carregarVp], nf: [st.bind(null, 'nf'), carregarNf], conf: [st.bind(null, 'conf'), carregarConf],
+  var PAG = { vpF: [function () { var s = st('vp'); return { set pag(v) { s.pagF = v; } }; }, redesenhar], pend: [st.bind(null, 'pend'), carregarPend], vp: [st.bind(null, 'vp'), carregarVp], nf: [st.bind(null, 'nf'), carregarNf], conf: [st.bind(null, 'conf'), carregarConf],
     consPed: [function () { var s = st('cons'); return { set pag(v) { s.pagPed = v; } }; }, consPedidos] };
 
   document.addEventListener('click', function (ev) {
@@ -694,10 +829,14 @@ var LG = (function () {
     nfIni: nfFiltro, nfFim: nfFiltro, nfCli: nfFiltro, nfCid: nfFiltro, nfVen: nfFiltro, nfTipo: nfFiltro, nfSt: nfFiltro,
     nfOrd: function (v) { var s = st('nf'); s.ord = v; s.pag = 1; carregarNf(); }, nfDir: function (v) { var s = st('nf'); s.dir = v; s.pag = 1; carregarNf(); },
     nfPedSel: function (v) { st('nf').pedSel = v; },
+    pedFxIni: pedFx, pedFxFim: pedFx, pedFxMot: pedFx, pedFxConf: pedFx, pedFxMin: pedFx, pedFxMax: pedFx,
+    vpFxIni: vpFx, vpFxFim: vpFx, vpFxMin: vpFx, vpFxMax: vpFx,
     nfExCli: function (v) { escolheu('nfExCli', v); }, nfExTipo: function (v) { escolheu('nfExTipo', v); },
     diaAddCli: function (v) { escolheu('diaAddCli', v); }, diaAddTipo: function (v) { escolheu('diaAddTipo', v); },
     cfIni: confFiltro, cfFim: confFiltro, cfUs: confFiltro, cfCs: confFiltro, cfBs: confFiltro
   };
+  function pedFx() { var s = st('ped'); s.fx = { ini: X.val('pedFxIni'), fim: X.val('pedFxFim'), mot: X.val('pedFxMot'), conf: X.val('pedFxConf'), vmin: X.val('pedFxMin'), vmax: X.val('pedFxMax') }; s.abreF = true; s.n = 40; redesenhar(); }
+  function vpFx() { var s = st('vp'); s.fx = { ini: X.val('vpFxIni'), fim: X.val('vpFxFim'), vmin: X.val('vpFxMin'), vmax: X.val('vpFxMax') }; s.abreF = true; s.pagF = 1; if (fxAtivo(s.fx) && !s.todos) vpTodos().then(redesenhar, falhou); redesenhar(); }
   function confFiltro() { var s = st('conf'); s.f = { ini: X.val('cfIni'), fim: X.val('cfFim'), us: X.val('cfUs'), cs: X.val('cfCs'), bs: X.val('cfBs') }; s.pag = 1; s.abreF = true; carregarConf(); }
   document.addEventListener('input', function (ev) { var id = ev.target.id; if (digitou[id]) digitou[id](ev.target.value); });
   document.addEventListener('change', function (ev) { var id = ev.target.id; if (mudou[id]) mudou[id](ev.target.value); });
@@ -713,5 +852,5 @@ var LG = (function () {
     if (aba === 'fat') { var f = st('fat').sub || 'dia'; if (f === 'dia') { carregarDia(); buscar(st('dia'), 'ex', '/logistics/billing/daily/exclusions'); } else { carregarNf(); buscar(st('nf'), 'ex', '/logistics/billing/report/exclusions'); } }
     if (aba === 'conf') carregarConf();
   }
-  return { ped: telaPed, pend: telaPend, vp: telaVp, cons: telaCons, sb: telaSb, rel: telaRel, fat: telaFat, conf: telaConf, recarregar: recarregar, S: S };
+  return { ped: telaPed, pend: telaPend, vp: telaVp, cons: telaCons, sb: telaSb, rel: telaRel, fat: telaFat, conf: telaConf, recarregar: recarregar, S: S, pngDia: pngDia };
 })();

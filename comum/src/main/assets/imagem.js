@@ -192,7 +192,7 @@
     },
     /** Tabela: { titulo, cols: [[rótulo, 'l'|'r', fração da largura]], linhas: [[...]], vazio } */
     tabela: function (ctx, b, x, y, w) {
-      var y0 = y, ix = x + 12, iw = w - 24, cols = b.cols, lin = b.linhas || [], LIM = 80, extra = Math.max(0, lin.length - LIM);
+      var y0 = y, ix = x + 12, iw = w - 24, cols = b.cols, lin = b.linhas || [], LIM = b.lim || 80, extra = Math.max(0, lin.length - LIM);
       lin = lin.slice(0, LIM);
       var xs = [], acc = 0; cols.forEach(function (c) { xs.push(ix + acc * iw); acc += c[2]; });
       var yy = y + 14;
@@ -216,6 +216,22 @@
       ctx.strokeStyle = C.ln; ctx.lineWidth = 1; rr(ctx, x + .5, y0 + .5, w - 1, yy - y0 - 1, 16); ctx.stroke();
       ctx.fillStyle = C.sf; rr(ctx, x, y0, w, yy - y0, 16); ctx.fill(); ctx.restore();
       return yy + 12;
+    },
+    colunas: function (ctx, b, x, y, w) {   // barras por dia (a destacada em rosa) + linha da média
+      var dd = b.dados || [], n = dd.length; if (!n) return y;
+      fonte(ctx, 11, 700); ctx.fillStyle = C.tx2; texto(ctx, String(b.titulo || '').toUpperCase(), x, y + 12, w * 0.6);
+      if (b.d) { fonte(ctx, 11); ctx.fillStyle = C.tx3; texto(ctx, b.d, x + w, y + 12, w * 0.4, 'right'); }
+      var top = y + 26, H = 110, base = top + H, mx = 1;
+      dd.forEach(function (k) { mx = Math.max(mx, F.n(k.v)); }); if (b.media) mx = Math.max(mx, F.n(b.media)); mx *= 1.12;
+      var bw = w / n;
+      dd.forEach(function (k, i) {
+        var hh = F.n(k.v) / mx * H, bx = x + i * bw + Math.min(2, bw * 0.15);
+        ctx.fillStyle = k.on ? C.rosa : C.azul; rr(ctx, bx, base - Math.max(2, hh), Math.max(2, bw - Math.min(4, bw * 0.3)), Math.max(2, hh), 3); ctx.fill();
+        if (k.r) { fonte(ctx, 9.5); ctx.fillStyle = C.tx3; texto(ctx, k.r, x + i * bw + bw / 2, base + 14, 0, 'center'); }
+      });
+      if (b.media) { var ym = base - F.n(b.media) / mx * H; ctx.strokeStyle = C.tx2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, ym); ctx.lineTo(x + w, ym); ctx.stroke(); ctx.setLineDash([]);
+        if (b.txtMedia) { fonte(ctx, 10); ctx.fillStyle = C.tx2; texto(ctx, b.txtMedia, x + w, ym - 4, w * 0.5, 'right'); } }
+      return base + 26;
     },
     card: function (ctx, b, x, y, w) {
       var y0 = y, yy = y + PAD;

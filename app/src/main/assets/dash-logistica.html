@@ -165,7 +165,7 @@ window.faturamentoHoje = function () {
   h += '<div class="chips"><span class="chip az">Mês: ' + X.k(mes.tot) + ' em ' + mes.dias + ' dias</span>' + (mes.melhor ? '<span class="chip ok">Melhor dia: ' + X.dm(mes.melhor.d) + ' · ' + X.k(mes.melhor.v) + '</span>' : '') + '</div></div>';
   var tipos = (hj ? hj.tipos : []).map(function (t) { return [t.order_type_label || t.label || t.name || t.description || t.type || t.code, F.n(t.total_value != null ? t.total_value : t.value), F.n(t.order_count != null ? t.order_count : t.count)]; }).filter(function (t) { return t[1] > 0; });
   if (tipos.length) h += X.card('Hoje por tipo', 'Venda, comodato, bonificação…', X.barras(tipos.map(function (t) { return [t[0], t[1], null, t[2] + ' ped.']; })));
-  h += '<div class="card" style="text-align:center;cursor:pointer" id="btFatPainel"><b style="font-size:14px">' + F.ic('imagem') + ' Gerar imagem do faturamento</b><div class="cs" style="margin:4px 0 0">Abre o painel de Faturamento, com a imagem de sempre</div></div>';
+  h += '<div class="card" style="text-align:center;cursor:pointer" id="btFatPainel"><b style="font-size:14px">' + F.ic('imagem') + ' Gerar imagem do faturamento</b><div class="cs" style="margin:4px 0 0">Dia escolhido no Faturamento Diário (ou o mais recente), com tipos e pedidos</div></div>';
   return h;
 };
 
@@ -176,7 +176,7 @@ document.addEventListener('click', function (ev) {
   if (t.hasAttribute('data-sub')) { filtroPed = t.getAttribute('data-sub'); nPed = 20; desenhar(); return; }
   if (t.hasAttribute('data-p')) { var n = t.getAttribute('data-p'); abertos[n] = !abertos[n]; desenhar(); return; }
   if (t.hasAttribute('data-mais')) { var m = t.getAttribute('data-mais'); if (m === 'ped') nPed += 30; if (m === 'redes') verRedes = true; desenhar(); return; }
-  if (t.id === 'btFatPainel') { try { if (X.raiz && App.aba) { App.aba('painel'); return; } } catch (e) { } if (history.length > 1) history.back(); else location.href = 'painel-faturamento.html'; }
+  if (t.id === 'btFatPainel') { if (LG.pngDia) LG.pngDia(); return; }
 });
 document.addEventListener('input', function (ev) {
   if (ev.target.id === 'busca') { busca = ev.target.value; nPed = 20; var pos = ev.target.selectionStart; desenhar(); var el = document.getElementById('busca'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { } } }
