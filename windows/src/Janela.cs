@@ -588,6 +588,8 @@ namespace Freedom
         public void JsApp(string codigo) { Js(webApp, codigo); }
         public void JsPainel(string codigo) { Js(webPainel, codigo); }
         public void JsDash(string codigo) { Js(webDash, codigo); }
+        /// <summary>Aviso (toast) em qualquer tela aberta: painel, Comercial/Logística/Admin ou Helpdesk.</summary>
+        public void JsToast(string codigo) { Js(webPainel, codigo); Js(webDash, codigo); Js(webApp, codigo); }
 
         public void AvisarHelpdesk() { if (paginaApp != "login") Js(webApp, "window.recebidoHelpdesk && recebidoHelpdesk()"); }
         public void AvisarPainel() { Js(webPainel, "window.recebido && recebido()"); }

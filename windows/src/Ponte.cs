@@ -55,7 +55,7 @@ namespace Freedom
         public void configurarAvisoMeta(bool ligado)
         {
             Metas.Ligar(ligado);
-            j.JsPainel("window.F && F.toast && F.toast(" + Q(ligado ? "Avisos de meta ligados" : "Avisos de meta desligados") + ")");
+            j.JsToast("window.F && F.toast && F.toast(" + Q(ligado ? "Avisos de meta ligados" : "Avisos de meta desligados") + ")");
         }
 
         // ---- imagem (PNG) dos painéis ----
@@ -76,9 +76,83 @@ namespace Freedom
                         obj.SetData("PNG", false, png);
                         Clipboard.SetDataObject(obj, true);
                     }
-                    j.JsPainel("window.F && F.toast && F.toast('Imagem copiada. É só colar (Ctrl+V) no WhatsApp ou no e-mail.')");
+                    j.JsToast("window.F && F.toast && F.toast('Imagem copiada. É só colar (Ctrl+V) no WhatsApp ou no e-mail.')");
                 }
-                catch (Exception e) { j.JsPainel("window.F && F.toast && F.toast(" + Q("Não consegui copiar: " + e.Message) + ")"); }
+                catch (Exception e) { j.JsToast("window.F && F.toast && F.toast(" + Q("Não consegui copiar: " + e.Message) + ")"); }
+            });
+        }
+
+        // ---- dados que as telas guardam num arquivo do app (não somem ao sair do login nem ao atualizar) ----
+        static string ArqDado(string nome)
+        {
+            var n = System.Text.RegularExpressions.Regex.Replace(nome ?? "", "[^a-z0-9_-]", "");
+            if (n.Length == 0) return null;
+            return System.IO.Path.Combine(Pastas.Sub("telas"), n + ".json");
+        }
+        public string lerDado(string nome)
+        {
+            try { var a = ArqDado(nome); return a != null && System.IO.File.Exists(a) ? System.IO.File.ReadAllText(a, Encoding.UTF8) : ""; } catch (Exception) { return ""; }
+        }
+        public bool gravarDado(string nome, string texto)
+        {
+            try
+            {
+                var a = ArqDado(nome); if (a == null) return false;
+                var t = a + ".tmp"; System.IO.File.WriteAllText(t, texto ?? "", new UTF8Encoding(false));
+                if (System.IO.File.Exists(a)) System.IO.File.Replace(t, a, null); else System.IO.File.Move(t, a);
+                return true;
+            }
+            catch (Exception) { return false; }
+        }
+        /// <summary>Cópia (backup) em Downloads, mostrando o arquivo no Explorer.</summary>
+        public void salvarCopia(string nome, string texto)
+        {
+            Fundo(() =>
+            {
+                try
+                {
+                    var pasta = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    System.IO.Directory.CreateDirectory(pasta);
+                    var seguro = string.Join("_", (nome ?? "Freedom.json").Split(System.IO.Path.GetInvalidFileNameChars()));
+                    var arq = System.IO.Path.Combine(pasta, seguro);
+                    System.IO.File.WriteAllText(arq, texto ?? "", new UTF8Encoding(false));
+                    try { Process.Start("explorer.exe", "/select,\"" + arq + "\""); } catch (Exception) { }
+                    j.JsToast("window.F && F.toast && F.toast(" + Q("Cópia salva em Downloads (" + seguro + ")") + ")");
+                }
+                catch (Exception e) { j.JsToast("window.F && F.toast && F.toast(" + Q("Não consegui salvar a cópia: " + e.Message) + ")"); }
+            });
+        }
+
+        /// <summary>Várias páginas de uma vez: grava os PNG numa pasta temporária e copia como arquivos.
+        /// No WhatsApp (ou e-mail, Teams) um Ctrl+V cola todas juntas.</summary>
+        public void copiarImagens(string lista, string nome)
+        {
+            JSONArray arr;
+            try { arr = new JSONArray(lista ?? "[]"); } catch (Exception) { return; }
+            Ui(() =>
+            {
+                try
+                {
+                    var pasta = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Freedom-imagens");
+                    System.IO.Directory.CreateDirectory(pasta);
+                    foreach (var velho in System.IO.Directory.GetFiles(pasta)) try { if (DateTime.Now - System.IO.File.GetLastWriteTime(velho) > TimeSpan.FromHours(2)) System.IO.File.Delete(velho); } catch (Exception) { }
+                    var b = string.Join("_", (nome ?? "Freedom").Split(System.IO.Path.GetInvalidFileNameChars()));
+                    if (b.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) b = b.Substring(0, b.Length - 4);
+                    var arqs = new System.Collections.Specialized.StringCollection();
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        var arq = System.IO.Path.Combine(pasta, b + "_pag" + (i + 1) + ".png");
+                        System.IO.File.WriteAllBytes(arq, Convert.FromBase64String(arr.OptString(i, "")));
+                        arqs.Add(arq);
+                    }
+                    if (arqs.Count == 0) return;
+                    var obj = new DataObject();
+                    obj.SetFileDropList(arqs);
+                    obj.SetData("Preferred DropEffect", new System.IO.MemoryStream(new byte[] { 5, 0, 0, 0 }));
+                    Clipboard.SetDataObject(obj, true);
+                    j.JsToast("window.F && F.toast && F.toast(" + Q(arqs.Count + " páginas copiadas. É só colar (Ctrl+V) no WhatsApp: vão todas de uma vez.") + ")");
+                }
+                catch (Exception e) { j.JsToast("window.F && F.toast && F.toast(" + Q("Não consegui copiar: " + e.Message) + ")"); }
             });
         }
 
@@ -97,9 +171,9 @@ namespace Freedom
                     var arq = System.IO.Path.Combine(pasta, seguro);
                     System.IO.File.WriteAllBytes(arq, dados);
                     try { Process.Start("explorer.exe", "/select,\"" + arq + "\""); } catch (Exception) { }
-                    j.JsPainel("window.F && F.toast && F.toast('Imagem salva em Imagens › Freedom')");
+                    j.JsToast("window.F && F.toast && F.toast('Imagem salva em Imagens › Freedom')");
                 }
-                catch (Exception e) { j.JsPainel("window.F && F.toast && F.toast(" + Q("Não consegui salvar: " + e.Message) + ")"); }
+                catch (Exception e) { j.JsToast("window.F && F.toast && F.toast(" + Q("Não consegui salvar: " + e.Message) + ")"); }
             });
         }
 

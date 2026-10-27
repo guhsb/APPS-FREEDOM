@@ -1357,6 +1357,41 @@ class Tela : Activity() {
             }
         }
 
+        // ---- dados que as telas guardam num arquivo do app (não somem ao sair do login nem ao atualizar) ----
+        private fun arqDado(nome: String): java.io.File? {
+            val n = nome.replace(Regex("[^a-z0-9_-]"), ""); if (n.isEmpty()) return null
+            return java.io.File(java.io.File(filesDir, "telas").apply { mkdirs() }, "$n.json")
+        }
+        @JavascriptInterface
+        fun lerDado(nome: String): String = try { arqDado(nome)?.takeIf { it.exists() }?.readText() ?: "" } catch (_: Exception) { "" }
+        @JavascriptInterface
+        fun gravarDado(nome: String, texto: String): Boolean = try {
+            val f = arqDado(nome) ?: throw Exception()
+            val t = java.io.File(f.parentFile, f.name + ".tmp"); t.writeText(texto); if (!t.renameTo(f)) { f.writeText(texto); t.delete() }; true
+        } catch (_: Exception) { false }
+        /** Cópia (backup) em Downloads. */
+        @JavascriptInterface
+        fun salvarCopia(nome: String, texto: String) {
+            val app = applicationContext
+            Thread {
+                val ok = try { Arquivos.salvar(app, texto.toByteArray(Charsets.UTF_8), Arquivos.nome(nome, "application/json"), "application/json") } catch (_: Exception) { false }
+                toast(if (ok) "Cópia salva em Downloads ($nome)" else "Não consegui salvar a cópia")
+            }.start()
+        }
+
+        /** Todas as páginas da imagem num compartilhar só. lista = JSON ["base64", ...] */
+        @JavascriptInterface
+        fun compartilharImagens(lista: String, nome: String) {
+            val paginas = try {
+                val arr = org.json.JSONArray(lista)
+                (0 until arr.length()).map { android.util.Base64.decode(arr.getString(it), android.util.Base64.DEFAULT) }
+            } catch (_: Exception) { return toast("Imagens inválidas") }
+            runOnUiThread {
+                try { Imagens.compartilharVarias(this@Tela, paginas, nome) }
+                catch (e: Exception) { toast("Não consegui compartilhar: " + (e.message ?: "erro")) }
+            }
+        }
+
         @JavascriptInterface
         fun salvarImagem(base64: String, nome: String) {
             val app = applicationContext

@@ -15,7 +15,7 @@
 <script src="dash.js"></script>
 <script src="logo-dados.js"></script>
 <script src="imagem.js"></script>
-<script src="logistica.js"></script>
+<script src="logistica.js"></script><script src="equipe.js"></script><script>LG.eq = function () { return EQ.tela(); };</script>
 <script>
 var X = Dash, d = null, aba = Dash.lembrar('log_aba2') || 'resumo', carregandoAgora = false, filtroPed = 'todos', busca = '', abertos = {}, nPed = 20, verRedes = false;
 var CORES_IDADE = ['#9aa9d6', '#7d8fd0', 'var(--azul)', 'var(--laranja)', 'var(--rosa)'];
@@ -67,7 +67,7 @@ function variacao(diasAtras) {
 function sinal(v) { return (v >= 0 ? '+' : '−') + X.k(Math.abs(v)); }
 
 // ---------- telas ----------
-var ABAS = [['resumo', 'Resumo'], ['ped', 'Pedidos'], ['pend', 'PEND'], ['vp', 'Valor Pedido'], ['cons', 'Consulta'], ['sb', 'Standby'], ['rel', 'Relatório'], ['fat', 'Faturamento'], ['conf', 'Conferência']];
+var ABAS = [['resumo', 'Resumo'], ['ped', 'Pedidos'], ['pend', 'PEND'], ['vp', 'Valor Pedido'], ['cons', 'Consulta'], ['sb', 'Standby'], ['rel', 'Relatório'], ['fat', 'Faturamento'], ['conf', 'Conferência'], ['eq', 'Equipe']];
 function desenhar() {
   if (!ABAS.some(function (a) { return a[0] === aba; })) aba = 'resumo';
   document.getElementById('sub').innerHTML = d ? 'Pendências agora · ' + X.int(d.ped) + ' pedidos' : 'Logística';

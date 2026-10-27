@@ -42,6 +42,28 @@ class Imagens : ContentProvider() {
             c.startActivity(Intent.createChooser(envio, "Compartilhar imagem").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         }
 
+        /** Várias páginas de uma vez: um único "Compartilhar" (WhatsApp recebe todas juntas). */
+        fun compartilharVarias(c: Context, paginas: List<ByteArray>, nome: String) {
+            val dir = pasta(c)
+            dir.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 3600_000L) it.delete() }
+            val base = seguro(nome).removeSuffix(".png")
+            val uris = ArrayList<Uri>()
+            paginas.forEachIndexed { i, dados ->
+                val f = File(dir, base + "_pag" + (i + 1) + ".png")
+                f.writeBytes(dados)
+                uris.add(Uri.Builder().scheme("content").authority(autoridade(c)).appendPath(f.name).build())
+            }
+            if (uris.isEmpty()) return
+            val envio = Intent(Intent.ACTION_SEND_MULTIPLE)
+                .setType("image/png")
+                .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val clip = android.content.ClipData.newRawUri(uris[0].lastPathSegment, uris[0])
+            for (k in 1 until uris.size) clip.addItem(android.content.ClipData.Item(uris[k]))
+            envio.clipData = clip
+            c.startActivity(Intent.createChooser(envio, "Compartilhar " + uris.size + " imagens").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        }
+
         /** Planilha exportada: grava e abre o "Abrir com / Compartilhar" (Excel, Drive, WhatsApp, e-mail…). */
         fun compartilharArquivo(c: Context, dados: ByteArray, nome: String, tipo: String) {
             val dir = pasta(c)

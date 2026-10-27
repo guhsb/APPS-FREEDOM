@@ -145,3 +145,19 @@ input.ckRem{width:20px;height:20px;flex:0 0 auto;margin:0 4px 0 0;accent-color:v
 .lin input.ckRem{align-self:center}
 .sugs button.on{background:var(--tx);color:var(--sf);border-color:var(--tx)}
 .graf{max-width:620px;margin-left:auto;margin-right:auto}
+/* Logística › Equipe */
+.eqDias{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}.eqDias b{padding:7px 12px;border-radius:99px;background:var(--sf);border:1px solid var(--ln);font-size:13px;cursor:pointer}
+.eqDias b.on{background:var(--tx);color:var(--sf);border-color:var(--tx)}.eqDias b small{font-size:10.5px;opacity:.7;margin-left:2px}
+.eqSet .cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap}.eqSet .cab b{font-size:15px;letter-spacing:.3px}
+.eqPes{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--ln)}.eqSet .cab+.eqPes{border-top:0}
+.eqPes .nm{flex:1;min-width:0}.eqPes .nm b{display:block;font-size:14px}.eqPes .nm span{display:block;font-size:12.5px;color:var(--tx2);margin-top:2px}
+.eqPes .hr{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.eqPes .hr i{font-style:normal;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:7px}
+.eqPes .hr .tr{background:var(--azul-s);color:var(--tx-azul)}.eqPes .hr .al{background:var(--laranja-s);color:var(--tx-laranja)}.eqPes .hr .pa{background:var(--sf3);color:var(--tx2)}
+.eqLinha{display:flex;gap:8px;align-items:center;margin-bottom:8px}.eqLinha .inp{flex:1;min-width:0}.eqLinha .lnk{font-size:20px;padding:0 6px;color:var(--tx3)}
+.eqCk{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:10px 0 4px;cursor:pointer}.eqCk input{width:18px;height:18px;accent-color:var(--rosa)}
+.eqDias b em{font-style:normal;font-size:11px;opacity:.65;margin-left:2px}
+.eqPes .eqAc{display:flex;flex-direction:column;align-items:flex-end;gap:8px}.eqPes .eqAc .lnk{white-space:nowrap}
+.eqPes.falta .nm{opacity:.55}.eqPes.falta .nm b{text-decoration:line-through}.eqPes.falta .nm b .bdg{text-decoration:none}
+.eqPes .hr .fn{background:var(--violeta-s, #ece7fd);color:var(--tx-violeta, #5b3fd0)}
+.eqPes.visita{background:linear-gradient(90deg,var(--violeta-s),transparent 60%);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:10px}
+.eqGeral{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;font-size:13.5px}.eqGeral svg.ic{width:16px;height:16px;vertical-align:-3px;color:var(--violeta)}

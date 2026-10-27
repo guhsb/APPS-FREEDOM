@@ -684,11 +684,11 @@ var LG = (function () {
     var s = st('ped'); if (!s.d) { F.toast('Espere os pedidos carregarem'); return; }
     var it = filtraPed(s.d.items), fx = s.fx || {}, tot = it.reduce(function (a, p) { return a + F.n(p.value); }, 0), por = {};
     it.forEach(function (p) { var c = p.effective_classification || 'PENDENCIA'; por[c] = por[c] || [0, 0]; por[c][0] += F.n(p.value); por[c][1]++; });
-    var tiles = [['PENDENCIA', 'Pendência', 'laranja'], ['EQUIPE', 'Equipe', 'azul'], ['FINALIZADO', 'Finalizado', 'verde']].map(function (c) { var v = por[c[0]] || [0, 0]; return { r: c[1] + ' · ' + v[1] + ' ped.', v: F.brl(v[0]), c: c[2] }; });
-    var bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Pedidos pendentes', valor: tot, pill: it.length + (it.length === 1 ? ' pedido' : ' pedidos') }, { tipo: 'tiles', cols: 3, itens: tiles }] }];
+    var linhas = [['PENDENCIA', 'Pendência', 'laranja'], ['EQUIPE', 'Equipe', 'azul'], ['FINALIZADO', 'Finalizado', 'verde']].map(function (c) { var v = por[c[0]] || [0, 0]; return { tipo: 'linha', r: c[1] + ' · ' + v[1] + (v[1] === 1 ? ' pedido' : ' pedidos'), v: F.brl(v[0]), c: c[2] }; });
+    var bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Pedidos pendentes', valor: tot, pill: it.length + (it.length === 1 ? ' pedido' : ' pedidos') }].concat(linhas) }];
     bl = bl.concat(descFiltros([s.busca ? 'busca "' + s.busca.trim() + '"' : '', s.rede ? 'rede ' + s.rede : '', s.cls ? nomeCls(s.cls) : '', fx.mot === 'com' ? 'com motivo' : fx.mot === 'sem' ? 'sem motivo' : fx.mot ? 'motivo "' + fx.mot + '"' : '', fx.conf ? (fx.conf === 'nenhuma' ? 'sem conferência' : 'conferência ' + (CONF[fx.conf] || fx.conf)) : ''].concat(faixa(fx))));
-    bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.31], ['Pedido', 'l', 0.12], ['Data', 'l', 0.12], ['Class.', 'l', 0.13], ['Motivo', 'l', 0.14], ['Valor', 'r', 0.18, 1]],
-      linhas: it.map(function (p) { return [p.customer || '—', p.order_number, X.dm(p.order_date), nomeCls(p.effective_classification), (p.reason || '').trim() || '—', F.brl(p.value)]; }) });
+    bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.39], ['Pedido', 'l', 0.14], ['Data', 'l', 0.12], ['Class.', 'l', 0.15], ['Valor', 'r', 0.2, 1]],
+      linhas: it.map(function (p) { var r = [p.customer || '—', p.order_number, X.dm(p.order_date), nomeCls(p.effective_classification), F.brl(p.value)], m = (p.reason || '').trim(); if (m) r.sub = 'Motivo: ' + m; return r; }) });
     F.gerarImagem({ titulo: 'Controle de Pedidos', sub: 'Logística · ' + quandoImg(), arquivo: 'freedom-logistica-pedidos', blocos: bl });
   }
   function pngVp(b) {
@@ -731,7 +731,7 @@ var LG = (function () {
     bl = bl.concat(descFiltros([f.ini || f.fim ? (f.ini ? F.dataBR(f.ini) : '…') + ' a ' + (f.fim ? F.dataBR(f.fim) : '…') : '', f.cli ? 'cliente ' + (nomeCli || f.cli) : '', f.cid ? 'cidade ' + f.cid : '', f.ven ? 'vendedor ' + f.ven : '', f.tipo ? 'tipo ' + f.tipo : '']));
     tipos.forEach(function (t) {
       var os = lista(t.orders); if (!os.length) return;
-      bl.push({ tipo: 'tabela', titulo: t.order_type_label, cor: cor(t), d: os.length + ' pedido(s) · ' + F.brl(t.value), lim: 120, cols: [['Cliente', 'l', 0.44], ['Pedido', 'l', 0.15], ['NF', 'l', 0.15], ['Valor', 'r', 0.26, 1]],
+      bl.push({ tipo: 'tabela', titulo: t.order_type_label + ' · ' + F.brl(t.value), cor: cor(t), d: os.length + ' pedido(s)', lim: 120, cols: [['Cliente', 'l', 0.44], ['Pedido', 'l', 0.15], ['NF', 'l', 0.15], ['Valor', 'r', 0.26, 1]],
         linhas: os.map(function (o) { return [o.customer_name || '—', o.order_number, o.invoice_number, F.brl(o.order_value)]; }) });
     });
     F.gerarImagem({ titulo: 'Faturamento Diário', sub: 'Dia ' + F.dataBR(dia.invoice_date) + ' · ' + quandoImg(), arquivo: 'Faturamento-' + X.dm(dia.invoice_date).replace('/', '-'), blocos: bl });

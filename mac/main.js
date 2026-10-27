@@ -520,6 +520,37 @@ const ponte = {
     try { clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(String(base64), 'base64'))); js(wc, "window.F && F.toast && F.toast('Imagem copiada. É só colar (⌘V) no WhatsApp ou no e-mail.')"); }
     catch (e) { js(wc, 'window.F && F.toast && F.toast(' + Q('Não consegui copiar: ' + e.message) + ')'); }
   },
+  lerDado: (wc, nome) => {
+    const n = String(nome || '').replace(/[^a-z0-9_-]/g, ''); if (!n) return '';
+    try { return fs.readFileSync(path.join(app.getPath('userData'), 'telas', n + '.json'), 'utf8'); } catch (e) { return ''; }
+  },
+  gravarDado: (wc, nome, texto) => {
+    const n = String(nome || '').replace(/[^a-z0-9_-]/g, ''); if (!n) return false;
+    try { const dir = path.join(app.getPath('userData'), 'telas'); fs.mkdirSync(dir, { recursive: true }); const a = path.join(dir, n + '.json'); fs.writeFileSync(a + '.tmp', String(texto || '')); fs.renameSync(a + '.tmp', a); return true; }
+    catch (e) { return false; }
+  },
+  salvarCopia: (wc, nome, texto) => {
+    try {
+      const dir = path.join(require('os').homedir(), 'Downloads'); fs.mkdirSync(dir, { recursive: true });
+      const arq = path.join(dir, String(nome || 'Freedom.json').replace(/[\/\\:*?"<>|]/g, '_'));
+      fs.writeFileSync(arq, String(texto || '')); shell.showItemInFolder(arq);
+      js(wc, 'window.F && F.toast && F.toast(' + Q('Cópia salva em Downloads') + ')');
+    } catch (e) { js(wc, 'window.F && F.toast && F.toast(' + Q('Não consegui salvar a cópia: ' + e.message) + ')'); }
+  },
+  copiarImagens: (wc, lista, nome) => {
+    // várias páginas: grava os PNG e copia como arquivos (⌘V no WhatsApp cola todas)
+    try {
+      const arr = JSON.parse(String(lista || '[]')), dir = path.join(app.getPath('temp'), 'Freedom-imagens'); fs.mkdirSync(dir, { recursive: true });
+      const base = String(nome || 'Freedom').replace(/[\/\\:*?"<>|]/g, '_').replace(/\.png$/i, ''), arqs = [];
+      arr.forEach((b, i) => { const arq = path.join(dir, base + '_pag' + (i + 1) + '.png'); fs.writeFileSync(arq, Buffer.from(String(b), 'base64')); arqs.push(arq); });
+      if (!arqs.length) return;
+      const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const plist = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array>' +
+        arqs.map((a) => '<string>' + esc(a) + '</string>').join('') + '</array></plist>';
+      clipboard.clear(); clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist));
+      js(wc, 'window.F && F.toast && F.toast(' + Q(arqs.length + ' páginas copiadas. É só colar (⌘V) no WhatsApp: vão todas de uma vez.') + ')');
+    } catch (e) { js(wc, 'window.F && F.toast && F.toast(' + Q('Não consegui copiar: ' + e.message) + ')'); }
+  },
   salvarImagem: (wc, base64, nome) => {
     try {
       const dir = path.join(app.getPath('pictures'), 'Freedom'); fs.mkdirSync(dir, { recursive: true });
