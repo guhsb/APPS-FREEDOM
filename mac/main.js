@@ -190,12 +190,14 @@ function selecionar(nova) {
 }
 
 // ---------------- barras novas (topo, atalhos, sino) ----------------
+const acoesTela = {};
 function shellJson() {
   const nomes = { helpdesk: 'Helpdesk', comercial: 'Comercial', logistica: 'Logística', admin: 'Admin', painel: 'Painel', site: 'Site' };
   const o = { logado: logado(), aba, abas: logado() ? abasDisponiveis().map(a => [a, nomes[a]]) : [], tema: temaClaro() ? 'claro' : 'escuro',
     naoLidos: aba === 'helpdesk' ? 0 : Helpdesk.naoVistos(), sino: sinoAberto, helpSub, helpdesk: Acesso.helpdesk(), email: Store.email() || '', nome: Acesso.nome() || '',
     paineis: Paineis.paraAba().map(p => ({ id: p.id, nome: p.nomeModulo })), painel: painelAtual };
   if (DASH[aba] && subs[DASH[aba]]) try { o.sub = JSON.parse(subs[DASH[aba]]); } catch (e) { }
+  try { const v = aba !== 'site' && vistaAtual(); if (v) { const a = acoesTela[v.webContents.getURL().split('#')[0]]; if (a) o.acoes = a; } } catch (e) { }
   return JSON.stringify(o);
 }
 function irSub(id) {
@@ -501,7 +503,7 @@ const ponte = {
   },
   sino: (wc, abrir, x) => { if (x > 0) sinoX = x; sino(!!abrir); },
   marcarLidos: () => { Helpdesk.marcarVisto(); avisarHelpdesk(); atualizarBarra(); },
-  subAbas: (wc, json) => { try { const j = JSON.parse(json); if (j.pagina) { subs[j.pagina] = json; atualizarBarra(); } } catch (e) { } },
+  subAbas: (wc, json) => { try { const j = JSON.parse(json); if (j.acoes === 1 && j.url) { acoesTela[j.url] = j; atualizarBarra(); return; } if (j.pagina) { subs[j.pagina] = json; atualizarBarra(); } } catch (e) { } },
   painelShell: (wc, id) => { painelAtual = id; garantirPainel(true); atualizarBarra(); },
   abrirTela: (wc, arq) => abrirTela(String(arq || '')),
   voltar: () => voltarApp(),

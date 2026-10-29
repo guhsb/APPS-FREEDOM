@@ -480,6 +480,7 @@ namespace Freedom
              .Put("helpdesk", Acesso.Helpdesk()).Put("email", Store.Email() ?? "").Put("nome", Acesso.Nome() ?? "");
             string pag; string sj;
             if (DASH.TryGetValue(aba, out pag) && subs.TryGetValue(pag, out sj)) try { o.Put("sub", new JSONObject(sj)); } catch (Exception) { }
+            try { var wa = WebAtual(); string aj; if (wa != null && wa != webSite && wa.Source != null && acoesTela.TryGetValue(wa.Source.GetLeftPart(UriPartial.Query), out aj)) o.Put("acoes", new JSONObject(aj)); } catch (Exception) { }
             return o.ToString();
         }
         public void AtualizarShell()
@@ -529,8 +530,10 @@ namespace Freedom
                 case "sair": ponte.sair(); break;
             }
         }
+        readonly Dictionary<string, string> acoesTela = new Dictionary<string, string>();
         public void SubAbas(string json)
         {
+            try { var a = new JSONObject(json ?? "{}"); if (a.OptInt("acoes", 0) == 1) { var u = a.OptString("url", ""); if (u.Length > 0) { acoesTela[u] = json; AtualizarShell(); } return; } } catch (Exception) { }
             try { var j = new JSONObject(json ?? "{}"); var pag = j.OptString("pagina", ""); if (pag.Length > 0) { subs[pag] = json; AtualizarShell(); } } catch (Exception) { }
         }
         /// <summary>Janelinha de avisos do sino (abre por cima da tela, embaixo do sino).</summary>
@@ -542,7 +545,7 @@ namespace Freedom
                 var w = new WebView2 { DefaultBackgroundColor = FUNDO, Visible = false, Size = new Size(450, 580) };
                 Controls.Add(w);
                 webSino = w;
-                try { await Preparar(w); w.CoreWebView2.Navigate(ASSET + "avisos.html?popup=1&fundo=1"); } catch (Exception) { webSino = null; try { Controls.Remove(w); w.Dispose(); } catch (Exception) { } return; }
+                try { await Preparar(w); w.CoreWebView2.Navigate(ASSET + "avisos.html?popup=1&fundo=1&recorte=1"); } catch (Exception) { webSino = null; try { Controls.Remove(w); w.Dispose(); } catch (Exception) { } return; }
             }
             sinoAberto = abrir && webSino != null;
             if (webSino != null)
@@ -560,7 +563,22 @@ namespace Freedom
             int cx = sinoX > 0 ? sinoX : ClientSize.Width - 330;
             int x = Math.Max(8, Math.Min(ClientSize.Width - w - 8, cx - w + 70));   // a janelinha fica embaixo do sino, alinhada pela direita
             webSino.Bounds = new Rectangle(x, 60, w, h);   // encosta na barra de cima: a setinha sai de dentro dela
-            Js(webSino, "window.seta&&seta(" + (cx - x) + ")");
+            int seta = Math.Max(24, Math.Min(w - 34, cx - x));
+            Js(webSino, "window.seta&&seta(" + seta + ")");
+            // a janela do WebView2 não fica transparente: recorta o formato do cartão (cantos curvos + setinha)
+            try
+            {
+                const int T = 10, R = 16;
+                var p = new System.Drawing.Drawing2D.GraphicsPath();
+                p.AddArc(0, T, R * 2, R * 2, 180, 90); p.AddArc(w - R * 2 - 1, T, R * 2, R * 2, 270, 90);
+                p.AddArc(w - R * 2 - 1, h - R * 2 - 1, R * 2, R * 2, 0, 90); p.AddArc(0, h - R * 2 - 1, R * 2, R * 2, 90, 90); p.CloseFigure();
+                var rg = new Region(p);
+                var t = new System.Drawing.Drawing2D.GraphicsPath();
+                t.AddPolygon(new[] { new Point(seta - 11, T + 1), new Point(seta, 0), new Point(seta + 11, T + 1) });
+                rg.Union(t);
+                var velho = webSino.Region; webSino.Region = rg; if (velho != null) velho.Dispose();
+            }
+            catch (Exception) { }
         }
         public void MarcarLidos() { Helpdesk.MarcarVisto(); AtualizarSelo(); AvisarHelpdesk(); }
 

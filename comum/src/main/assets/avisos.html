@@ -12,6 +12,11 @@ html.popup .caixa{position:relative;margin:10px 10px 0;height:calc(100vh - 22px)
 html.popup .caixa>.avLista{border-radius:0 0 18px 18px}
 html.popup .caixa:before{content:"";position:absolute;top:-7px;left:var(--seta,380px);width:13px;height:13px;background:var(--sf);border-left:1px solid var(--ln2);border-top:1px solid var(--ln2);transform:translateX(-50%) rotate(45deg);border-radius:3px 0 0 0}
 html.popup .pe{border-radius:0 0 18px 18px}
+/* Windows: o app recorta a janela no formato do cartão (cantos de 16px + setinha de 10px no topo) */
+html.popup.recorte body{background:var(--sf)}
+html.popup.recorte .caixa{margin:10px 0 0;height:calc(100vh - 10px);border-radius:16px;box-shadow:none;border:1px solid var(--ln2)}
+html.popup.recorte .caixa:before{top:-10px;width:22px;height:11px;transform:translateX(-50%);border:0;border-radius:0;background:var(--ln2);clip-path:polygon(50% 0,100% 100%,0 100%)}
+html.popup.recorte .caixa:after{content:"";position:absolute;top:-8.5px;left:var(--seta,380px);width:19px;height:10px;transform:translateX(-50%);background:var(--sf);clip-path:polygon(50% 0,100% 100%,0 100%)}
 .sinoIc{width:30px;height:30px;border-radius:10px;background:var(--rosa-s);color:var(--rosa);display:none;align-items:center;justify-content:center;flex:none}.sinoIc svg.ic{width:17px;height:17px}
 html.popup .sinoIc{display:flex}
 .cab small{font-size:12px;color:var(--tx3);font-weight:500;margin-left:2px}
@@ -43,6 +48,7 @@ html:not(.popup) .avLista{background:var(--sf);border:1px solid var(--ln);border
 var popup = /popup=1/.test(location.search + location.hash), filtro = 'todos', ultimo = '';
 if (popup) document.documentElement.classList.add('popup');
 if (/fundo=1/.test(location.search + location.hash)) document.documentElement.classList.add('fundo');
+if (/recorte=1/.test(location.search + location.hash)) document.documentElement.classList.add('recorte');
 document.getElementById('sinoIc').innerHTML = F.ic('sino');
 /** A setinha aponta para o sino (posição enviada pelo app). */
 window.seta = function (x) { document.querySelector('.caixa').style.setProperty('--seta', Math.max(24, Math.min(window.innerWidth - 34, x)) + 'px'); };

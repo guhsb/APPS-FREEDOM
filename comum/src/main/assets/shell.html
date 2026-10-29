@@ -90,8 +90,9 @@ function rail(e) {
   if (e.aba === 'helpdesk') { subs = HELP; atual = e.helpSub || 'inicio'; }
   else if (e.sub && e.sub.lista) { subs = e.sub.lista; atual = e.sub.atual; }
   if (subs.length) h += '<div class="g subs">' + subs.map(function (s) { return '<i data-s="' + esc(s[0]) + '" title="' + esc(s[1]) + '"' + (s[0] === atual ? ' class="on"' : '') + '>' + S(IC[s[0]] || IC.pontos) + '</i>'; }).join('') + '</div>';
-  h += '<div class="g">' + (e.aba !== 'site' ? '<i data-r="imagem" title="Gerar imagem (PNG)">' + S(ACOES.imagem) + '</i>' : '') +
-    (e.aba === 'comercial' ? '<i data-r="excel" title="Exportar Excel">' + S(ACOES.excel) + '</i>' : '') +
+  var ac = e.acoes || {}, temImg = e.aba !== 'site' && ac.img !== false, temXls = e.aba === 'comercial' && ac.xls !== false;
+  h += '<div class="g">' + (temImg ? '<i data-r="imagem" title="Gerar imagem (PNG)">' + S(ACOES.imagem) + '</i>' : '') +
+    (temXls ? '<i data-r="excel" title="Exportar Excel">' + S(ACOES.excel) + '</i>' : '') +
     (e.helpdesk ? '<i data-r="chamado" class="ro" title="Abrir chamado">' + S(ACOES.chamado) + '</i>' : '') + '</div>';
   h += '<div class="mola"></div><div class="g"><i data-r="sair" title="' + (sairPede ? 'Toque de novo para sair' : 'Sair / trocar login') + '"' + (sairPede ? ' class="pede"' : '') + '>' + S(ACOES.sair) + '</i></div></div>';
   return h;

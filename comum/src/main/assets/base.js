@@ -287,6 +287,23 @@ var Base = {
     if (nome !== 'atualizar' && F.toast) F.toast(nome === 'excel' ? 'Esta tela não tem exportar Excel' : 'Esta tela não tem imagem');
     return false;
   };
+  /** Conta para a barra do PC quais atalhos esta tela tem (sem botão de imagem = o atalho some). */
+  var ultAcoes = '', tAcoes = 0;
+  function relatarAcoes() {
+    try {
+      if (!window.App || !App.subAbas || /(shell|avisos)\.html/.test(location.pathname)) return;
+      var o = { acoes: 1, url: location.href.split('#')[0],
+        img: !!achar('#btImg,[data-act$="Png"],[data-eq="png"],#btFatPainel', /imagem/i),
+        xls: !!achar('[data-a="excel"],[data-act="exportar"],#btExcel', /excel/i) };
+      var k = JSON.stringify(o); if (k === ultAcoes) return; ultAcoes = k; App.subAbas(k);
+    } catch (e) { }
+  }
+  function agendarAcoes() { clearTimeout(tAcoes); tAcoes = setTimeout(relatarAcoes, 400); }
+  window.addEventListener('load', function () {
+    agendarAcoes();
+    try { new MutationObserver(agendarAcoes).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] }); } catch (e) { }
+  });
+  window.addEventListener('focus', function () { ultAcoes = ''; agendarAcoes(); });
   // celular: a barra de baixo flutua por cima; um espaço no fim para nada ficar escondido atrás dela
   try { if (window.App && App.plataforma && App.plataforma() === 'android') document.documentElement.classList.add('barraFlutuante'); } catch (e) { }
 })();
