@@ -127,3 +127,4 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;strok
 .modal .previa .pagImg{border-bottom:6px solid var(--sf3)}
 .modal .previa .pagTopo{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--sf);position:sticky;top:0;z-index:1;font-size:13px}
 .modal .previa .pagTopo button.pagBt{display:inline-flex;width:auto;margin:0;padding:7px 12px;font-size:12.5px;border-radius:9px;background:var(--rosa);color:#fff}
+html.barraFlutuante body::after{content:"";display:block;height:92px}

@@ -39,6 +39,14 @@ namespace Freedom
         readonly Panel conteudo = new Panel();
         readonly Dictionary<string, BotaoAba> abas = new Dictionary<string, BotaoAba>();
         WebView2 webApp, webSite, webPainel, webDash;
+        // layout novo: barra de cima (abas em pílula, sino), atalhos da esquerda e a janelinha de avisos do sino
+        readonly WebView2 webTopo = new WebView2 { Dock = DockStyle.Top, Height = 76, Visible = false };
+        readonly WebView2 webRail = new WebView2 { Dock = DockStyle.Left, Width = 78, Visible = false };
+        WebView2 webSino;
+        bool sinoAberto;
+        int sinoX = -1;   // centro do sino (na barra de cima), para a setinha da janelinha apontar para ele
+        string helpSub = "inicio";
+        readonly Dictionary<string, string> subs = new Dictionary<string, string>();   // página -> partes (abas) que ela tem
         string dashAtual;   // aba (comercial/logistica/admin) que está aberta no webDash
         static readonly Dictionary<string, string> DASH = new Dictionary<string, string> { { "comercial", "dash-comercial.html" }, { "logistica", "dash-logistica.html" }, { "admin", "admin.html" } };
         Panel caixaPainel;
@@ -70,8 +78,11 @@ namespace Freedom
             conteudo.Dock = DockStyle.Fill;
             conteudo.BackColor = FUNDO;
             Controls.Add(conteudo);
-            MontarNav();
-            Controls.Add(nav);
+            MontarNav();   // barra lateral antiga: continua montada (estado das abas), mas não aparece mais
+            webTopo.DefaultBackgroundColor = FUNDO; webRail.DefaultBackgroundColor = FUNDO;
+            Controls.Add(webRail);
+            Controls.Add(webTopo);
+            Resize += (s, e) => PosicionarSino();
 
             bandeja.Icon = Icon ?? SystemIcons.Application;
             bandeja.Text = "Freedom";
@@ -170,7 +181,8 @@ namespace Freedom
             BackColor = FUNDO; ForeColor = TEXTO; conteudo.BackColor = FUNDO; nav.BackColor = BARRA;
             if (caixaPainel != null) caixaPainel.BackColor = FUNDO;
             if (chips != null) chips.BackColor = FUNDO;
-            foreach (var w in new[] { webApp, webPainel, webDash }) if (w != null) { w.DefaultBackgroundColor = FUNDO; try { w.CoreWebView2.ExecuteScriptAsync("window.temaMudou&&temaMudou(" + "'" + t + "')"); } catch (Exception) { } }
+            webTopo.DefaultBackgroundColor = FUNDO; webRail.DefaultBackgroundColor = FUNDO;
+            foreach (var w in new[] { webApp, webPainel, webDash, webTopo, webRail, webSino }) if (w != null && w.CoreWebView2 != null) { w.DefaultBackgroundColor = FUNDO; try { w.CoreWebView2.ExecuteScriptAsync("window.temaMudou&&temaMudou(" + "'" + t + "')"); } catch (Exception) { } }
             BarraTitulo();
             MontarChips();
             foreach (var b in abas.Values) b.Invalidate();
@@ -364,6 +376,9 @@ namespace Freedom
             if (webApp == null) return;
             bool logado = Store.Logado();
             nav.Visible = logado;
+            webTopo.Visible = logado && webTopo.CoreWebView2 != null;
+            webRail.Visible = logado && webRail.CoreWebView2 != null;
+            if (!logado) Sino(false);
             int y = 12;
             foreach (var kv in abas)
             {
@@ -373,6 +388,7 @@ namespace Freedom
             }
             if (logado && !AbaDisponivel(aba)) Selecionar(new[] { "helpdesk", "comercial", "logistica", "painel", "site" }.First(AbaDisponivel));
             if (caixaPainel != null) MontarChips();
+            AtualizarShell();
         }
 
         void PintarAbas() { foreach (var kv in abas) { kv.Value.Ativa = kv.Key == aba; kv.Value.Invalidate(); } }
@@ -385,6 +401,7 @@ namespace Freedom
             b.Invalidate();
             int n = Helpdesk.NaoVistos();
             bandeja.Text = n > 0 ? "Freedom · " + n + " novidade(s)" : "Freedom";
+            AtualizarShell();
         }
 
         // ---------------- início ----------------
@@ -436,7 +453,116 @@ namespace Freedom
             webApp = w;
             var pend = caminhoPendente; caminhoPendente = null;
             Carregar(pend);
+            await PrepararBarras();
         }
+
+        async Task PrepararBarras()
+        {
+            try
+            {
+                await Preparar(webTopo); webTopo.CoreWebView2.Navigate(ASSET + "shell.html?modo=topo");
+                await Preparar(webRail); webRail.CoreWebView2.Navigate(ASSET + "shell.html?modo=rail");
+                AjustarAbas();
+            }
+            catch (Exception) { }
+        }
+
+        // ---------------- barras novas (topo, atalhos, sino) ----------------
+        public string ShellJson()
+        {
+            var o = new JSONObject();
+            bool logado = Store.Logado();
+            var lista = new JSONArray();
+            foreach (var it in new[] { new[] { "helpdesk", "Helpdesk" }, new[] { "comercial", "Comercial" }, new[] { "logistica", "Logística" }, new[] { "admin", "Admin" }, new[] { "painel", "Painel" }, new[] { "site", "Site" } })
+                if (logado && AbaDisponivel(it[0])) lista.Put(new JSONArray().Put(it[0]).Put(it[1]));
+            o.Put("logado", logado).Put("aba", aba).Put("abas", lista).Put("tema", Claro ? "claro" : "escuro")
+             .Put("naoLidos", aba == "helpdesk" ? 0 : Helpdesk.NaoVistos()).Put("sino", sinoAberto).Put("helpSub", helpSub)
+             .Put("helpdesk", Acesso.Helpdesk()).Put("email", Store.Email() ?? "").Put("nome", Acesso.Nome() ?? "");
+            string pag; string sj;
+            if (DASH.TryGetValue(aba, out pag) && subs.TryGetValue(pag, out sj)) try { o.Put("sub", new JSONObject(sj)); } catch (Exception) { }
+            return o.ToString();
+        }
+        public void AtualizarShell()
+        {
+            Js(webTopo, "window.shellAtualizar&&shellAtualizar()");
+            Js(webRail, "window.shellAtualizar&&shellAtualizar()");
+            if (sinoAberto) Js(webSino, "window.recebidoHelpdesk&&recebidoHelpdesk()");
+        }
+        WebView2 WebAtual()
+        {
+            if (aba == "helpdesk") return webApp;
+            if (aba == "painel") return webPainel;
+            if (aba == "site") return webSite;
+            return DASH.ContainsKey(aba) ? webDash : webApp;
+        }
+        public void IrAbaShell(string id)
+        {
+            Sino(false);
+            if (aba == id && id == "site") AbrirUrlSite(Api.SITE + "/");
+            else if (aba == id && id == "helpdesk" && paginaApp == "sub") { VoltarHelpdesk(); Js(webApp, "window.F&&F.entrar&&F.entrar()"); }
+            else Selecionar(id);
+        }
+        /// <summary>Atalho da esquerda: troca a parte da tela aberta (Vendedores, Pedidos…).</summary>
+        public void IrSub(string id)
+        {
+            id = System.Text.RegularExpressions.Regex.Replace(id ?? "", "[^A-Za-z0-9_-]", "");
+            if (id.Length == 0) return;
+            if (aba == "helpdesk")
+            {
+                helpSub = id;
+                if (id == "inicio") VoltarHelpdesk();
+                else if (id == "dash") AbrirTela("dash-helpdesk.html");
+                else AbrirTela("lista.html#" + id);
+                Js(webApp, "setTimeout(function(){window.F&&F.entrar&&F.entrar()},60)");
+                AtualizarShell();
+                return;
+            }
+            if (DASH.ContainsKey(aba)) JsDash("(function(){var b=document.querySelector('.tabs:not(.sub) [data-aba=\"" + id + "\"]');if(b)b.click();})()");
+        }
+        public void AcaoShell(string nome)
+        {
+            switch (nome)
+            {
+                case "imagem": case "excel": case "atualizar": Js(WebAtual(), "window.acaoRail&&acaoRail('" + nome + "')"); break;
+                case "chamado": Sino(false); helpSub = ""; AbrirTela("novo.html"); break;
+                case "claro": case "escuro": DefinirTema(nome); break;
+                case "sair": ponte.sair(); break;
+            }
+        }
+        public void SubAbas(string json)
+        {
+            try { var j = new JSONObject(json ?? "{}"); var pag = j.OptString("pagina", ""); if (pag.Length > 0) { subs[pag] = json; AtualizarShell(); } } catch (Exception) { }
+        }
+        /// <summary>Janelinha de avisos do sino (abre por cima da tela, embaixo do sino).</summary>
+        public void Sino(bool abrir, int x) { if (x > 0) sinoX = x; Sino(abrir); }
+        public async void Sino(bool abrir)
+        {
+            if (abrir && webSino == null)
+            {
+                var w = new WebView2 { DefaultBackgroundColor = FUNDO, Visible = false, Size = new Size(450, 580) };
+                Controls.Add(w);
+                webSino = w;
+                try { await Preparar(w); w.CoreWebView2.Navigate(ASSET + "avisos.html?popup=1&fundo=1"); } catch (Exception) { webSino = null; try { Controls.Remove(w); w.Dispose(); } catch (Exception) { } return; }
+            }
+            sinoAberto = abrir && webSino != null;
+            if (webSino != null)
+            {
+                PosicionarSino();
+                webSino.Visible = sinoAberto;
+                if (sinoAberto) { webSino.BringToFront(); webSino.Focus(); Js(webSino, "window.recebidoHelpdesk&&recebidoHelpdesk()"); }
+            }
+            AtualizarShell();
+        }
+        void PosicionarSino()
+        {
+            if (webSino == null) return;
+            int w = 450, h = Math.Min(600, Math.Max(320, ClientSize.Height - 80));
+            int cx = sinoX > 0 ? sinoX : ClientSize.Width - 330;
+            int x = Math.Max(8, Math.Min(ClientSize.Width - w - 8, cx - w + 70));   // a janelinha fica embaixo do sino, alinhada pela direita
+            webSino.Bounds = new Rectangle(x, 60, w, h);   // encosta na barra de cima: a setinha sai de dentro dela
+            Js(webSino, "window.seta&&seta(" + (cx - x) + ")");
+        }
+        public void MarcarLidos() { Helpdesk.MarcarVisto(); AtualizarSelo(); AvisarHelpdesk(); }
 
         async Task Preparar(WebView2 w)
         {
@@ -522,6 +648,7 @@ namespace Freedom
         {
             if (webApp == null) { aba = nova; return; }
             if (!AbaDisponivel(nova) && Store.Logado()) nova = new[] { "helpdesk", "comercial", "logistica", "painel", "site" }.First(AbaDisponivel);
+            bool trocou = aba != nova;
             aba = nova;
             webApp.Visible = nova == "helpdesk" || !Store.Logado();
             if (nova == "site") GarantirSite(null);
@@ -534,6 +661,9 @@ namespace Freedom
             if (nova == "helpdesk") { Helpdesk.MarcarVisto(); AvisarHelpdesk(); }
             if (nova == "painel" && Atualizador.Velho(2)) AtualizarPaineis();
             AtualizarSelo();
+            // a tela nova entra embaçada e sobe um pouco até ficar em foco
+            if (trocou && nova != "site") Js(WebAtual(), "window.F&&F.entrar&&F.entrar()");
+            AtualizarShell();
         }
 
         // ---------------- telas do Helpdesk ----------------
@@ -554,7 +684,7 @@ namespace Freedom
         {
             if (webApp == null) { caminhoPendente = "/helpdesk/tickets/" + id; CriarTelas(); return; }
             webApp.CoreWebView2.Navigate(ASSET + "chamado.html#" + id);
-            paginaApp = "sub";
+            paginaApp = "sub"; helpSub = "";
             Selecionar("helpdesk");
         }
 
@@ -566,10 +696,11 @@ namespace Freedom
             if (!TELAS.Contains(nome) || !System.Text.RegularExpressions.Regex.IsMatch(resto, "^[A-Za-z0-9_=&%.-]*$")) return;
             webApp.CoreWebView2.Navigate(ASSET + arquivo);
             paginaApp = "sub";
+            helpSub = nome == "dash-helpdesk.html" ? "dash" : nome == "lista.html" ? (resto.Split('&')[0] == "" ? "fila" : resto.Split('&')[0]) : "";
             Selecionar("helpdesk");
         }
 
-        public void VoltarHelpdesk() { if (webApp == null) return; webApp.CoreWebView2.Navigate(ASSET + "helpdesk.html"); paginaApp = "helpdesk"; }
+        public void VoltarHelpdesk() { if (webApp == null) return; webApp.CoreWebView2.Navigate(ASSET + "helpdesk.html"); paginaApp = "helpdesk"; helpSub = "inicio"; AtualizarShell(); }
 
         public void VoltarApp()
         {

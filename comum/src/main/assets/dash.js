@@ -135,7 +135,21 @@ var Dash = (function () {
   };
 
   // ---- abas e estado ----
-  X.abas = function (lista, atual, attr) { return '<div class="tabs' + (attr === 'sub' ? ' sub' : '') + '">' + lista.map(function (t) { var id = t[0], txt = t[1]; return '<b data-' + (attr || 'aba') + '="' + F.esc(id) + '"' + (id === atual ? ' class="on"' : '') + '>' + txt + '</b>'; }).join('') + '</div>'; };
+  var ultimoRelato = '';
+  /** Conta para o app quais partes a tela tem (e qual está aberta): os atalhos da esquerda no PC seguem isso. */
+  function relatarAbas(lista, atual) {
+    try {
+      var j = JSON.stringify({ pagina: location.pathname.split('/').pop(), lista: lista.map(function (t) { return [t[0], String(t[1]).replace(/<[^>]+>/g, '').trim()]; }), atual: atual });
+      if (j === ultimoRelato) return; ultimoRelato = j;
+      if (window.App && App.subAbas) setTimeout(function () { try { App.subAbas(j); } catch (e) { } }, 0);
+    } catch (e) { }
+  }
+  // trocar de parte (aba de cima) tem a mesma transição das abas do app
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest ? ev.target.closest('.tabs:not(.sub) [data-aba]') : null; if (!t || t.classList.contains('on')) return;
+    setTimeout(function () { var c = document.getElementById('c'); if (c && F.entrar) F.entrar(c); }, 0);
+  }, true);
+  X.abas = function (lista, atual, attr) { if (!attr) relatarAbas(lista, atual); return '<div class="tabs' + (attr === 'sub' ? ' sub' : '') + '">' + lista.map(function (t) { var id = t[0], txt = t[1]; return '<b data-' + (attr || 'aba') + '="' + F.esc(id) + '"' + (id === atual ? ' class="on"' : '') + '>' + txt + '</b>'; }).join('') + '</div>'; };
   X.carregando = function (t) { return '<div class="carregando"><i></i>' + (t || 'Carregando…') + '</div>'; };
   X.erro = function (msg) { var st = document.getElementById('sub'); if (st && /Carregando/.test(st.textContent)) st.textContent = 'Não atualizou · toque em Tentar'; return '<div class="aviso" role="alert">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar(true)">Tentar</button></div>'; };
   /** Última resposta guardada no aparelho: a tela abre na hora com ela e se atualiza sozinha. */

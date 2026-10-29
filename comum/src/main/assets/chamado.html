@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="stylesheet" href="base.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
 <style>
-body{padding-bottom:96px}
+body{padding-bottom:150px}
 .topo .bt.voltar{border:0;background:transparent;width:34px;margin-left:-8px}
 .topo .bt.voltar svg.ic{transform:rotate(180deg);width:24px;height:24px}
 .info{padding:14px 16px}
@@ -63,16 +63,31 @@ body{padding-bottom:96px}
 .dia{align-self:center;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--tx3);text-transform:uppercase;margin:6px 0 0}
 .anx .item{align-items:center}
 .anx .ico{background:var(--sf3);color:var(--tx2)}
-.caixa{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--topo);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  border-top:1px solid var(--ln);padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
-.caixa textarea{flex:1;min-width:0;resize:none;max-height:140px;min-height:44px;background:var(--sf2);border:1px solid var(--ln2);border-radius:14px;color:var(--tx);
+.caixa{position:fixed;left:0;right:0;bottom:14px;z-index:20;margin:0 auto;width:calc(100% - 24px);max-width:736px;box-sizing:border-box;
+  background:var(--sf);border:1.5px solid var(--ln2);border-radius:18px;padding:10px 10px 10px 12px;display:flex;flex-direction:column;gap:6px;
+  box-shadow:0 12px 32px rgba(15,27,61,.18),0 2px 6px rgba(15,27,61,.08);transition:border-color .2s,box-shadow .2s}
+.caixa:before{content:"";position:absolute;left:18px;right:18px;top:-1.5px;height:3px;border-radius:0 0 3px 3px;background:var(--rosa);opacity:.85}
+.caixa:focus-within{border-color:var(--rosa);box-shadow:0 12px 32px rgba(15,27,61,.2),0 0 0 4px var(--rosa-s)}
+.caixa .cx1{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--rosa);padding:2px 2px 0}
+.caixa .cx1 svg.ic{width:14px;height:14px}.caixa .cx1 small{margin-left:auto;font-size:11.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--tx3)}
+.caixa .cx2{display:flex;gap:8px;align-items:flex-end}
+.caixa textarea{flex:1;min-width:0;resize:none;max-height:140px;min-height:44px;background:var(--sf2);border:1px solid var(--ln);border-radius:12px;color:var(--tx);
   font:inherit;font-size:15px;line-height:1.35;padding:11px 12px;outline:none}
-.caixa textarea:focus{border-color:var(--rosa)}
-.caixa button{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:var(--rosa);color:#fff;display:flex;align-items:center;justify-content:center}
-.caixa button:disabled{background:var(--sf3);color:var(--tx3)}
+.caixa textarea::placeholder{color:var(--tx3)}
+.caixa button{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:var(--rosa);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.caixa button:disabled{background:var(--sf3);color:var(--tx3);cursor:default}
 .caixa .fechado{flex:1;text-align:center;color:var(--tx3);font-size:13px;padding:10px}
+html.barraFlutuante .caixa{bottom:86px}
+html[data-tema="escuro"] .caixa{background:var(--sf2);border-color:var(--ln2);box-shadow:0 12px 32px rgba(0,0,0,.55)}
+html[data-tema="escuro"] .caixa textarea{background:var(--bg)}
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--sf3);color:var(--tx);border:1px solid var(--ln2);border-radius:12px;
   padding:10px 14px;font-size:13px;z-index:30;max-width:90%;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
+
+.colarPrint{position:fixed;inset:0;z-index:80;background:rgba(15,27,61,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+.colarPrint .cp{background:var(--sf);border-radius:16px;padding:16px;max-width:520px;width:100%;box-shadow:0 18px 50px rgba(15,27,61,.25)}
+.colarPrint img{display:block;max-width:100%;max-height:55vh;margin:12px auto;border-radius:10px;border:1px solid var(--ln)}
+.colarPrint .cpb{display:flex;gap:8px;justify-content:flex-end}.colarPrint button{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}
+.colarPrint .n{background:var(--sf3);color:var(--tx)}.colarPrint .s{background:var(--rosa);color:#fff}
 </style></head><body>
 <div class="topo">
   <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
@@ -83,8 +98,11 @@ body{padding-bottom:96px}
 <div id="aviso"></div>
 <div id="conteudo"><div class="carregando"><i></i>Abrindo o chamado…</div></div>
 <div class="caixa" id="caixa" style="display:none">
+  <div class="cx1" id="cx1"><span id="cxIc"></span>Sua resposta</div>
+  <div class="cx2">
   <textarea id="texto" rows="1" maxlength="10000" placeholder="Escreva uma resposta…"></textarea>
   <button id="btEnviar" aria-label="Enviar" disabled></button>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 <script src="base.js"></script>
@@ -115,6 +133,7 @@ document.getElementById('btVoltar').innerHTML = F.ic('seta');
 document.getElementById('btAt').innerHTML = F.ic('atualizar');
 document.getElementById('btSite').innerHTML = F.ic('externo');
 document.getElementById('btEnviar').innerHTML = F.ic('enviar');
+document.getElementById('cxIc').innerHTML = F.ic('msg');
 
 function stLabel(s) { return (STATUS[s] || [s || '—'])[0]; }
 function prLabel(s) { return (PRIO[s] || [s || '—'])[0]; }
@@ -318,7 +337,7 @@ function render(d) {
   h += '<div class="sec"><h2>Anexos</h2><span id="nAnexos"></span></div><div id="anexosBox"></div>';
   if (!fechado) h += '<div style="margin-top:8px"' + (temCamera() ? ' class="duas"' : '') + '>' + bt('btAnexar', enviandoAnexo ? 'Enviando ' + enviandoAnexo + '…' : 'Anexar arquivo', 'linha', 'clipe') +
     (temCamera() && !enviandoAnexo ? bt('btFoto', 'Tirar foto', 'linha', 'camera') : '') + '</div>' +
-    '<div class="nota">PDF, imagem, texto, Excel ou Word · até 10 MB</div>';
+    '<div class="nota">PDF, imagem, texto, Excel ou Word · até 10 MB' + (temCamera() ? '' : ' · <b>dica:</b> tire um print e cole aqui com <b>Ctrl+V</b>') + '</div>';
   h += '<div class="rod">Tudo aqui é o mesmo chamado do site · ' + F.ic('externo').replace('class="ic ', 'class="ic " style="width:12px;height:12px;vertical-align:-2px"') + ' abre no site</div>';
   document.getElementById('conteudo').innerHTML = h;
   Object.keys(guard).forEach(function (k) { var el = document.getElementById(k); if (el) el.value = guard[k]; });
@@ -332,6 +351,7 @@ function render(d) {
   var aviso = caixa.querySelector('.fechado');
   document.getElementById('texto').style.display = fechado ? 'none' : '';
   document.getElementById('btEnviar').style.display = fechado ? 'none' : '';
+  document.getElementById('cx1').style.display = fechado ? 'none' : '';
   if (fechado && !aviso) caixa.insertAdjacentHTML('afterbegin', '<div class="fechado">Chamado ' + F.esc(stLabel(t.status).toLowerCase()) + ' · não aceita novas mensagens</div>');
   if (!fechado && aviso) aviso.remove();
 }
@@ -444,6 +464,33 @@ function carregar(silencioso) {
   try { App.carregarChamado(ID); } catch (e) { carregando = false; }
 }
 function carregarAnexos() { try { App.anexosChamado(ID); } catch (e) {} }
+/** Ctrl+V com print copiado: manda a imagem como anexo do chamado (mostra a prévia antes). */
+var printSeq = 0, printEspera = {};
+window.novoAnexo = function (seq, ok, msg) { var f = printEspera[seq]; delete printEspera[seq]; if (f) f(ok, msg); };
+function enviarPrint(f) {
+  var r = new FileReader();
+  r.onload = function () {
+    var s = String(r.result), b64 = s.slice(s.indexOf(',') + 1), seq = ++printSeq;
+    enviandoAnexo = f.name; if (dados) render(dados);
+    printEspera[seq] = function (ok, msg) { enviandoAnexo = ''; mostrarToast(ok ? 'Print anexado ao chamado' : (msg || 'Não consegui anexar o print')); if (ok) carregarAnexos(); if (dados) render(dados); };
+    try { App.enviarAnexoNovo(seq, ID, f.name, f.type || 'image/png', b64); } catch (e) { delete printEspera[seq]; enviandoAnexo = ''; mostrarToast('Esta versão do app não envia o print colado'); if (dados) render(dados); }
+  };
+  r.readAsDataURL(f);
+}
+F.aoColarImagem(function (arqs) {
+  if (!ID || enviandoAnexo) return;
+  var f = arqs[0];
+  if (f.size > 10 * 1024 * 1024) { mostrarToast('O print passa de 10 MB'); return; }
+  var url = URL.createObjectURL(f), fundo = document.createElement('div');
+  fundo.className = 'colarPrint';
+  fundo.innerHTML = '<div class="cp"><b>Anexar este print ao chamado?</b><img src="' + url + '" alt="Print"><div class="cpb"><button class="n">Cancelar</button><button class="s">Anexar</button></div></div>';
+  document.body.appendChild(fundo);
+  var fechar = function () { URL.revokeObjectURL(url); fundo.remove(); };
+  fundo.querySelector('.n').onclick = fechar;
+  fundo.querySelector('.s').onclick = function () { fechar(); enviarPrint(f); };
+  fundo.onclick = function (ev) { if (ev.target === fundo) fechar(); };
+  fundo.querySelector('.s').focus();
+});
 /** Chamado sem acesso some da lista "Chamados em aberto" da tela inicial. */
 function semAcesso(sim) {
   try { var l = JSON.parse(localStorage.getItem('hd_semacesso') || '[]'), k = String(ID), i = l.indexOf(k);

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
+<title>Avisos</title>
+<style>
+body{padding:0 16px 24px}
+html.popup body{padding:0;background:transparent;overflow:hidden;max-width:none}
+html.popup.fundo body{background:var(--bg)}
+html.popup .caixa{position:relative;margin:10px 10px 0;height:calc(100vh - 22px);display:flex;flex-direction:column;border:1px solid var(--ln2);border-radius:18px;background:var(--sf);
+  box-shadow:0 10px 26px rgba(15,27,61,.16),0 2px 6px rgba(15,27,61,.06)}
+html.popup .caixa>.avLista{border-radius:0 0 18px 18px}
+html.popup .caixa:before{content:"";position:absolute;top:-7px;left:var(--seta,380px);width:13px;height:13px;background:var(--sf);border-left:1px solid var(--ln2);border-top:1px solid var(--ln2);transform:translateX(-50%) rotate(45deg);border-radius:3px 0 0 0}
+html.popup .pe{border-radius:0 0 18px 18px}
+.sinoIc{width:30px;height:30px;border-radius:10px;background:var(--rosa-s);color:var(--rosa);display:none;align-items:center;justify-content:center;flex:none}.sinoIc svg.ic{width:17px;height:17px}
+html.popup .sinoIc{display:flex}
+.cab small{font-size:12px;color:var(--tx3);font-weight:500;margin-left:2px}
+.cab{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 8px}
+.cab h1{font-size:17px;margin:0;font-weight:800}.cab .lnk{font-size:12.5px;font-weight:700;color:var(--azul);background:none;border:0;padding:4px;cursor:pointer;font-family:inherit}
+html:not(.popup) .cab{padding:16px 0 10px}
+.filtros{display:inline-flex;background:var(--sf3);border-radius:99px;padding:3px;margin:0 16px 10px}html:not(.popup) .filtros{margin:0 0 12px}
+.filtros b{padding:6px 13px;border-radius:99px;font-size:12.5px;color:var(--tx2);cursor:pointer;font-weight:600}.filtros b.on{background:var(--sf);color:var(--tx);box-shadow:0 1px 2px rgba(15,27,61,.08)}
+.avLista{flex:1;overflow:auto}
+html:not(.popup) .avLista{background:var(--sf);border:1px solid var(--ln);border-radius:16px;overflow:hidden}
+.av{display:flex;gap:11px;padding:11px 16px;border-top:1px solid var(--ln);position:relative;cursor:pointer;transition:background .2s}
+.av:first-child{border-top:0}.av:hover{background:var(--sf2)}
+.av.nv{background:var(--rosa-s)}.av.nv:before{content:"";position:absolute;left:6px;top:22px;width:6px;height:6px;border-radius:50%;background:var(--rosa)}
+.av .q{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}.av .q svg.ic{width:17px;height:17px}
+.av .tx{flex:1;min-width:0}.av b{display:block;font-size:13px;line-height:1.3}.av p{margin:2px 0 0;font-size:12px;color:var(--tx2);line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.av em{font-style:normal;font-size:11px;color:var(--tx3);white-space:nowrap}
+.vazio3{padding:28px 16px;text-align:center;color:var(--tx3);font-size:13px}
+.pe{padding:9px 16px;text-align:center;font-size:11.5px;color:var(--tx3);border-top:1px solid var(--ln)}
+.voltar svg{transform:rotate(180deg)}.voltar{width:36px;height:36px;border-radius:11px;border:1px solid var(--ln);background:var(--sf);display:flex;align-items:center;justify-content:center;color:var(--tx);cursor:pointer}
+</style></head><body>
+<div class="caixa">
+  <div class="cab"><div style="display:flex;align-items:center;gap:10px"><button class="voltar" id="btVoltar" aria-label="Voltar"></button><span class="sinoIc" id="sinoIc"></span><h1>Avisos <small id="qtd"></small></h1></div><button class="lnk" id="btLidos">Marcar todos como lidos</button></div>
+  <div class="filtros" role="tablist"><b data-f="todos" class="on">Todos</b><b data-f="nl">Não lidos</b><b data-f="av">Avaliações</b></div>
+  <div class="avLista" id="lista"></div>
+  <div class="pe">Últimos 60 avisos · os mesmos de "Últimas atualizações" do Helpdesk</div>
+</div>
+<script src="base.js"></script>
+<script>
+var popup = /popup=1/.test(location.search + location.hash), filtro = 'todos', ultimo = '';
+if (popup) document.documentElement.classList.add('popup');
+if (/fundo=1/.test(location.search + location.hash)) document.documentElement.classList.add('fundo');
+document.getElementById('sinoIc').innerHTML = F.ic('sino');
+/** A setinha aponta para o sino (posição enviada pelo app). */
+window.seta = function (x) { document.querySelector('.caixa').style.setProperty('--seta', Math.max(24, Math.min(window.innerWidth - 34, x)) + 'px'); };
+var bv = document.getElementById('btVoltar');
+if (popup) bv.style.display = 'none';
+else { bv.innerHTML = F.ic('seta'); bv.onclick = function () { try { App.voltar(); } catch (e) { history.back(); } }; }
+
+function est() { try { return JSON.parse(App.helpdesk() || '{}'); } catch (e) { return {}; } }
+function quando(ms) {
+  if (!ms) return '';
+  var d = new Date(ms), h = new Date(), seg = Math.round((h - d) / 1000), min = Math.round(seg / 60);
+  if (seg < 60) return 'agora'; if (min < 60) return min + ' min';
+  if (d.toDateString() === h.toDateString()) return F.hhmm(ms);
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+}
+function tipo(x) {
+  var t = (x.titulo + ' ' + (x.linhas || []).join(' ')).toLowerCase();
+  if (/^avalia/.test((x.titulo || '').toLowerCase())) return ['estrela', 'var(--verde)', 'var(--verde-s)'];
+  if (x.meu) return ['pessoa', 'var(--tx2)', 'var(--sf3)'];
+  if (x.novo) return ['mais2', 'var(--rosa)', 'var(--rosa-s)'];
+  if (t.indexOf('sla') >= 0) return ['alerta', 'var(--laranja)', 'var(--laranja-s)'];
+  if (t.indexOf('anexou') >= 0) return ['clipe', 'var(--tx2)', 'var(--sf3)'];
+  if (t.indexOf('status') >= 0 || t.indexOf('prioridade') >= 0 || t.indexOf('respons') >= 0 || t.indexOf('transferi') >= 0) return ['troca', 'var(--violeta)', 'var(--violeta-s)'];
+  return ['msg', 'var(--azul)', 'var(--azul-s)'];
+}
+function render() {
+  var e = est(), feed = e.feed || [], visto = e.visto || 0;
+  var k = JSON.stringify([feed.length, feed[0] && feed[0].t, visto, filtro]); if (k === ultimo) return; ultimo = k;
+  var nl = feed.filter(function (x) { return !x.meu && x.t > visto; }).length;
+  document.querySelector('[data-f="nl"]').textContent = 'Não lidos' + (nl ? ' ' + nl : '');
+  document.getElementById('qtd').textContent = nl ? '· ' + nl + (nl === 1 ? ' novo' : ' novos') : '';
+  document.getElementById('btLidos').style.visibility = nl ? 'visible' : 'hidden';
+  var l = feed.filter(function (x) {
+    if (filtro === 'nl') return !x.meu && x.t > visto;
+    if (filtro === 'av') return /^avalia/i.test(x.titulo || '');
+    return true;
+  });
+  document.getElementById('lista').innerHTML = l.length ? l.map(function (x) {
+    var tp = tipo(x), novo = !x.meu && x.t > visto, linhas = (x.linhas || []).slice(0, 2).join(' · ') || x.texto || '';
+    return '<div class="av' + (novo ? ' nv' : '') + '" data-c="' + F.esc(x.caminho || '/helpdesk') + '"><span class="q" style="background:' + tp[2] + ';color:' + tp[1] + '">' + F.ic(tp[0]) + '</span>' +
+      '<div class="tx"><b>' + F.esc(x.titulo || '') + '</b><p>' + F.esc(linhas) + '</p></div><em>' + quando(x.t) + '</em></div>';
+  }).join('') : '<div class="vazio3">' + (filtro === 'nl' ? 'Nenhum aviso novo.' : filtro === 'av' ? 'Nenhuma avaliação ainda.' : 'Nenhum aviso por enquanto.<br>Quando um chamado mudar, aparece aqui.') + '</div>';
+}
+document.querySelector('.filtros').onclick = function (ev) {
+  var b = ev.target.closest('[data-f]'); if (!b) return; filtro = b.getAttribute('data-f');
+  [].forEach.call(document.querySelectorAll('.filtros b'), function (x) { x.classList.toggle('on', x === b); }); ultimo = ''; render();
+};
+document.getElementById('lista').onclick = function (ev) {
+  var a = ev.target.closest('[data-c]'); if (!a) return;
+  try { if (popup && App.sino) App.sino(false); App.abrirSite(a.getAttribute('data-c')); } catch (e) { }
+};
+document.getElementById('btLidos').onclick = function () { try { App.marcarLidos(); } catch (e) { } ultimo = ''; setTimeout(render, 50); };
+window.recebidoHelpdesk = function () { ultimo = ''; render(); };
+window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t === 'escuro' ? 'escuro' : 'claro'); };
+if (popup) window.addEventListener('blur', function () { setTimeout(function () { try { if (!document.hasFocus()) App.sino(false); } catch (e) { } }, 120); });
+render(); setInterval(render, 20000);
+</script>
+</body></html>

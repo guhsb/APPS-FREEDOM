@@ -53,7 +53,7 @@ class Tela : Activity() {
         const val EXTRA_ABA = "aba"
         const val EXTRA_PAINEL = "painel"
         const val EXTRA_ATUALIZAR = "atualizar"
-        private val TELAS = setOf("lista.html", "novo.html", "dash-helpdesk.html")
+        private val TELAS = setOf("lista.html", "novo.html", "dash-helpdesk.html", "avisos.html")
         private val RE_CHAMADO = Regex("^(?:https://relatorios\\.cbfreedom\\.com\\.br)?/helpdesk/tickets/(\\d+)/?$")
         const val ABA_HELPDESK = "helpdesk"
         const val ABA_SITE = "site"
@@ -118,7 +118,8 @@ class Tela : Activity() {
 
     private lateinit var conteudo: FrameLayout
     private lateinit var linhaAbas: View
-    private lateinit var barraAbas: LinearLayout
+    private lateinit var barraAbas: FrameLayout
+    private lateinit var indicadorAba: View   // a pílula branca que desliza até a aba aberta
     private lateinit var webApp: WebView          // login e aba Helpdesk
     private var webSite: WebView? = null
     private var webDash: WebView? = null          // Comercial, Logística e Administração
@@ -170,7 +171,7 @@ class Tela : Activity() {
         @Suppress("DEPRECATION")
         run {
             window.statusBarColor = FUNDO
-            window.navigationBarColor = FUNDO_BARRA
+            window.navigationBarColor = FUNDO
             window.decorView.systemUiVisibility = if (claro)
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
         }
@@ -181,16 +182,16 @@ class Tela : Activity() {
         Helpdesk.criarCanais(this)
         pintarJanela()
 
-        val raiz = LinearLayout(this)
-        raiz.orientation = LinearLayout.VERTICAL
+        // layout novo: a barra de abas é uma pílula escura que flutua por cima do fim da tela
+        val raiz = FrameLayout(this)
         raiz.setBackgroundColor(FUNDO)
         conteudo = FrameLayout(this)
-        raiz.addView(conteudo, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        linhaAbas = View(this)
-        linhaAbas.setBackgroundColor(COR_LINHA)
-        raiz.addView(linhaAbas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        raiz.addView(conteudo, cheio())
+        linhaAbas = View(this)   // a linha antiga em cima da barra não existe mais
         barraAbas = criarAbas()
-        raiz.addView(barraAbas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(68)))
+        val lpB = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(62), Gravity.BOTTOM)
+        lpB.setMargins(dp(12), 0, dp(12), dp(12))
+        raiz.addView(barraAbas, lpB)
         setContentView(raiz)
 
         webApp = novaWebLocal()
@@ -203,12 +204,26 @@ class Tela : Activity() {
     private fun dp(v: Int): Int = Math.round(v * resources.displayMetrics.density)
     private fun cheio() = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
 
-    /** Barra de abas no estilo Material 3: ícone dentro de uma "pílula" que acende na aba ativa. */
-    private fun criarAbas(): LinearLayout {
-        val barra = LinearLayout(this)
-        barra.orientation = LinearLayout.HORIZONTAL
-        barra.setBackgroundColor(FUNDO_BARRA)
-        barra.setPadding(dp(8), dp(8), dp(8), dp(6))
+    private val BARRA_FLUT by lazy { cor("#0f1b3d", "#232a3a") }
+    private val PILULA_ATIVA by lazy { cor("#ffffff", "#f3f5f9") }
+    private val ICONE_INATIVO by lazy { cor("#aab3c8", "#8b93a7") }
+    private val ICONE_ATIVO by lazy { cor("#0f1b3d", "#0b0d12") }
+
+    /** Barra de abas flutuante (pílula escura); a aba aberta fica numa pílula branca que desliza; o sino abre os avisos. */
+    private fun criarAbas(): FrameLayout {
+        val barra = FrameLayout(this)
+        val fundo = GradientDrawable(); fundo.cornerRadius = dp(31).toFloat(); fundo.setColor(BARRA_FLUT)
+        barra.background = fundo
+        barra.elevation = dp(10).toFloat()
+        barra.setPadding(dp(5), dp(5), dp(5), dp(5))
+        indicadorAba = View(this)
+        val fi = GradientDrawable(); fi.cornerRadius = dp(26).toFloat(); fi.setColor(PILULA_ATIVA)
+        indicadorAba.background = fi
+        indicadorAba.visibility = View.INVISIBLE
+        barra.addView(indicadorAba, FrameLayout.LayoutParams(dp(60), ViewGroup.LayoutParams.MATCH_PARENT))
+        val linha = LinearLayout(this)
+        linha.orientation = LinearLayout.HORIZONTAL
+        barra.addView(linha, cheio())
         val itens = listOf(
             Triple(ABA_HELPDESK, "Helpdesk", R.drawable.ic_aba_helpdesk),
             Triple(ABA_COMERCIAL, "Comercial", R.drawable.ic_aba_comercial),
@@ -217,85 +232,93 @@ class Tela : Activity() {
             Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel),
             Triple(ABA_SITE, "Site", R.drawable.ic_aba_site)
         )
-        iconesAba[ABA_COMERCIAL] = Pair(R.drawable.ic_aba_comercial, R.drawable.ic_aba_comercial_ativa)
-        iconesAba[ABA_LOGISTICA] = Pair(R.drawable.ic_aba_logistica, R.drawable.ic_aba_logistica_ativa)
-        iconesAba[ABA_ADMIN] = Pair(R.drawable.ic_aba_admin, R.drawable.ic_aba_admin_ativa)
-        iconesAba[ABA_HELPDESK] = Pair(R.drawable.ic_aba_helpdesk, R.drawable.ic_aba_helpdesk_ativa)
-        iconesAba[ABA_SITE] = Pair(R.drawable.ic_aba_site, R.drawable.ic_aba_site_ativa)
-        iconesAba[ABA_PAINEL] = Pair(R.drawable.ic_aba_painel, R.drawable.ic_aba_painel_ativa)
         for ((id, rotulo, icone) in itens) {
             val item = LinearLayout(this)
             item.orientation = LinearLayout.VERTICAL
-            item.gravity = Gravity.CENTER_HORIZONTAL
+            item.gravity = Gravity.CENTER
             item.isClickable = true
             item.contentDescription = rotulo
-
-            val pilula = FrameLayout(this)
             val img = ImageView(this)
             img.setImageResource(icone)
-            pilula.addView(img, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
-            if (id == ABA_HELPDESK) {
-                selo = TextView(this)
-                selo.setTextColor(Color.WHITE)
-                selo.textSize = 9.5f
-                selo.typeface = android.graphics.Typeface.DEFAULT_BOLD
-                selo.gravity = Gravity.CENTER
-                selo.minWidth = dp(17)
-                selo.setPadding(dp(4), 0, dp(4), 0)
-                val fundo = GradientDrawable()
-                fundo.cornerRadius = dp(9).toFloat()
-                fundo.setColor(Cor.ROSA)
-                fundo.setStroke(dp(2), FUNDO_BARRA)
-                selo.background = fundo
-                selo.visibility = View.GONE
-                val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(17), Gravity.TOP or Gravity.END)
-                lp.topMargin = dp(1); lp.marginEnd = dp(10)
-                pilula.addView(selo, lp)
-            }
-            item.addView(pilula, LinearLayout.LayoutParams(dp(52), dp(32)))
+            img.setColorFilter(ICONE_INATIVO)
+            item.addView(img, LinearLayout.LayoutParams(dp(20), dp(20)))
             val txt = TextView(this)
             txt.text = rotulo
-            txt.textSize = 11f
+            txt.textSize = 10f
             txt.maxLines = 1
             txt.gravity = Gravity.CENTER
-            txt.letterSpacing = 0.01f
+            txt.setTextColor(ICONE_INATIVO)
             val lpT = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            lpT.topMargin = dp(4)
+            lpT.topMargin = dp(2)
             item.addView(txt, lpT)
             item.setOnClickListener {
                 // tocar de novo no Site volta para o início do site
                 when {
                     aba == id && id == ABA_SITE -> webSite?.let { abrirUrlSite(Helpdesk.SITE + "/") }
-                    aba == id && id == ABA_HELPDESK && paginaApp == "sub" -> voltarHelpdesk()
+                    aba == id && id == ABA_HELPDESK && paginaApp == "sub" -> { voltarHelpdesk(); entrar(webApp) }
                     else -> selecionar(id)
                 }
             }
             item.setOnLongClickListener {
                 if (id == ABA_SITE) { selecionar(ABA_SITE); webSite?.reload(); toast("Recarregando o site…"); true } else false
             }
-            barra.addView(item, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            linha.addView(item, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
             abas[id] = Pair(img, txt)
             itensAba[id] = item
         }
+        // sino: avisos (tela cheia), com o número de novidades
+        val sino = FrameLayout(this)
+        sino.isClickable = true
+        sino.contentDescription = "Avisos"
+        val img = ImageView(this)
+        img.setImageResource(R.drawable.ic_notificacao)
+        img.setColorFilter(ICONE_INATIVO)
+        sino.addView(img, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
+        selo = TextView(this)
+        selo.setTextColor(Color.WHITE)
+        selo.textSize = 9.5f
+        selo.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        selo.gravity = Gravity.CENTER
+        selo.minWidth = dp(17)
+        selo.setPadding(dp(4), 0, dp(4), 0)
+        val fs = GradientDrawable(); fs.cornerRadius = dp(9).toFloat(); fs.setColor(Cor.ROSA); fs.setStroke(dp(2), BARRA_FLUT)
+        selo.background = fs
+        selo.visibility = View.GONE
+        val lpS = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(17), Gravity.TOP or Gravity.END)
+        lpS.topMargin = dp(6); lpS.marginEnd = dp(4)
+        sino.addView(selo, lpS)
+        sino.setOnClickListener { abrirTela("avisos.html") }
+        linha.addView(sino, LinearLayout.LayoutParams(dp(46), ViewGroup.LayoutParams.MATCH_PARENT))
         return barra
     }
 
+    /** A pílula branca desliza até a aba aberta; ícone e texto da aba aberta ficam escuros. */
     private fun pintarAbas() {
         for ((id, par) in abas) {
             val ativa = id == aba
-            val cor = if (ativa) Cor.ROSA else COR_INATIVA
-            iconesAba[id]?.let { par.first.setImageResource(if (ativa) it.second else it.first) }
+            val cor = if (ativa) ICONE_ATIVO else ICONE_INATIVO
             par.first.setColorFilter(cor)
-            par.second.setTextColor(if (ativa) TEXTO else COR_INATIVA)
+            par.second.setTextColor(cor)
             par.second.typeface = if (ativa) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-            val pilula = par.first.parent as? View ?: continue
-            if (ativa) {
-                val f = GradientDrawable()
-                f.cornerRadius = dp(16).toFloat()
-                f.setColor(ROSA_SUAVE)
-                pilula.background = f
-            } else pilula.background = null
         }
+        val alvo = itensAba[aba] ?: return
+        alvo.post {
+            if (alvo.width == 0 || alvo.visibility != View.VISIBLE) { indicadorAba.visibility = View.INVISIBLE; return@post }
+            val lp = indicadorAba.layoutParams
+            val primeira = indicadorAba.visibility != View.VISIBLE
+            if (lp.width != alvo.width) { lp.width = alvo.width; indicadorAba.layoutParams = lp }
+            val x = alvo.left.toFloat()
+            if (primeira) { indicadorAba.translationX = x; indicadorAba.visibility = View.VISIBLE }
+            else indicadorAba.animate().translationX(x).setDuration(380).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+        }
+    }
+
+    /** A tela nova entra embaçada… no Android: aparece suave e sobe um pouco até o lugar. */
+    private fun entrar(v: View?) {
+        if (v == null || v.visibility != View.VISIBLE) return
+        v.animate().cancel()
+        v.alpha = 0f; v.translationY = dp(14).toFloat()
+        v.animate().alpha(1f).translationY(0f).setDuration(380).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
     }
 
     private fun abaDisponivel(id: String): Boolean = when (id) {
@@ -314,6 +337,7 @@ class Tela : Activity() {
             selecionar(listOf(ABA_HELPDESK, ABA_COMERCIAL, ABA_LOGISTICA, ABA_PAINEL, ABA_SITE).first { abaDisponivel(it) })
         }
         if (caixaPainel != null) montarChips()
+        pintarAbas()
     }
 
     private fun atualizarSelo() {
@@ -362,6 +386,7 @@ class Tela : Activity() {
     }
 
     private fun selecionar(nova: String) {
+        val trocou = aba != nova
         aba = nova
         webApp.visibility = if (nova == ABA_HELPDESK) View.VISIBLE else View.GONE
         if (nova == ABA_SITE) garantirSite(null)
@@ -377,6 +402,7 @@ class Tela : Activity() {
         }
         if (nova == ABA_PAINEL && Atualizador.velho(this, 2)) atualizarPainel()
         atualizarSelo()
+        if (trocou) entrar(when (nova) { ABA_HELPDESK -> webApp; ABA_SITE -> caixaSite; ABA_PAINEL -> caixaPainel; else -> webDash })
     }
 
     /** Chamado (/helpdesk/tickets/ID) abre na tela do app; o resto abre na aba Site. */
@@ -889,6 +915,7 @@ class Tela : Activity() {
         caixa.addView(aviso, cheio())
         avisoSite = aviso
         conteudo.addView(caixa, cheio())
+        caixa.setPadding(0, 0, 0, dp(86))   // a barra flutuante não cobre o fim do site
         caixaSite = caixa
         progresso = pb
         webSite = w
@@ -1346,6 +1373,14 @@ class Tela : Activity() {
 
         @JavascriptInterface
         fun abrirTela(arquivo: String) = runOnUiThread { this@Tela.abrirTela(arquivo) }
+
+        /** Avisos: "Marcar todos como lidos". */
+        @JavascriptInterface
+        fun marcarLidos() = runOnUiThread { Helpdesk.marcarVisto(this@Tela); atualizarSelo(); avisarHelpdesk() }
+
+        /** As telas contam suas partes (usado pelos atalhos do PC; no celular não precisa). */
+        @JavascriptInterface
+        fun subAbas(json: String) { }
 
         // ---- imagem (PNG) dos painéis ----
         @JavascriptInterface

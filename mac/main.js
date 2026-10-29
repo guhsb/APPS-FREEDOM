@@ -19,12 +19,13 @@ const Controle = require('./core/controle');
 const SITE_HOST = 'relatorios.cbfreedom.com.br';
 const WWW = path.join(__dirname, 'www');
 const TELAS = ['lista.html', 'novo.html', 'dash-helpdesk.html'];
-const NAV = 84;
+const NAV = 78, TOPO = 76;   // layout novo: atalhos na esquerda e abas em pílula no topo (shell.html, modo mac)
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
 let janela = null, vApp = null, vSite = null, vPainel = null, tray = null;
-let vDash = null, dashAtual = null;
+let vDash = null, dashAtual = null, vSino = null, sinoAberto = false, sinoX = -1, helpSub = 'inicio';
+const subs = {};   // página -> partes (abas) que ela tem
 const DASH = { comercial: 'dash-comercial.html', logistica: 'dash-logistica.html', admin: 'admin.html' };
 let aba = 'helpdesk', painelAtual = null, paginaApp = '', saindo = false, siteCarregado = false, ultimoLoginSite = 0;
 let monitor = null, timerPaineis = null;
@@ -96,8 +97,8 @@ function opcoesTela(preload) {
 
 function criarJanela() {
   janela = new BrowserWindow({ width: 1180, height: 800, minWidth: 820, minHeight: 560, show: false, backgroundColor: corFundo(), title: 'Freedom',
-    webPreferences: { preload: path.join(__dirname, 'preload-shell.js'), contextIsolation: true } });
-  janela.loadFile(path.join(__dirname, 'ui', 'shell.html'));
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false } });
+  janela.loadURL(url('shell.html') + '?modo=mac');
   janela.webContents.on('did-finish-load', atualizarBarra);
   janela.on('close', e => { if (!saindo) { e.preventDefault(); janela.hide(); } });
   janela.on('resize', posicionar);
@@ -120,10 +121,15 @@ function vistaAtual() { return aba === 'site' ? vSite : aba === 'painel' ? vPain
 function posicionar() {
   if (!janela) return;
   const [w, h] = janela.getContentSize();
-  const x = logado() ? NAV : 0;
+  const x = logado() ? NAV : 0, y = logado() ? TOPO : 0;
   const chips = aba === 'painel' && Paineis.paraAba().length > 1 ? 52 : 0;
-  for (const v of [vApp, vSite, vPainel, vDash]) if (v) v.setBounds({ x, y: 0, width: Math.max(0, w - x), height: h });
-  if (vPainel) vPainel.setBounds({ x, y: chips, width: Math.max(0, w - x), height: h - chips });
+  for (const v of [vApp, vSite, vPainel, vDash]) if (v) v.setBounds({ x, y, width: Math.max(0, w - x), height: Math.max(0, h - y) });
+  if (vPainel) vPainel.setBounds({ x, y: y + chips, width: Math.max(0, w - x), height: Math.max(0, h - y - chips) });
+  if (vSino) {
+    const sw = 450, sh = Math.min(600, Math.max(320, h - 80)), cx = sinoX > 0 ? sinoX : w - 330, sx = Math.max(8, Math.min(w - sw - 8, cx - sw + 70));
+    vSino.setBounds({ x: sx, y: 60, width: sw, height: sh });
+    js(vSino.webContents, 'window.seta && seta(' + (cx - sx) + ')');
+  }
 }
 
 function mostrarSo(v) {
@@ -147,6 +153,8 @@ function atualizarBarra() {
   const n = aba === 'helpdesk' ? 0 : Helpdesk.naoVistos();
   janela.webContents.send('barra-estado', { tema: temaClaro() ? 'claro' : 'escuro', logado: logado(), abas: abasDisponiveis(), aba, selo: n,
     paineis: Paineis.paraAba().map(p => ({ id: p.id, nome: p.nomeModulo })), painel: painelAtual });
+  js(janela.webContents, 'window.shellAtualizar && shellAtualizar()');
+  if (sinoAberto && vSino) js(vSino.webContents, 'window.recebidoHelpdesk && recebidoHelpdesk()');
   const total = Helpdesk.naoVistos();
   try { app.dock && app.dock.setBadge(total > 0 ? String(total) : ''); } catch (e) { }
   if (tray) tray.setToolTip(total > 0 ? 'Freedom · ' + total + ' novidade(s)' : 'Freedom');
@@ -168,6 +176,7 @@ function selecionar(nova) {
   if (!logado()) return carregar(null);
   const disp = abasDisponiveis();
   if (disp.indexOf(nova) < 0) nova = ['helpdesk', 'comercial', 'logistica', 'painel', 'site'].find(x => disp.indexOf(x) >= 0);
+  const trocou = aba !== nova;
   aba = nova;
   if (nova === 'site') garantirSite(null);
   if (nova === 'painel') garantirPainel();
@@ -175,6 +184,42 @@ function selecionar(nova) {
   mostrarSo(nova === 'site' ? vSite : nova === 'painel' ? vPainel : DASH[nova] ? vDash : vApp);
   if (nova === 'helpdesk') { Helpdesk.marcarVisto(); avisarHelpdesk(); }
   if (nova === 'painel' && Paineis.velho(2)) Paineis.atualizar();
+  atualizarBarra();
+  // a tela nova entra embaçada e sobe um pouco até ficar em foco
+  if (trocou && nova !== 'site') { const v = vistaAtual(); if (v) js(v.webContents, 'window.F && F.entrar && F.entrar()'); }
+}
+
+// ---------------- barras novas (topo, atalhos, sino) ----------------
+function shellJson() {
+  const nomes = { helpdesk: 'Helpdesk', comercial: 'Comercial', logistica: 'Logística', admin: 'Admin', painel: 'Painel', site: 'Site' };
+  const o = { logado: logado(), aba, abas: logado() ? abasDisponiveis().map(a => [a, nomes[a]]) : [], tema: temaClaro() ? 'claro' : 'escuro',
+    naoLidos: aba === 'helpdesk' ? 0 : Helpdesk.naoVistos(), sino: sinoAberto, helpSub, helpdesk: Acesso.helpdesk(), email: Store.email() || '', nome: Acesso.nome() || '',
+    paineis: Paineis.paraAba().map(p => ({ id: p.id, nome: p.nomeModulo })), painel: painelAtual };
+  if (DASH[aba] && subs[DASH[aba]]) try { o.sub = JSON.parse(subs[DASH[aba]]); } catch (e) { }
+  return JSON.stringify(o);
+}
+function irSub(id) {
+  id = String(id || '').replace(/[^A-Za-z0-9_-]/g, ''); if (!id) return;
+  if (aba === 'helpdesk') {
+    if (id === 'inicio') voltarHelpdesk(); else if (id === 'dash') abrirTela('dash-helpdesk.html'); else abrirTela('lista.html#' + id);
+    helpSub = id; js(vApp.webContents, 'setTimeout(function(){window.F&&F.entrar&&F.entrar()},60)'); atualizarBarra(); return;
+  }
+  if (DASH[aba] && vDash) js(vDash.webContents, "(function(){var b=document.querySelector('.tabs:not(.sub) [data-aba=\"" + id + "\"]');if(b)b.click();})()");
+}
+function sino(abrir) {
+  if (abrir && !vSino) {
+    vSino = new WebContentsView(opcoesTela('preload.js'));
+    vSino.setBackgroundColor('#00000000');   // transparente: só o cartão arredondado aparece
+    janela.contentView.addChildView(vSino);
+    protegerNavegacao(vSino.webContents, true);
+    vSino.webContents.loadURL(url('avisos.html') + '?popup=1');
+  }
+  sinoAberto = !!abrir && !!vSino;
+  if (vSino) {
+    if (sinoAberto) { try { janela.contentView.removeChildView(vSino); janela.contentView.addChildView(vSino); } catch (e) { } }   // por cima de tudo
+    vSino.setVisible(sinoAberto); posicionar();
+    if (sinoAberto) { vSino.webContents.focus(); js(vSino.webContents, 'window.recebidoHelpdesk && recebidoHelpdesk()'); }
+  }
   atualizarBarra();
 }
 
@@ -191,7 +236,7 @@ function abrirCaminho(caminho) {
 
 function abrirChamado(id) {
   vApp.webContents.loadURL(url('chamado.html') + '#' + id);
-  paginaApp = 'sub';
+  paginaApp = 'sub'; helpSub = '';
   selecionar('helpdesk');
 }
 
@@ -200,10 +245,11 @@ function abrirTela(arquivo) {
   if (TELAS.indexOf(nome) < 0 || !/^[A-Za-z0-9_=&%.-]*$/.test(resto)) return;
   vApp.webContents.loadURL(url(nome) + (resto ? '#' + resto : ''));
   paginaApp = 'sub';
+  helpSub = nome === 'dash-helpdesk.html' ? 'dash' : nome === 'lista.html' ? (resto.split('&')[0] || 'fila') : '';
   selecionar('helpdesk');
 }
 
-function voltarHelpdesk() { vApp.webContents.loadURL(url('helpdesk.html')); paginaApp = 'helpdesk'; }
+function voltarHelpdesk() { vApp.webContents.loadURL(url('helpdesk.html')); paginaApp = 'helpdesk'; helpSub = 'inicio'; atualizarBarra(); }
 function voltarApp() {
   const h = vApp.webContents.navigationHistory;
   if (paginaApp === 'sub' && h && h.canGoBack()) h.goBack(); else voltarHelpdesk();
@@ -398,7 +444,7 @@ const ponte = {
     Prefs.de('aparencia').editar().put('tema', t).commit();
     nativeTheme.themeSource = t === 'claro' ? 'light' : 'dark';
     if (janela) { janela.setBackgroundColor(corFundo()); js(janela.webContents, 'window.temaMudou && temaMudou(' + Q(t) + ')'); }
-    for (const v of [vApp, vPainel]) if (v) { try { v.setBackgroundColor(corFundo()); } catch (e) { } js(v.webContents, 'window.temaMudou && temaMudou(' + Q(t) + ')'); }
+    for (const v of [vApp, vPainel, vDash, vSino]) if (v) { try { v.setBackgroundColor(corFundo()); } catch (e) { } js(v.webContents, 'window.temaMudou && temaMudou(' + Q(t) + ')'); }
   },
   dadosPainel: (wc, id) => JSON.stringify(Paineis.dadosPainel(id, resumoApp())),
   dados: () => { const l = Paineis.paraAba(); return JSON.stringify(Paineis.dadosPainel(l.length ? l[0].id : '', resumoApp())); },
@@ -438,6 +484,25 @@ const ponte = {
   abrirSite: (wc, c) => abrirCaminho(c),
   siteDireto: (wc, c) => abrirNoSite(c),
   aba: (wc, nome) => selecionar(nome),
+  // barras novas
+  shell: () => shellJson(),
+  irAba: (wc, id) => {
+    sino(false);
+    if (aba === id && id === 'site' && vSite) vSite.webContents.loadURL(SITE + '/');
+    else if (aba === id && id === 'helpdesk' && paginaApp === 'sub') { voltarHelpdesk(); js(vApp.webContents, 'window.F && F.entrar && F.entrar()'); }
+    else selecionar(id);
+  },
+  irSub: (wc, id) => irSub(id),
+  acaoShell: (wc, nome) => {
+    if (nome === 'imagem' || nome === 'excel' || nome === 'atualizar') { const v = vistaAtual(); if (v) js(v.webContents, "window.acaoRail && acaoRail('" + nome + "')"); }
+    else if (nome === 'chamado') { sino(false); abrirTela('novo.html'); }
+    else if (nome === 'claro' || nome === 'escuro') { ponte.definirTema(wc, nome); atualizarBarra(); }
+    else if (nome === 'sair') ponte.sair();
+  },
+  sino: (wc, abrir, x) => { if (x > 0) sinoX = x; sino(!!abrir); },
+  marcarLidos: () => { Helpdesk.marcarVisto(); avisarHelpdesk(); atualizarBarra(); },
+  subAbas: (wc, json) => { try { const j = JSON.parse(json); if (j.pagina) { subs[j.pagina] = json; atualizarBarra(); } } catch (e) { } },
+  painelShell: (wc, id) => { painelAtual = id; garantirPainel(true); atualizarBarra(); },
   abrirTela: (wc, arq) => abrirTela(String(arq || '')),
   voltar: () => voltarApp(),
   liberarBateria: () => { },

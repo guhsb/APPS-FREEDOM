@@ -203,6 +203,15 @@ namespace Freedom
 
         public void sair() { Ui(j.SairDoApp); }
 
+        // ---- barras novas do PC (topo, atalhos da esquerda, sino) ----
+        public string shell() { try { return (string)j.Invoke((Func<string>)j.ShellJson); } catch (Exception) { return "{}"; } }
+        public void irAba(string id) { Ui(() => j.IrAbaShell(id ?? "")); }
+        public void irSub(string id) { Ui(() => j.IrSub(id ?? "")); }
+        public void acaoShell(string nome) { Ui(() => j.AcaoShell(nome ?? "")); }
+        public void sino(bool abrir, object x) { int px = 0; try { px = Convert.ToInt32(x); } catch (Exception) { } Ui(() => j.Sino(abrir, px)); }
+        public void marcarLidos() { Ui(j.MarcarLidos); }
+        public void subAbas(string json) { Ui(() => j.SubAbas(json)); }
+
         /// <summary>Interruptor remoto: {} = liberado; senão {tipo, mensagem} (a tela de login mostra o aviso).</summary>
         public string controle() { var b = Controle.Estado(); return b == null ? "{}" : b.ToString(); }
 

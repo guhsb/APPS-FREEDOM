@@ -67,7 +67,7 @@ function montar() {
     (podeAnexar() ? '<div class="campo"><label>Anexos <span class="cont" id="cAnx"></span></label><div class="anexos" id="anexos"></div>' +
       '<button type="button" class="btAnexo" id="btAnexo">' + F.ic('clipe') + 'Anexar arquivo ou foto</button>' +
       '<input type="file" id="arq" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,text/plain" style="display:none">' +
-      '<div class="dica">PDF, imagem, texto, Excel ou Word · até 10 MB cada' + (temArrastar() ? ' · dá para arrastar os arquivos para cá' : '') + '</div></div>' : '') +
+      '<div class="dica">PDF, imagem, texto, Excel ou Word · até 10 MB cada' + (temArrastar() ? ' · dá para arrastar os arquivos para cá ou colar um print (Ctrl+V)' : '') + '</div></div>' : '') +
     '<div class="campo" id="campoResp" style="display:none"><label for="resp">Responsável (opcional)</label><select id="resp"><option value="">Deixar para o setor</option></select></div>' +
     '</div><button class="enviar" id="btEnviar">' + F.ic('mais2') + 'Abrir chamado</button>' +
     (podeAnexar() ? '' : '<div class="rod">Depois de abrir, dá para anexar arquivos na tela do chamado</div>');
@@ -94,6 +94,8 @@ function montar() {
     // computador: arrastar arquivos para a tela
     document.addEventListener('dragover', function (ev) { if (enviando) return; ev.preventDefault(); document.getElementById('btAnexo').classList.add('sobre'); });
     document.addEventListener('dragleave', function (ev) { if (!ev.relatedTarget) document.getElementById('btAnexo').classList.remove('sobre'); });
+    // print copiado (Win+Shift+S, PrintScreen…): Ctrl+V anexa a imagem
+    F.aoColarImagem(function (arqs) { if (enviando) return; adicionar(arqs); F.toast(arqs.length > 1 ? arqs.length + ' prints anexados' : 'Print anexado'); });
     document.addEventListener('drop', function (ev) { ev.preventDefault(); document.getElementById('btAnexo').classList.remove('sobre'); if (!enviando && ev.dataTransfer) adicionar(ev.dataTransfer.files); });
   }
 }
