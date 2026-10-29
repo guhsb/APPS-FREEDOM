@@ -693,14 +693,28 @@ namespace Freedom
         // ---------------- telas do Helpdesk ----------------
 
         static readonly System.Text.RegularExpressions.Regex RE_CHAMADO =
-            new System.Text.RegularExpressions.Regex(@"^(?:https://relatorios\.cbfreedom\.com\.br)?/helpdesk/tickets/(\d+)/?$");
+            new System.Text.RegularExpressions.Regex(@"^(?:https?://(?:www\.)?relatorios\.cbfreedom\.com\.br)?/helpdesk/tickets/(\d+)(?:[/?#].*)?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        /// <summary>Outras telas do Helpdesk que o app tem: o aviso abre aqui, não no site.</summary>
+        static string TelaDoHelpdesk(string c)
+        {
+            var p = System.Text.RegularExpressions.Regex.Replace((c ?? "").Trim(), @"^https?://(?:www\.)?relatorios\.cbfreedom\.com\.br", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            p = p.Split('?', '#')[0].TrimEnd('/').ToLowerInvariant();
+            if (p == "/helpdesk/workspace" || p == "/helpdesk/atendimento" || p == "/helpdesk/fila") return "lista.html#fila";
+            if (p == "/helpdesk/ratings" || p == "/helpdesk/avaliacoes" || p == "/helpdesk/dashboard") return "dash-helpdesk.html";
+            if (p == "/helpdesk/meus" || p == "/helpdesk/my-tickets") return "lista.html#meus";
+            if (p == "/helpdesk" || p == "/helpdesk/inicio") return "helpdesk.html";
+            return null;
+        }
 
         public void AbrirCaminho(string caminho)
         {
             if (webApp == null) { caminhoPendente = caminho; CriarTelas(); return; }
             var m = RE_CHAMADO.Match((caminho ?? "").Trim());
             int id;
-            if (m.Success && int.TryParse(m.Groups[1].Value, out id) && Acesso.Helpdesk()) AbrirChamado(id);
+            if (m.Success && int.TryParse(m.Groups[1].Value, out id) && Acesso.Helpdesk()) { AbrirChamado(id); return; }
+            var tela = Acesso.Helpdesk() ? TelaDoHelpdesk(caminho) : null;
+            if (tela == "helpdesk.html") { VoltarHelpdesk(); Selecionar("helpdesk"); }
+            else if (tela != null) AbrirTela(tela);
             else AbrirNoSite(caminho);
         }
 

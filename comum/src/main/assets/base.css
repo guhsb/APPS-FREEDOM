@@ -165,9 +165,10 @@ html.largo .esqG{grid-template-columns:repeat(2,minmax(0,1fr))}
 html.largo .esqG>.cheio{grid-column:1/-1}
 html.largo .esqT{grid-template-columns:repeat(4,minmax(0,1fr))}
 html.largo .esqL{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-html.largo .esqG:has(.esqE){grid-template-columns:minmax(0,1fr) 380px}
+html.largo .esqG:has(.esqE){grid-template-columns:380px minmax(0,1fr)}
+html.largo .esqG>.esqD{order:-1}
 /* chamado: conversa à esquerda, dados e anexos à direita */
-html.largo .gC{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+html.largo .gC{display:grid;grid-template-columns:380px minmax(0,1fr);gap:16px;align-items:start}
 html.largo .gC .ladoE{display:flex;flex-direction:column;gap:10px;min-width:0}
 html.largo .gC .ladoE>*{margin-top:0!important}
 html.largo .gC .ladoD{position:sticky;top:84px;display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -194,3 +195,12 @@ html.largo .card.duas>.ct,html.largo .card.duas>.cs,html.largo .card.duas>.vazio
 html.largo .gL>.par{align-self:stretch}
 html.largo .gL>.bl.par>:last-child{flex:1}
 html.largo .gL>.cheio svg:not(.ic),html.largo .gL>.bl.cheio svg:not(.ic){max-height:300px}
+/* chamado no PC: a página fica parada; rola só a conversa */
+html.largo.chamadoFixo,html.largo.chamadoFixo body{overflow:hidden;height:100%}
+html.largo.chamadoFixo body{padding-bottom:0}
+html.largo.chamadoFixo .gC{align-items:stretch}
+html.largo.chamadoFixo .gC .ladoE{overflow-y:auto;overscroll-behavior:contain;padding:0 6px 0 2px;scrollbar-width:thin;min-height:0}
+html.largo.chamadoFixo .gC .ladoD{position:static;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;min-height:0}
+html.largo.chamadoFixo .ladoD .rod{display:none}
+html.largo.chamadoFixo .ladoD .card{padding:14px}
+html.largo.chamadoFixo .ladoD .op h3{margin-top:2px}

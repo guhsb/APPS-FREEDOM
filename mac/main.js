@@ -226,13 +226,25 @@ function sino(abrir) {
 }
 
 // ---------------- telas do app ----------------
-const RE_CHAMADO = /^(?:https:\/\/relatorios\.cbfreedom\.com\.br)?\/helpdesk\/tickets\/(\d+)\/?$/;
+const RE_CHAMADO = /^(?:https?:\/\/(?:www\.)?relatorios\.cbfreedom\.com\.br)?\/helpdesk\/tickets\/(\d+)(?:[/?#].*)?$/i;
+/** Outras telas do Helpdesk que o app tem: o aviso abre aqui, não no site. */
+function telaDoHelpdesk(c) {
+  const p = String(c || '').trim().replace(/^https?:\/\/(?:www\.)?relatorios\.cbfreedom\.com\.br/i, '').split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase();
+  if (['/helpdesk/workspace', '/helpdesk/atendimento', '/helpdesk/fila'].includes(p)) return 'lista.html#fila';
+  if (['/helpdesk/ratings', '/helpdesk/avaliacoes', '/helpdesk/dashboard'].includes(p)) return 'dash-helpdesk.html';
+  if (['/helpdesk/meus', '/helpdesk/my-tickets'].includes(p)) return 'lista.html#meus';
+  if (p === '/helpdesk' || p === '/helpdesk/inicio') return 'helpdesk.html';
+  return null;
+}
 
 function abrirCaminho(caminho) {
   const c = String(caminho || '').trim();
   if (c.startsWith('painel:')) { painelAtual = c.slice(7); garantirPainel(true); selecionar('painel'); return; }
   const m = c.match(RE_CHAMADO);
-  if (m && Acesso.helpdesk()) abrirChamado(Number(m[1]));
+  if (m && Acesso.helpdesk()) { abrirChamado(Number(m[1])); return; }
+  const tela = Acesso.helpdesk() ? telaDoHelpdesk(c) : null;
+  if (tela === 'helpdesk.html') { voltarHelpdesk(); selecionar('helpdesk'); }
+  else if (tela) abrirTela(tela);
   else abrirNoSite(c);
 }
 
@@ -547,6 +559,17 @@ const ponte = {
       js(wc, 'window.chamadoEnviandoAnexo && chamadoEnviandoAnexo(' + id + ',' + Q(path.basename(arq)) + ')');
       Chamado.anexar(id, arq).then(r => js(wc, 'window.chamadoAcao && chamadoAcao(' + id + ",'anexo'," + r.ok + ',' + Q(r.mensagem) + ')'));
     });
+  },
+  salvarArquivo: (wc, base64, nome, mime) => {
+    try {
+      const pasta = path.join(require('os').homedir(), 'Downloads'); fs.mkdirSync(pasta, { recursive: true });
+      const seguro = String(nome || 'arquivo').replace(/[\/\\:*?"<>|]/g, '_').trim() || 'arquivo';
+      const ext = path.extname(seguro), base = path.basename(seguro, ext);
+      let arq = path.join(pasta, seguro), i = 2; while (fs.existsSync(arq) && i < 200) arq = path.join(pasta, base + ' (' + (i++) + ')' + ext);
+      fs.writeFileSync(arq, Buffer.from(String(base64 || ''), 'base64'));
+      shell.showItemInFolder(arq);
+      js(wc, 'window.F && F.toast && F.toast(' + Q('Salvo em Downloads: ' + path.basename(arq)) + ')');
+    } catch (e) { js(wc, 'window.F && F.toast && F.toast(' + Q('Não consegui salvar: ' + e.message) + ')'); }
   },
   baixarAnexo: (wc, id, anexo, nome) => {
     Chamado.baixarAnexo(Number(id), Number(anexo), nome).then(arq => {

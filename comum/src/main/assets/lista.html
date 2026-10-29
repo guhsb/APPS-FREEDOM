@@ -38,7 +38,7 @@ body{padding-bottom:90px}
 body.kb,html.largo body.kb{max-width:none!important;margin:0!important}
 html.largo body.kb{padding:0 22px}
 html.largo .kanban{gap:10px}
-html.largo .col{min-width:180px;max-height:calc(100vh - 200px)}
+html.largo .col{min-width:180px;max-height:var(--altKb,calc(100vh - 200px))}
 html.largo .col h4{font-size:12.5px;padding:12px 12px 9px}
 html.largo .kb .filtros{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .vis{display:inline-flex;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:3px;margin:0 0 10px;gap:2px}
@@ -48,7 +48,7 @@ html.largo .kb .filtros{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .kb .filtros{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
 .kanban{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;align-items:flex-start}
 .col{flex:1 1 0;min-width:142px;background:var(--sf2);border:1px solid var(--ln);border-radius:14px;display:flex;flex-direction:column;
-  max-height:calc(100vh - 230px);transition:opacity .15s,background .15s,outline-color .15s;outline:2px dashed transparent;outline-offset:-2px}
+  max-height:var(--altKb,calc(100vh - 230px));transition:opacity .15s,background .15s,outline-color .15s;outline:2px dashed transparent;outline-offset:-2px}
 .col h4{margin:0;padding:10px 10px 8px;font-size:12px;white-space:nowrap;font-weight:700;display:flex;align-items:center;gap:7px;color:var(--tx)}
 .col h4 i{width:9px;height:9px;border-radius:50%;flex:none}
 .col h4 span{overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -58,6 +58,10 @@ html.largo .kb .filtros{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .col.pode{outline-color:var(--verde)}
 .col.nao{opacity:.42}
 .col.sobre{background:var(--azul-s);outline-color:var(--azul)}
+.kbMais{margin-top:2px;border:1px dashed var(--ln2);background:var(--sf);color:var(--azul);border-radius:10px;padding:9px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+.kbMais:hover{border-color:var(--azul)}.kbMais svg.ic{width:14px;height:14px}
+.kbTodosT{font-size:16px;font-weight:800;margin:0 0 12px}.kbTodosT em{font-style:normal;font-size:12px;color:var(--tx3);background:var(--sf3);border-radius:99px;padding:2px 9px;margin-left:4px}
+.kbTodos{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}.kbTodos .kc{cursor:pointer}
 .col .maisCol{font-size:11.5px;color:var(--tx3);text-align:center;padding:4px}
 .kc{background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:9px 10px;cursor:grab;box-shadow:var(--sombra);user-select:none}
 .kc:hover{border-color:var(--ln2)}
@@ -239,6 +243,8 @@ function desenhar(ultimos) {
 }
 
 document.getElementById('lista').addEventListener('click', function (ev) {
+  var vm = ev.target.closest ? ev.target.closest('[data-kbmais]') : null;
+  if (vm) { verTodosKb(vm.getAttribute('data-kbmais')); return; }
   var it = ev.target.closest ? ev.target.closest('[data-id]') : null;
   if (it) { try { App.abrirSite('/helpdesk/tickets/' + it.getAttribute('data-id')); } catch (e) {} }
 });
@@ -311,14 +317,42 @@ function desenharKanban() {
     var d = kbDados[c[0]] || { itens: [], total: 0 }, s = F.STATUS[c[0]] || [c[1], 'var(--tx3)'];
     tot += d.total;
     var resto = d.total - d.itens.length;
+    // Resolvido junta muitos: mostra só os 3 mais recentes e o resto num "Ver todos"
+    var curto = c[0] === 'RESOLVED' && d.itens.length > 3, vis = curto ? d.itens.slice(0, 3) : d.itens;
     return '<div class="col" data-col="' + c[0] + '"><h4 title="' + c[1] + '"><i style="background:' + s[1] + '"></i><span>' + c[1] + '</span><em>' + d.total + '</em></h4><div class="cards">' +
-      (d.itens.length ? d.itens.map(cartao).join('') : '<div class="vz">Nenhum chamado</div>') +
-      (resto > 0 ? '<div class="maisCol">+ ' + resto + ' (use a Lista para ver todos)</div>' : '') + '</div></div>';
+      (vis.length ? vis.map(cartao).join('') : '<div class="vz">Nenhum chamado</div>') +
+      (curto ? '<button class="kbMais" data-kbmais="' + c[0] + '">Ver todos (' + d.total + ')' + F.ic('baixo') + '</button>' :
+        resto > 0 ? '<div class="maisCol">+ ' + resto + ' (use a Lista para ver todos)</div>' : '') + '</div></div>';
   }).join('') + '</div>';
   document.getElementById('sub').textContent = tot + (tot === 1 ? ' chamado' : ' chamados');
   var antes = document.getElementById('kanban'), rolagem = antes ? antes.scrollLeft : 0;     // mantém a posição ao redesenhar
   document.getElementById('lista').innerHTML = h;
   if (rolagem) document.getElementById('kanban').scrollLeft = rolagem;
+  alturaKanban();
+}
+/** As colunas cabem na tela: a página não rola, só a coluna (se precisar). */
+function alturaKanban() {
+  var k = document.getElementById('kanban'); if (!k) return;
+  var topo = k.getBoundingClientRect().top + window.scrollY;
+  k.style.setProperty('--altKb', Math.max(220, window.innerHeight - topo - 18) + 'px');
+}
+window.addEventListener('resize', alturaKanban);
+/** "Ver todos" do Resolvido: abre a lista inteira por cima (clicar num cartão abre o chamado). */
+function verTodosKb(col) {
+  var d = (kbDados || {})[col]; if (!d) return;
+  var nome = (COLS.filter(function (c) { return c[0] === col; })[0] || ['', ''])[1];
+  var f = document.createElement('div'); f.className = 'vmFundo';
+  f.innerHTML = '<div class="vmCaixa"><button class="vmFechar" type="button" aria-label="Fechar"><span style="font-size:22px;line-height:1">×</span></button>' +
+    '<div class="kbTodosT">' + F.esc(nome) + ' <em>' + d.total + '</em></div><div class="kbTodos">' + d.itens.map(cartao).join('').replace(/draggable="true"/g, '') + '</div>' +
+    (d.total > d.itens.length ? '<div class="maisCol">+ ' + (d.total - d.itens.length) + ' mais antigos · use a Lista para ver todos</div>' : '') + '</div>';
+  document.body.appendChild(f); document.body.style.overflow = 'hidden';
+  function fechar() { document.removeEventListener('keydown', tecla); f.remove(); document.body.style.overflow = ''; }
+  function tecla(ev) { if (ev.key === 'Escape') fechar(); }
+  document.addEventListener('keydown', tecla);
+  f.addEventListener('click', function (ev) {
+    if (ev.target === f || ev.target.closest('.vmFechar')) { fechar(); return; }
+    var it = ev.target.closest('[data-id]'); if (it) { fechar(); try { App.abrirSite('/helpdesk/tickets/' + it.getAttribute('data-id')); } catch (e) { } }
+  });
 }
 
 /** Regras do chamado (status permitidos e versão) — vem da mesma tela do chamado do site. */

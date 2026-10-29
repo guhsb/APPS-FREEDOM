@@ -54,7 +54,19 @@ class Tela : Activity() {
         const val EXTRA_PAINEL = "painel"
         const val EXTRA_ATUALIZAR = "atualizar"
         private val TELAS = setOf("lista.html", "novo.html", "dash-helpdesk.html", "avisos.html")
-        private val RE_CHAMADO = Regex("^(?:https://relatorios\\.cbfreedom\\.com\\.br)?/helpdesk/tickets/(\\d+)/?$")
+        private val RE_CHAMADO = Regex("^(?:https?://(?:www\\.)?relatorios\\.cbfreedom\\.com\\.br)?/helpdesk/tickets/(\\d+)(?:[/?#].*)?$", RegexOption.IGNORE_CASE)
+        /** Outras telas do Helpdesk que o app tem: o aviso abre aqui, não no site. */
+        private fun telaDoHelpdesk(c: String): String? {
+            val p = c.trim().replace(Regex("^https?://(?:www\\.)?relatorios\\.cbfreedom\\.com\\.br", RegexOption.IGNORE_CASE), "")
+                .split('?', '#')[0].trimEnd('/').lowercase()
+            return when (p) {
+                "/helpdesk/workspace", "/helpdesk/atendimento", "/helpdesk/fila" -> "lista.html#fila"
+                "/helpdesk/ratings", "/helpdesk/avaliacoes", "/helpdesk/dashboard" -> "dash-helpdesk.html"
+                "/helpdesk/meus", "/helpdesk/my-tickets" -> "lista.html#meus"
+                "/helpdesk", "/helpdesk/inicio" -> "helpdesk.html"
+                else -> null
+            }
+        }
         const val ABA_HELPDESK = "helpdesk"
         const val ABA_SITE = "site"
         const val ABA_PAINEL = "painel"
@@ -409,7 +421,13 @@ class Tela : Activity() {
     private fun abrirCaminho(caminho: String) {
         val m = RE_CHAMADO.find(caminho.trim())
         val id = m?.groupValues?.get(1)?.toIntOrNull()
-        if (id != null && Acesso.helpdesk(this)) abrirChamado(id) else abrirNoSite(caminho)
+        if (id != null && Acesso.helpdesk(this)) { abrirChamado(id); return }
+        val tela = if (Acesso.helpdesk(this)) telaDoHelpdesk(caminho) else null
+        when {
+            tela == "helpdesk.html" -> { voltarHelpdesk(); selecionar(ABA_HELPDESK) }
+            tela != null -> abrirTela(tela)
+            else -> abrirNoSite(caminho)
+        }
     }
 
     private fun abrirChamado(id: Int) {
@@ -1425,6 +1443,19 @@ class Tela : Activity() {
                 try { Imagens.compartilharVarias(this@Tela, paginas, nome) }
                 catch (e: Exception) { toast("Não consegui compartilhar: " + (e.message ?: "erro")) }
             }
+        }
+
+        /** Arquivo gerado pela tela (PDF da conversa): salva em Downloads e abre o compartilhar. */
+        @JavascriptInterface
+        fun salvarArquivo(base64: String, nome: String, mime: String) {
+            val app = applicationContext
+            Thread {
+                val dados = try { android.util.Base64.decode(base64, android.util.Base64.DEFAULT) } catch (_: Exception) { null }
+                if (dados == null) { toast("Arquivo inválido"); return@Thread }
+                val ok = try { Arquivos.salvar(app, dados, Arquivos.nome(nome, mime), mime) } catch (_: Exception) { false }
+                toast(if (ok) "Salvo em Downloads ($nome)" else "Não consegui salvar em Downloads")
+                runOnUiThread { try { Imagens.compartilharArquivo(this@Tela, dados, nome, mime) } catch (_: Exception) { } }
+            }.start()
         }
 
         @JavascriptInterface

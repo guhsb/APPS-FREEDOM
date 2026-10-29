@@ -23,16 +23,16 @@ body{padding-bottom:150px}
 .op h3{margin:10px 0 2px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2)}
 .linhaOp{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-top:1px solid var(--ln)}
 .linhaOp:first-of-type{border-top:0}
-.linhaOp label{font-size:12px;color:var(--tx3);font-weight:600}
+.linhaOp label,.opCx label{font-size:12px;color:var(--tx3);font-weight:600}
 .linhaOp .lado{display:flex;gap:8px}
-.linhaOp select{flex:1;min-width:0;background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:11px 10px;font:inherit;font-size:14.5px}
+.linhaOp select,.opCx select{flex:1;min-width:0;background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:11px 10px;font:inherit;font-size:14.5px}
 .linhaOp .lado button{flex:none;border:0;border-radius:10px;padding:0 16px;font:inherit;font-weight:700;font-size:14px;background:var(--rosa);color:#fff}
 .linhaOp .lado button:disabled{background:var(--sf3);color:var(--tx3)}
 .area{width:100%;min-height:90px;resize:vertical;background:var(--sf2);border:1px solid var(--ln2);border-radius:12px;color:var(--tx);font:inherit;font-size:14.5px;
   line-height:1.4;padding:10px 12px;outline:none}
 .area:focus{border-color:var(--rosa)}
-.linhaOp input.busca{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:11px 10px;font:inherit;font-size:14.5px;outline:0}
-.linhaOp input.busca:focus{border-color:var(--rosa)}
+.linhaOp input.busca,.opCx input.busca{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-radius:10px;padding:11px 10px;font:inherit;font-size:14.5px;outline:0}
+.linhaOp input.busca:focus,.opCx input.busca:focus{border-color:var(--rosa)}
 .trBox{display:flex;flex-direction:column;gap:6px}.trTit{display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:800;color:var(--tx)}.trTit .ic{width:18px;height:18px;color:var(--rosa)}.trBox label{margin-top:6px}
 .aprov{border-color:rgba(31,191,143,.35);background:linear-gradient(180deg,rgba(31,191,143,.08),transparent 70%),var(--sf)}
 .aprov h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:15px;color:var(--verde)}
@@ -83,6 +83,23 @@ html[data-tema="escuro"] .caixa textarea{background:var(--bg)}
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--sf3);color:var(--tx);border:1px solid var(--ln2);border-radius:12px;
   padding:10px 14px;font-size:13px;z-index:30;max-width:90%;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
 
+.opModal,.opModal>.opCx{display:contents}.opTit{display:none}.soLargo{display:none}
+html.largo .soLargo{display:block}
+html.largo .opModal{display:flex;position:fixed;inset:0;z-index:95;background:rgba(15,27,61,.38);align-items:center;justify-content:center;padding:24px;animation:opF .18s ease}
+html.largo .opModal>.opCx{display:flex;flex-direction:column;gap:8px;width:100%;max-width:560px;max-height:calc(100vh - 48px);overflow:auto;background:var(--sf);border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(15,27,61,.3);animation:opS .22s cubic-bezier(.3,.7,.2,1)}
+html.largo .opTit{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:800;margin-bottom:4px}html.largo .opTit svg.ic{width:18px;height:18px;color:var(--rosa)}
+html.largo .opCx .area{min-height:140px}
+html.largo .opCx label{font-size:12.5px;color:var(--tx2);font-weight:600;margin-top:4px}
+@keyframes opF{from{opacity:0}}@keyframes opS{from{opacity:0;transform:translateY(12px) scale(.98)}}
+/* PC: a coluna da direita fica do tamanho da tela (rola só ela se precisar) */
+html.largo .gC .ladoD{max-height:calc(100vh - 84px - 140px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:2px}
+.opGrade{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 0 4px}
+.opBt{display:flex;align-items:center;gap:9px;text-align:left;background:var(--sf2);border:1px solid var(--ln);border-radius:12px;padding:10px;font:inherit;color:var(--tx);cursor:pointer;min-width:0;transition:border-color .15s,background .15s}
+.opBt:hover{border-color:var(--rosa);background:var(--sf)}
+.opBt>svg.ic{width:18px;height:18px;flex:none;color:var(--rosa)}
+.opBt span{min-width:0;display:flex;flex-direction:column}.opBt b{font-size:13px;line-height:1.2}.opBt small{font-size:11.5px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.linhaOp.opSol{border-top:0;padding-top:6px}
+.opCx .linhaOp{border-top:0;padding:0}
 .colarPrint{position:fixed;inset:0;z-index:80;background:rgba(15,27,61,.35);display:flex;align-items:center;justify-content:center;padding:16px}
 .colarPrint .cp{background:var(--sf);border-radius:16px;padding:16px;max-width:520px;width:100%;box-shadow:0 18px 50px rgba(15,27,61,.25)}
 .colarPrint img{display:block;max-width:100%;max-height:55vh;margin:12px auto;border-radius:10px;border:1px solid var(--ln)}
@@ -93,6 +110,7 @@ html[data-tema="escuro"] .caixa textarea{background:var(--bg)}
   <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
   <div class="tt"><h1 id="tit">Chamado</h1><div class="st" id="sub">Carregando…</div></div>
   <button class="bt" id="btAt" aria-label="Atualizar"></button>
+  <button class="bt" id="btPdf" aria-label="Exportar conversa em PDF" title="Exportar conversa (PDF com anexos)"></button>
   <button class="bt" id="btSite" aria-label="Abrir no site"></button>
 </div>
 <div id="aviso"></div>
@@ -106,6 +124,7 @@ html[data-tema="escuro"] .caixa textarea{background:var(--bg)}
 </div>
 <div class="toast" id="toast"></div>
 <script src="base.js"></script>
+<script src="conversa-pdf.js"></script>
 <script>
 F.IC.enviar = '<path d="M4 12l16-8-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/>';
 F.IC.externo = '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>';
@@ -123,7 +142,7 @@ var FECHADOS = ['RESOLVED', 'CLOSED', 'CANCELED', 'CANCELLED'];
 var ID = parseInt((location.hash || '').replace('#', ''), 10) || 0;
 var dados = null, ultimaChave = '', enviando = false, carregando = false, deNovo = false;
 var ocupado = '';                  // operação em andamento (trava os botões)
-var abertoSol = false, abertoRej = false, confirmaAceite = false;
+var abertoSol = false, abertoRej = false, confirmaAceite = false, abertoOp = null;   // abertoOp: janela de status/prioridade/responsável/setor (PC)
 var abertoTR = false, tr = { setor: '', busca: '', resp: '', motivo: '' };   // transferir responsável (outro setor, só este chamado)
 var anexos = null, enviandoAnexo = '';
 // abriu outro chamado com esta tela aberta: recarrega para trocar de chamado
@@ -250,8 +269,9 @@ function render(d) {
         h += '<div class="duas">' + bt('btAceitar', confirmaAceite ? 'Toque p/ confirmar' : 'Aceitar solução', 'verde', 'ok') +
           bt('btRejAbrir', 'Rejeitar', 'linha', 'x') + '</div>';
       } else {
-        h += '<label class="nota" for="txMotivo">Motivo da rejeição</label><textarea class="area" id="txMotivo" maxlength="2000" placeholder="Explique o que ainda falta…"></textarea>' +
-          '<div class="duas" style="margin-top:8px">' + bt('btRejeitar', 'Enviar rejeição', 'rosa') + bt('btRejCancelar', 'Cancelar', 'linha') + '</div>';
+        h += '<div class="soLargo"><div class="duas">' + bt('btAceitar2', 'Aceitar solução', 'verde', 'ok') + bt('btRejAberto', 'Rejeitar', 'linha', 'x') + '</div></div>' +
+          janela(F.ic('x') + 'Rejeitar solução', '<label class="nota" for="txMotivo">Motivo da rejeição</label><textarea class="area" id="txMotivo" maxlength="2000" placeholder="Explique o que ainda falta…"></textarea>' +
+          '<div class="duas" style="margin-top:8px">' + bt('btRejeitar', 'Enviar rejeição', 'rosa') + bt('btRejCancelar', 'Cancelar', 'linha') + '</div>', 'btRejCancelar');
       }
       h += '</div>';
     } else {
@@ -261,51 +281,74 @@ function render(d) {
   }
 
   // atendimento (só o que este login pode fazer, igual ao site)
+  // PC (tela larga): cada ação vira um botão numa grade e o formulário abre numa janela, para a coluna caber inteira sem rolar
+  var PC = document.documentElement.classList.contains('largo'), grade = [], modais = '';
+  function opItem(chave, icone, rotulo, resumo, corpo) {
+    if (!PC) return corpo;
+    grade.push('<button class="opBt" type="button" data-op="' + chave + '">' + F.ic(icone) + '<span><b>' + rotulo + '</b>' + (resumo ? '<small>' + F.esc(resumo) + '</small>' : '') + '</span></button>');
+    if (abertoOp === chave) modais += janela(F.ic(icone) + rotulo, corpo + '<div class="duas" style="margin-top:4px"><span></span>' + bt('opFechar', 'Cancelar', 'linha') + '</div>', 'opFechar');
+    return '';
+  }
   var linhas = '';
   if (cap.can_take) linhas += '<div class="linhaOp">' + bt('btAssumir', 'Assumir chamado', 'rosa', 'pessoa') + '</div>';
   if (cap.can_change_status && (cap.valid_statuses || []).length) {
-    linhas += '<div class="linhaOp"><label for="selStatus">Status · atual: ' + F.esc(stLabel(t.status)) + '</label><div class="lado"><select id="selStatus">' +
+    linhas += opItem('status', 'troca', 'Status', stLabel(t.status), '<div class="linhaOp"><label for="selStatus">Status · atual: ' + F.esc(stLabel(t.status)) + '</label><div class="lado"><select id="selStatus">' +
       opcoes(cap.valid_statuses.map(function (v) { return [v, stLabel(v)]; }), '', 'Alterar para…') +
-      '</select><button id="btStatus"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btStatus' ? '…' : 'Alterar') + '</button></div></div>';
+      '</select><button id="btStatus"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btStatus' ? '…' : 'Alterar') + '</button></div></div>');
   }
   if (cap.can_change_priority) {
-    linhas += '<div class="linhaOp"><label for="selPrio">Prioridade</label><div class="lado"><select id="selPrio">' +
+    linhas += opItem('prio', 'alerta', 'Prioridade', (PRIO[t.priority] || [t.priority || ''])[0], '<div class="linhaOp"><label for="selPrio">Prioridade</label><div class="lado"><select id="selPrio">' +
       opcoes(Object.keys(PRIO).map(function (k) { return [k, PRIO[k][0]]; }), t.priority) +
-      '</select><button id="btPrio"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btPrio' ? '…' : 'Salvar') + '</button></div></div>';
+      '</select><button id="btPrio"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btPrio' ? '…' : 'Salvar') + '</button></div></div>');
   }
   if (cap.can_change_assignee) {
-    linhas += '<div class="linhaOp"><label for="selResp">Responsável (transferir para outra pessoa)</label><div class="lado"><select id="selResp">' +
+    var nomeResp = ((d.assignee_options || []).filter(function (o) { return o.id === t.assignee_user_id; })[0] || {}).name || (t.assignee_user_id == null ? 'Não atribuído' : (d.assignee_name || ''));
+    linhas += opItem('resp', 'pessoa', 'Responsável', nomeResp, '<div class="linhaOp"><label for="selResp">Responsável (transferir para outra pessoa)</label><div class="lado"><select id="selResp">' +
       opcoes((d.assignee_options || []).map(function (o) { return [o.id, o.name]; }), t.assignee_user_id == null ? '' : t.assignee_user_id, 'Não atribuído') +
-      '</select><button id="btResp"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btResp' ? '…' : 'Salvar') + '</button></div></div>';
+      '</select><button id="btResp"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btResp' ? '…' : 'Salvar') + '</button></div></div>');
   }
   var trOpc = opcoesTR(d);
   if (cap.can_transfer_assignee && trOpc.length) {
-    linhas += '<div class="linhaOp">';
-    if (!abertoTR) linhas += bt('btTRAbrir', 'Transferir responsável', 'linha', 'pessoa') +
-      '<div class="nota">Passa o chamado para alguém de outro setor, sem mudar a fila.</div>';
-    else linhas += '<div class="trBox"><div class="trTit">' + F.ic('pessoa') + 'Transferir responsável</div>' +
+    var trForm = '<div class="trBox"><div class="trTit">' + F.ic('pessoa') + 'Transferir responsável</div>' +
       '<div class="nota" style="margin:0 0 4px">A fila permanece em ' + F.esc(d.queue_name || 'este setor') + '. O acesso será concedido somente a este chamado.</div>' +
       '<label for="trSetor">Setor</label><select id="trSetor">' + setoresTR(trOpc).map(function (x) { return '<option>' + F.esc(x) + '</option>'; }).join('') + '</select>' +
       '<label for="trBusca">Pesquisar responsável</label><input class="busca" id="trBusca" placeholder="Nome do responsável" autocomplete="off">' +
       '<label for="trResp">Novo responsável</label><select id="trResp"></select>' +
       '<label for="trMotivo">Motivo do encaminhamento</label><textarea class="area" id="trMotivo" maxlength="2000" placeholder="Explique por que está passando o chamado…"></textarea>' +
       '<div class="duas" style="margin-top:6px">' + bt('btTRConfirmar', 'Confirmar transferência', 'rosa') + bt('btTRCancelar', 'Cancelar', 'linha') + '</div></div>';
-    linhas += '</div>';
+    if (PC) {
+      grade.push('<button class="opBt" type="button" id="btTRAbrir">' + F.ic('pessoa') + '<span><b>Transferir responsável</b><small>outro setor, mesma fila</small></span></button>');
+      if (abertoTR) modais += janela('', trForm, 'btTRCancelar');
+    } else {
+      linhas += '<div class="linhaOp">' + (!abertoTR ? bt('btTRAbrir', 'Transferir responsável', 'linha', 'pessoa') +
+        '<div class="nota">Passa o chamado para alguém de outro setor, sem mudar a fila.</div>' : trForm) + '</div>';
+    }
   }
   if (cap.can_transfer && (d.transfer_options || []).length) {
-    linhas += '<div class="linhaOp"><label for="selSetor">Transferir para outro setor</label><div class="lado"><select id="selSetor">' +
+    linhas += opItem('setor', 'seta', 'Transferir setor', d.queue_name || '', '<div class="linhaOp"><label for="selSetor">Transferir para outro setor</label><div class="lado"><select id="selSetor">' +
       opcoes(d.transfer_options.map(function (o) { return [o.id, o.name]; }), '', 'Escolha o setor…') +
-      '</select><button id="btSetor"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btSetor' ? '…' : 'Transferir') + '</button></div></div>';
+      '</select><button id="btSetor"' + (ocupado ? ' disabled' : '') + '>' + (ocupado === 'btSetor' ? '…' : 'Transferir') + '</button></div></div>');
+  }
+  if (PC) {
+    var nA = anexos == null ? '' : anexos.length ? anexos.length + (anexos.length === 1 ? ' arquivo' : ' arquivos') : 'nenhum';
+    grade.push('<button class="opBt" type="button" data-op="anexos">' + F.ic('clipe') + '<span><b>Anexos' + (enviandoAnexo ? ' · enviando…' : '') + '</b><small>' + nA + (fechado ? '' : ' · anexar') + '</small></span></button>');
+    if (abertoOp === 'anexos') modais += janela(F.ic('clipe') + 'Anexos', anexosHtml(fechado).replace('<div class="sec"><h2>Anexos</h2><span id="nAnexos"></span></div>', '') +
+      '<div class="duas" style="margin-top:4px"><span></span>' + bt('opFechar', 'Fechar', 'linha') + '</div>', 'opFechar');
+    linhas += '<div class="opGrade">' + grade.join('') + '</div>';
   }
   if (cap.can_propose_solution && !fechado) {
-    linhas += '<div class="linhaOp">';
-    if (!abertoSol) linhas += bt('btSolAbrir', 'Solicitar conclusão', 'verde', 'ok') +
-      '<div class="nota">Envia a solução para o solicitante confirmar e concluir o chamado.</div>';
-    else linhas += '<label for="txSolucao">Solução (o solicitante vai ler e confirmar)</label>' +
+    var solForm = '<label for="txSolucao">Solução (o solicitante vai ler e confirmar)</label>' +
       '<textarea class="area" id="txSolucao" maxlength="10000" placeholder="Descreva o que foi feito para resolver…"></textarea>' +
       '<div class="duas">' + bt('btSolEnviar', 'Enviar solução', 'verde') + bt('btSolCancelar', 'Cancelar', 'linha') + '</div>';
-    linhas += '</div>';
+    if (PC) {
+      linhas += '<div class="linhaOp opSol">' + bt('btSolAbrir', 'Solicitar conclusão', 'verde', 'ok') + '</div>';
+      if (abertoSol) modais += janela(F.ic('ok') + 'Solicitar conclusão', solForm, 'btSolCancelar');
+    } else {
+      linhas += '<div class="linhaOp">' + (!abertoSol ? bt('btSolAbrir', 'Solicitar conclusão', 'verde', 'ok') +
+        '<div class="nota">Envia a solução para o solicitante confirmar e concluir o chamado.</div>' : solForm) + '</div>';
+    }
   }
+  linhas += modais;
   if (linhas) h += '<div class="card op"><h3>Atendimento</h3>' + linhas + '</div>';
 
   // conversa
@@ -333,13 +376,13 @@ function render(d) {
   if (!itens.length && !(d.pendentes || []).length) h += '<div class="vazio">Nenhuma mensagem ainda.</div>';
   h += '</div>';
 
-  // anexos
-  h += '<div class="sec"><h2>Anexos</h2><span id="nAnexos"></span></div><div id="anexosBox"></div>';
-  if (!fechado) h += '<div style="margin-top:8px"' + (temCamera() ? ' class="duas"' : '') + '>' + bt('btAnexar', enviandoAnexo ? 'Enviando ' + enviandoAnexo + '…' : 'Anexar arquivo', 'linha', 'clipe') +
-    (temCamera() && !enviandoAnexo ? bt('btFoto', 'Tirar foto', 'linha', 'camera') : '') + '</div>' +
-    '<div class="nota">PDF, imagem, texto, Excel ou Word · até 10 MB' + (temCamera() ? '' : ' · <b>dica:</b> tire um print e cole aqui com <b>Ctrl+V</b>') + '</div>';
+  // anexos (no PC ficam no botão "Anexos" do atendimento)
+  if (!PC) h += anexosHtml(fechado);
   h += '<div class="rod">Tudo aqui é o mesmo chamado do site · ' + F.ic('externo').replace('class="ic ', 'class="ic " style="width:12px;height:12px;vertical-align:-2px"') + ' abre no site</div>';
   document.getElementById('conteudo').innerHTML = h;
+  // janela do formulário (PC): vai para o fim da página para ficar por cima de tudo
+  [].forEach.call(document.querySelectorAll('body>.opModal'), function (m) { m.remove(); });
+  if (document.documentElement.classList.contains('largo')) [].forEach.call(document.querySelectorAll('#conteudo .opModal'), function (m) { document.body.appendChild(m); });
   Object.keys(guard).forEach(function (k) { var el = document.getElementById(k); if (el) el.value = guard[k]; });
   desenharAnexos();
   desenharAval();
@@ -400,6 +443,8 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('input', function (ev) { if (ev.target.id === 'txAval') avalTxt = ev.target.value; });
 
 function desenharAnexos() {
+  var sb = document.querySelector('[data-op="anexos"] small');   // PC: o botão "Anexos" mostra quantos tem
+  if (sb && anexos != null) sb.textContent = (anexos.length ? anexos.length + (anexos.length === 1 ? ' arquivo' : ' arquivos') : 'nenhum') + (document.getElementById('btAnexar') || !fechadoAtual() ? ' · anexar' : '');
   var box = document.getElementById('anexosBox'); if (!box) return;
   var n = document.getElementById('nAnexos');
   if (anexos == null) { box.innerHTML = '<div class="vazio">Carregando anexos…</div>'; return; }
@@ -420,6 +465,29 @@ function operar(botao, tipo, valor) {
   try { App.operarChamado(ID, tipo, valor == null ? '' : String(valor)); } catch (e) { ocupado = ''; if (dados) render(dados); }
 }
 function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+function fechadoAtual() { var t = dados && dados.ticket; return !!(t && FECHADOS.indexOf(t.status) >= 0); }
+function anexosHtml(fechado) {
+  var a = '<div class="sec"><h2>Anexos</h2><span id="nAnexos"></span></div><div id="anexosBox"></div>';
+  if (!fechado) a += '<div style="margin-top:8px"' + (temCamera() ? ' class="duas"' : '') + '>' + bt('btAnexar', enviandoAnexo ? 'Enviando ' + enviandoAnexo + '…' : 'Anexar arquivo', 'linha', 'clipe') +
+    (temCamera() && !enviandoAnexo ? bt('btFoto', 'Tirar foto', 'linha', 'camera') : '') + '</div>' +
+    '<div class="nota">PDF, imagem, texto, Excel ou Word · até 10 MB' + (temCamera() ? '' : ' · <b>dica:</b> tire um print e cole aqui com <b>Ctrl+V</b>') + '</div>';
+  return a;
+}
+/** No PC (tela larga) o formulário abre numa janela por cima; no celular continua no lugar. */
+function janela(tit, corpo, cancelar) {
+  return '<div class="opModal" data-cancel="' + cancelar + '"><div class="opCx">' + (tit ? '<div class="opTit">' + tit + '</div>' : '') + corpo + '</div></div>';
+}
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Escape' || !document.documentElement.classList.contains('largo')) return;
+  var m = document.querySelector('.opModal'); if (m) { var b = document.getElementById(m.getAttribute('data-cancel')); if (b) b.click(); }
+});
+document.addEventListener('click', function (ev) {
+  var o = ev.target.closest && ev.target.closest('[data-op]');
+  if (o && window.dados) { abertoOp = o.getAttribute('data-op'); render(dados); return; }
+  if (ev.target.closest && ev.target.closest('#opFechar')) { abertoOp = null; if (window.dados) render(dados); return; }
+  var m = ev.target; if (!m.classList || !m.classList.contains('opModal') || !document.documentElement.classList.contains('largo')) return;
+  var b = document.getElementById(m.getAttribute('data-cancel')); if (b) b.click();
+});
 function ligar(d) {
   var t = d.ticket || {};
   function on(id, f) { var el = document.getElementById(id); if (el) el.onclick = f; }
@@ -545,7 +613,7 @@ window.chamadoAcao = function (id, tipo, ok, msg) {
     if (dados) render(dados);
   } else {
     ocupado = '';
-    if (ok) { abertoSol = false; abertoRej = false; confirmaAceite = false; if (tipo === 'transferirResp') abertoTR = false; }
+    if (ok) { abertoSol = false; abertoRej = false; confirmaAceite = false; abertoOp = null; if (tipo === 'transferirResp') abertoTR = false; }
     mostrarToast(msg || (ok ? 'Feito' : 'Não deu certo'));
     if (dados) render(dados);              // destrava os botões
   }
@@ -564,6 +632,19 @@ be.onclick = function () {
 };
 document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
 document.getElementById('btAt').onclick = function () { carregar(); carregarAnexos(); };
+document.getElementById('btPdf').innerHTML = F.ic('baixar');
+var gerandoPdf = false;
+document.getElementById('btPdf').onclick = function () {
+  if (gerandoPdf) return;
+  if (!dados || !dados.ticket) { mostrarToast('Espere o chamado carregar'); return; }
+  if (!window.App || !App.salvarArquivo) { mostrarToast('Atualize o app para exportar a conversa'); return; }
+  gerandoPdf = true; var b = this; b.classList.add('gira'); mostrarToast('Gerando o PDF da conversa…');
+  window.exportarConversaPdf(dados, anexos || [], mostrarToast).then(function (b64) {
+    var t = dados.ticket, d = new Date(), p = function (n) { return ('0' + n).slice(-2); };
+    App.salvarArquivo(b64, 'Chamado_' + String(t.protocol || t.id).replace(/[^A-Za-z0-9-]/g, '') + '_conversa_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.pdf', 'application/pdf');
+  }).catch(function (e) { mostrarToast('Não consegui gerar o PDF: ' + (e && e.message || e)); })
+    .then(function () { gerandoPdf = false; b.classList.remove('gira'); });
+};
 document.getElementById('btSite').onclick = function () { try { App.siteDireto('/helpdesk/tickets/' + ID); } catch (e) {} };
 F.topoSombra();
 carregar();

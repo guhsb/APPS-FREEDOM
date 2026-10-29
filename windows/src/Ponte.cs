@@ -326,6 +326,26 @@ namespace Freedom
             });
         }
 
+        /// <summary>Salva um arquivo gerado pela tela (ex.: PDF da conversa) em Downloads e mostra no Explorer.</summary>
+        public void salvarArquivo(string base64, string nome, string mime)
+        {
+            Fundo(() =>
+            {
+                try
+                {
+                    var dados = Convert.FromBase64String(base64 ?? "");
+                    var seguro = string.Join("_", (nome ?? "arquivo").Split(System.IO.Path.GetInvalidFileNameChars())).Trim();
+                    if (seguro.Length == 0) seguro = "arquivo";
+                    var destino = System.IO.Path.Combine(Pastas.Downloads, seguro); int n = 2;
+                    while (System.IO.File.Exists(destino)) destino = System.IO.Path.Combine(Pastas.Downloads, System.IO.Path.GetFileNameWithoutExtension(seguro) + " (" + (n++) + ")" + System.IO.Path.GetExtension(seguro));
+                    System.IO.File.WriteAllBytes(destino, dados);
+                    try { Process.Start("explorer.exe", "/select,\"" + destino + "\""); } catch (Exception) { }
+                    j.JsApp("window.F && F.toast && F.toast(" + Q("Salvo em Downloads: " + System.IO.Path.GetFileName(destino)) + ")");
+                }
+                catch (Exception e) { j.JsApp("window.F && F.toast && F.toast(" + Q("Não consegui salvar: " + e.Message) + ")"); }
+            });
+        }
+
         public void baixarAnexo(object idO, object anexoO, string nome)
         {
             int id = N(idO), anexo = N(anexoO);

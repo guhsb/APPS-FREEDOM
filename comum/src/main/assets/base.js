@@ -368,8 +368,19 @@ F.aoColarImagem = function (fn) {
       var conv = k.classList.contains('tl') || (k.classList.contains('sec') && l[ix + 1] && l[ix + 1].classList.contains('tl'));
       (conv ? E : D).appendChild(k);
     });
-    g.appendChild(E); g.appendChild(D); c.appendChild(g);
+    g.appendChild(D); g.appendChild(E); c.appendChild(g);   // dados à esquerda, conversa à direita
+    // a página não rola: só a conversa (esquerda) e, se precisar, a coluna da direita
+    raiz.classList.add('chamadoFixo'); alturaChamado();
+    if (rolConv.fim || rolConv.top == null) E.scrollTop = rolConv.top == null ? 0 : E.scrollHeight; else E.scrollTop = rolConv.top;
+    E.addEventListener('scroll', function () { rolConv.top = E.scrollTop; rolConv.fim = E.scrollHeight - E.scrollTop - E.clientHeight < 30; });
   }
+  var rolConv = { top: null, fim: false };
+  function alturaChamado() {
+    var g = document.querySelector('.gC'); if (!g) return;
+    var cx = document.getElementById('caixa'), baixo = cx && cx.offsetHeight ? cx.offsetHeight + 26 : 20;
+    g.style.height = Math.max(260, window.innerHeight - g.getBoundingClientRect().top - baixo) + 'px';
+  }
+  window.addEventListener('resize', function () { alturaChamado(); });
   function grupoCartoes(c, l) {
     var g = document.createElement('div'); g.className = 'gL';
     var blocos = [];
