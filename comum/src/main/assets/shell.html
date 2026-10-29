@@ -26,7 +26,7 @@ html[data-tema=escuro] .marca{background:#fff}
 .usu{display:flex;align-items:center;gap:9px;background:var(--sf);border-radius:999px;padding:5px 14px 5px 5px;box-shadow:var(--sombra);flex:none;max-width:230px}
 .usu .av{width:34px;height:34px;border-radius:50%;background:var(--rosa);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
 .usu b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.usu small{display:block;font-size:11px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.usu div{min-width:0}
+.usu div{min-width:0}.usu{cursor:pointer;transition:box-shadow .2s,background .2s}.usu:hover{box-shadow:0 0 0 2px var(--rosa-s),var(--sombra)}.usu.on{box-shadow:0 0 0 2px var(--rosa),var(--sombra)}
 @media (max-width:1000px){.usu div{display:none}.usu{padding:5px}.pilulas b{padding:9px 12px}}
 /* ---- atalhos da esquerda ---- */
 .rail{height:100vh;box-sizing:border-box;padding:8px 0 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
@@ -81,7 +81,7 @@ function topo(e) {
     (e.abas || []).map(function (a) { return '<b data-aba="' + esc(a[0]) + '"' + (a[0] === e.aba ? ' class="on"' : '') + '>' + esc(a[1]) + '</b>'; }).join('') + '</div>' +
     '<div class="botoes"><span class="bt' + (e.sino ? ' on' : '') + '" id="btSino" title="Avisos">' + S(ACOES.sino) + '<span class="selo' + (e.naoLidos ? '' : ' zero') + '">' + (e.naoLidos > 99 ? '99+' : (e.naoLidos || 0)) + '</span></span>' +
     '<span class="bt" id="btAtual" title="Atualizar esta tela">' + S(ACOES.atualizar) + '</span></div>' +
-    '<div class="usu" title="' + esc(e.email) + '"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>' + esc(e.email || '') + '</small></div></div></div>';
+    '<div class="usu' + (e.helpSub === 'config' ? ' on' : '') + '" id="btUsu" title="Configurações · ' + esc(e.email) + '"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>' + esc(e.email || '') + '</small></div></div></div>';
   return h;
 }
 function rail(e) {
@@ -125,10 +125,11 @@ window.shellAtualizar = function () { desenhar(); };
 window.temaMudou = function () { desenhar(true); };
 window.addEventListener('resize', posInd);
 document.addEventListener('click', function (ev) {
-  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-s],[data-r],[data-pn],#btSino,#btAtual') : null; if (!t) return;
+  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-s],[data-r],[data-pn],#btSino,#btAtual,#btUsu') : null; if (!t) return;
   try {
     if (t.hasAttribute('data-pn')) { App.painelShell(t.getAttribute('data-pn')); return; }
     if (t.id === 'btSino') { var rb = t.getBoundingClientRect(); App.sino(!t.classList.contains('on'), Math.round(rb.left + rb.width / 2)); return; }
+    if (t.id === 'btUsu') { App.acaoShell('config'); return; }
     if (t.id === 'btAtual') { t.classList.add('gira'); setTimeout(function () { t.classList.remove('gira'); }, 900); App.acaoShell('atualizar'); return; }
     if (t.hasAttribute('data-aba')) { App.irAba(t.getAttribute('data-aba')); return; }
     if (t.hasAttribute('data-s')) { [].forEach.call(document.querySelectorAll('[data-s]'), function (x) { x.classList.toggle('on', x === t); }); App.irSub(t.getAttribute('data-s')); return; }

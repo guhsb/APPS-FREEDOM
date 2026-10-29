@@ -528,6 +528,11 @@ namespace Freedom
                 case "chamado": Sino(false); helpSub = ""; AbrirTela("novo.html"); break;
                 case "claro": case "escuro": DefinirTema(nome); break;
                 case "sair": ponte.sair(); break;
+                case "config":
+                    if (webApp == null || !AbaDisponivel("helpdesk")) break;
+                    Sino(false);
+                    webApp.CoreWebView2.Navigate(ASSET + "helpdesk.html?config=1"); paginaApp = "sub"; helpSub = "config";
+                    Selecionar("helpdesk"); AtualizarShell(); break;
             }
         }
         readonly Dictionary<string, string> acoesTela = new Dictionary<string, string>();

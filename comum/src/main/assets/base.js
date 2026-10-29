@@ -325,3 +325,100 @@ F.aoColarImagem = function (fn) {
     fn(arqs);
   });
 };
+
+// ---- PC: usa a largura da tela (cartões em 2 colunas) e mostra o formato da tela enquanto os dados chegam ----
+(function () {
+  var raiz = document.documentElement, pc = false;
+  try { var pl = window.App && App.plataforma && App.plataforma(); pc = pl === 'windows' || pl === 'mac'; } catch (e) { }
+  function medir() { raiz.classList.toggle('largo', pc && window.innerWidth >= 980); }
+  medir(); window.addEventListener('resize', function () { var a = raiz.classList.contains('largo'); medir(); if (a !== raiz.classList.contains('largo')) tudo(); });
+
+  // esqueleto: cartões cinzas brilhando no lugar dos dados (no celular também)
+  function i(w, h, m) { return '<i style="width:' + w + ';height:' + h + 'px' + (m ? ';margin-top:' + m + 'px' : '') + '"></i>'; }
+  function esqueleto(onde) {
+    if (onde.id === 'lista') return '<div class="esqL">' + new Array(7).join('<div class="esq">' + i('30%', 13) + i('70%', 11) + i('22%', 10) + '</div>') + '</div>';
+    if (/chamado\.html/.test(location.pathname)) return '<div class="esqG"><div class="esqE">' + i('20%', 12) + '<div class="esq" style="width:70%">' + i('40%', 11) + i('90%', 12) + i('60%', 12) + '</div><div class="esq" style="width:55%;align-self:flex-end">' + i('30%', 11) + i('80%', 12) + '</div><div class="esq" style="width:65%">' + i('40%', 11) + i('85%', 12) + '</div></div>' +
+      '<div class="esqD"><div class="esq">' + i('45%', 14) + i('80%', 18) + i('100%', 40, 14) + '</div><div class="esq">' + i('35%', 12) + i('100%', 44, 10) + '</div></div></div>';
+    var t = '<div class="esq">' + i('50%', 11) + i('70%', 24) + i('40%', 10) + '</div>';
+    return '<div class="esqG"><div class="esq cheio">' + i('22%', 12) + i('45%', 36) + i('30%', 12) + i('100%', 12, 20) + i('60%', 24, 14) + '</div>' +
+      '<div class="esqT cheio">' + t + t + t + t + '</div>' +
+      '<div class="esq">' + i('40%', 14) + i('60%', 10) + i('100%', 180, 18) + '</div>' +
+      '<div class="esq">' + i('45%', 14) + i('100%', 38, 16) + i('100%', 38) + i('100%', 38) + i('100%', 38) + '</div></div>';
+  }
+  function trocarCarregando(c) {
+    if (!c) return;
+    [].forEach.call(c.querySelectorAll(':scope>.carregando:not(.esqOn)'), function (k) { k.classList.add('esqOn'); k.insertAdjacentHTML('beforeend', esqueleto(c)); });
+  }
+
+  // agrupa "título de seção + o que vem embaixo" e põe os cartões lado a lado
+  var CHEIO = /\b(tabs|filtro|filtros|hero|status|aviso|kpis|acoes|k4|sla|rod|nota|carregando|dashbt|vis|kanban|topo)\b/;
+  function itens(c) {
+    var l = [];
+    [].forEach.call(c.children, function (k) {
+      if (k.classList.contains('gL')) [].forEach.call(k.children, function (x) { if (x.classList.contains('bl')) [].push.apply(l, [].slice.call(x.children)); else l.push(x); });
+      else if (k.classList.contains('gC')) [].forEach.call(k.children, function (x) { [].push.apply(l, [].slice.call(x.children)); });
+      else l.push(k);
+    });
+    return l.filter(function (x) { return x.tagName !== 'SCRIPT' && x.tagName !== 'STYLE'; });
+  }
+  function grupoChamado(c, l) {
+    var E = document.createElement('div'), D = document.createElement('div'), g = document.createElement('div');
+    E.className = 'ladoE'; D.className = 'ladoD'; g.className = 'gC';
+    l.forEach(function (k, ix) {
+      var conv = k.classList.contains('tl') || (k.classList.contains('sec') && l[ix + 1] && l[ix + 1].classList.contains('tl'));
+      (conv ? E : D).appendChild(k);
+    });
+    g.appendChild(E); g.appendChild(D); c.appendChild(g);
+  }
+  function grupoCartoes(c, l) {
+    var g = document.createElement('div'); g.className = 'gL';
+    var blocos = [];
+    for (var n = 0; n < l.length; n++) {
+      var k = l[n]; k.classList.remove('cheio');
+      if (k.classList.contains('sec') && l[n + 1]) {
+        var b = document.createElement('div'); b.className = 'bl'; b.appendChild(k);
+        while (l[n + 1] && !l[n + 1].classList.contains('sec') && !/\b(tabs|filtro|hero|k4|sla|rod|kpis|acoes|dashbt)\b/.test(l[n + 1].className)) b.appendChild(l[++n]);
+        blocos.push(b); continue;
+      }
+      blocos.push(k);
+    }
+    blocos.forEach(function (k) { k.classList.remove('cheio'); g.appendChild(k); });
+    c.appendChild(g);
+    // linhas curtas (filtros, botões, avisos) e o que ficaria sozinho na linha ocupam a largura toda: sem buraco
+    var col = 0, ant = null;
+    blocos.forEach(function (k) {
+      var cheio = !k.classList.contains('bl') && (CHEIO.test(k.className) || !k.className || k.getBoundingClientRect().height < 80);
+      if (cheio) { k.classList.add('cheio'); if (col === 1 && ant) ant.classList.add('cheio'); col = 0; ant = null; return; }
+      if (col === 0) { ant = k; col = 1; } else { col = 0; ant = null; }
+    });
+    if (col === 1 && ant) ant.classList.add('cheio');
+  }
+  var ocupado = false;
+  function agrupar(c) {
+    if (!c || ocupado) return;
+    ocupado = true;
+    try {
+      trocarCarregando(c);
+      var l = itens(c);
+      if (!raiz.classList.contains('largo') || c.id === 'lista' || (l.length === 1 && l[0].classList.contains('carregando'))) {
+        if (c.querySelector(':scope>.gL,:scope>.gC')) l.forEach(function (k) { k.classList.remove('cheio'); c.appendChild(k); });
+        [].slice.call(c.querySelectorAll(':scope>.gL,:scope>.gC')).forEach(function (x) { x.remove(); });
+        return;
+      }
+      var ja = c.children.length === 1 && (c.firstElementChild.classList.contains('gL') || c.firstElementChild.classList.contains('gC'));
+      if (ja) return;
+      var velhos = [].slice.call(c.querySelectorAll(':scope>.gL,:scope>.gC'));
+      if (/chamado\.html/.test(location.pathname) && l.some(function (x) { return x.classList.contains('tl'); })) grupoChamado(c, l); else grupoCartoes(c, l);
+      velhos.forEach(function (x) { x.remove(); });
+    } catch (e) { } finally { ocupado = false; }
+  }
+  function alvos() { return ['conteudo', 'c', 'lista'].map(function (id) { return document.getElementById(id); }).filter(Boolean); }
+  function tudo() { alvos().forEach(function (c) { if (c.id === 'lista') trocarCarregando(c); else agrupar(c); }); }
+  function ligar() {
+    alvos().forEach(function (c) {
+      new MutationObserver(function () { if (c.id === 'lista') trocarCarregando(c); else agrupar(c); }).observe(c, { childList: true });
+    });
+    tudo();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ligar); else ligar();
+})();

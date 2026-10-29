@@ -128,3 +128,48 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;strok
 .modal .previa .pagTopo{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--sf);position:sticky;top:0;z-index:1;font-size:13px}
 .modal .previa .pagTopo button.pagBt{display:inline-flex;width:auto;margin:0;padding:7px 12px;font-size:12.5px;border-radius:9px;background:var(--rosa);color:#fff}
 html.barraFlutuante body::after{content:"";display:block;height:92px}
+
+/* ---- esqueleto enquanto os dados chegam ---- */
+.carregando.esqOn{padding:0;text-align:left;font-size:0;color:transparent}
+.carregando.esqOn>i{display:none}
+.carregando.esqOn i{border:0;animation:none;margin:0 0 10px;border-radius:8px}
+.esq{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:16px;box-shadow:var(--sombra);overflow:hidden;position:relative}
+.esq i{display:block;border-radius:8px;background:var(--sf3);margin-bottom:10px;position:relative;overflow:hidden}
+.esq i:last-child{margin-bottom:0}
+.esq i:after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);animation:brilho 1.2s infinite}
+html[data-tema="escuro"] .esq i:after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent)}
+@keyframes brilho{to{transform:translateX(100%)}}
+.esqG{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.esqT{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.esqL{display:flex;flex-direction:column;gap:8px}
+.esqE{display:flex;flex-direction:column;gap:10px}.esqE>i{background:var(--sf3);border-radius:6px;display:block}
+.esqD{display:flex;flex-direction:column;gap:12px}
+
+/* ---- PC (Windows/Mac): usa a largura da tela ---- */
+html.largo body,html.largo body.dash{max-width:1180px!important;margin:0 auto}
+html.largo .gL{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+html.largo .gL>*{margin-top:0!important;margin-bottom:0!important;min-width:0}
+html.largo .gL>.cheio{grid-column:1/-1}
+html.largo .gL .card{margin-bottom:0}
+html.largo .bl{display:flex;flex-direction:column;gap:8px;min-width:0}
+html.largo .bl>*{margin-top:0!important;margin-bottom:0!important}
+html.largo .gL+*{margin-top:12px}
+html.largo .k4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))!important}
+html.largo .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
+html.largo .filtros{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))!important}
+html.largo .graf{max-width:none}
+html.largo .barraLote{max-width:1180px!important}
+html.largo #lista>.lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;background:none;border:0;box-shadow:none;overflow:visible;border-radius:0}
+html.largo #lista>.lista>*{background:var(--sf);border:1px solid var(--ln)!important;border-radius:14px;box-shadow:var(--sombra)}
+html.largo .esqG{grid-template-columns:repeat(2,minmax(0,1fr))}
+html.largo .esqG>.cheio{grid-column:1/-1}
+html.largo .esqT{grid-template-columns:repeat(4,minmax(0,1fr))}
+html.largo .esqL{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+html.largo .esqG:has(.esqE){grid-template-columns:minmax(0,1fr) 380px}
+/* chamado: conversa à esquerda, dados e anexos à direita */
+html.largo .gC{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+html.largo .gC .ladoE{display:flex;flex-direction:column;gap:10px;min-width:0}
+html.largo .gC .ladoE>*{margin-top:0!important}
+html.largo .gC .ladoD{position:sticky;top:84px;display:flex;flex-direction:column;gap:12px;min-width:0}
+html.largo .gC .ladoD>*{margin:0!important}
+html.largo .caixa{max-width:1156px}

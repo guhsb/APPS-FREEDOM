@@ -56,7 +56,11 @@ var STATUS = { OPEN: ['Aberto', 'var(--azul)', 'rgba(79,124,255,.15)'], IN_PROGR
   PENDING_APPROVAL: ['Aguard. aprovação', 'var(--verde)', 'rgba(31,191,143,.15)'] };
 var PRIO = { LOW: '#6b7489', MEDIUM: '#4f7cff', NORMAL: '#4f7cff', HIGH: '#f0a53a', URGENT: '#ef4444', CRITICAL: '#ef4444' };
 var PRIO_TXT = { LOW: 'Baixa', MEDIUM: 'Média', NORMAL: 'Normal', HIGH: 'Alta', URGENT: 'Urgente', CRITICAL: 'Crítica' };
-var ultimo = '', diagAberto = false, cfgAberta = false;   // configurações começam minimizadas
+var ultimo = '', diagAberto = false, cfgAberta = false;
+// PC: as configurações abrem pelo nome do usuário (canto de cima), numa tela só delas (helpdesk.html?config=1)
+var SO_CFG = /config=1/.test(location.search), PC = true;
+try { PC = App.plataforma() !== 'android'; } catch (e) { }
+if (SO_CFG) { cfgAberta = true; document.querySelector('.topo h1').textContent = 'Configurações'; }   // configurações começam minimizadas
 // trocar o tema remonta a tela no Android: volta com as configurações abertas
 try { if (localStorage.getItem('cfgAbrir')) { cfgAberta = true; localStorage.removeItem('cfgAbrir'); } } catch (e) { }
 document.getElementById('btAt').innerHTML = F.ic('atualizar');
@@ -109,13 +113,14 @@ function render() {
   document.getElementById('sub').innerHTML = (nome ? 'Olá, <b>' + F.esc(nome) + '</b> · ' : '') +
     (e.verificando ? 'verificando…' : e.ultima ? 'verificado ' + quando(e.ultima) : 'ainda não verificado');
   var h = '';
+  var ap = e.app || {};
+  if (!SO_CFG) {
 
   // situação dos avisos
   var ok = e.status === 'ok' || !e.status, cls = !e.ativo ? 'off' : ok ? '' : 'erro';
   var txt = !e.ativo ? 'Avisos desligados' : ok ? 'Avisos ligados · ' + (e.tempoReal ? 'tempo real' : 'econômico') + ' (' + rotInt(e.intervalo) + ')' : e.status;
   h += '<div class="status ' + cls + '"><i></i><span>' + F.esc(txt) + '</span></div>';
 
-  var ap = e.app || {};
   if (ap.baixando)
     h += '<div class="aviso rosa">' + F.ic('atualizar') + '<span>Baixando a versão nova do app… <b>' + F.int(ap.progresso) + '%</b></span></div>';
   else if (ap.nova)
@@ -187,11 +192,12 @@ function render() {
     h += '</div>';
   }
 
+  }
   // configurações
   var opts = [15, 30, 60, 120, 300, 600, 900, 1800].map(function (s) {
     return '<option value="' + s + '"' + (s === e.intervalo ? ' selected' : '') + '>' + rotInt(s) + '</option>';
   }).join('');
-  h += '<button class="cfgTopo' + (cfgAberta ? ' on' : '') + '" id="btCfg"><span class="ico">' + F.ic('engrenagem') + '</span><span class="tx"><b>Configurações</b>' +
+  if (!SO_CFG && !PC) h += '<button class="cfgTopo' + (cfgAberta ? ' on' : '') + '" id="btCfg"><span class="ico">' + F.ic('engrenagem') + '</span><span class="tx"><b>Configurações</b>' +
     '<em>Avisos, som, aparência, versão do app e login</em></span>' + F.ic('baixo', 'seta') + '</button>';
   if (cfgAberta) h += '<div class="lista cfg">' +
     linhaCfg('lua', 'Modo escuro', 'Desligado, o app fica claro, com as cores do site.', chave('cTema', F.tema() === 'escuro')) +
@@ -209,10 +215,10 @@ function render() {
       '<button class="b2" id="btCopiarDiag" style="margin-top:10px;width:100%;border:0;border-radius:10px;padding:11px;font:inherit;font-weight:700;background:var(--sf3);color:var(--tx)">Copiar diagnóstico</button></div>' : '') +
     linhaBotao('sair', 'sair', 'Sair / trocar login', F.esc(e.email || ''), 'rgba(239,68,68,.12)', 'var(--tx-vermelho)', 'perigo') +
     '</div>';
-  h += '<div class="rod">Toque num número, aviso ou chamado para abrir</div>';
+  if (!SO_CFG) h += '<div class="rod">Toque num número, aviso ou chamado para abrir</div>';
 
   document.getElementById('conteudo').innerHTML = h;
-  document.getElementById('btCfg').onclick = function () { cfgAberta = !cfgAberta; ultimo = ''; render(); if (cfgAberta) { var b = document.getElementById('btCfg'); if (b.scrollIntoView) b.scrollIntoView({ behavior: 'smooth', block: 'start' }); } };
+  var bcfg = document.getElementById('btCfg'); if (bcfg) bcfg.onclick = function () { cfgAberta = !cfgAberta; ultimo = ''; render(); if (cfgAberta) { var b = document.getElementById('btCfg'); if (b.scrollIntoView) b.scrollIntoView({ behavior: 'smooth', block: 'start' }); } };
   if (!cfgAberta) return;
   document.getElementById('cTema').onchange = function () { try { if (App.plataforma() === 'android') localStorage.setItem('cfgAbrir', '1'); } catch (e) { } F.definirTema(this.checked ? 'escuro' : 'claro'); };
   document.getElementById('cAtivo').onchange = function () { cfg({ ativo: this.checked }); };

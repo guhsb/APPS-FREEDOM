@@ -85,6 +85,8 @@ body.kb{max-width:none!important;margin:0!important}
 F.IC.busca = '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>';
 // #meus · #fila · #comigo  (+ &sla=AT_RISK · &status=OPEN ...)
 var partes = (location.hash || '#meus').slice(1).split('&');
+// os atalhos da esquerda só trocam o "#..." do endereço: recarrega para mostrar a outra lista
+window.addEventListener('hashchange', function () { location.reload(); });
 var modo = partes[0] || 'meus';
 var f = { status: '', priority: '', queue: '', sla: '', sort: '', busca: '', sem: '' };
 partes.slice(1).forEach(function (p) { var kv = p.split('='); if (kv[0] in f) f[kv[0]] = decodeURIComponent(kv[1] || ''); });
