@@ -157,7 +157,7 @@ html.largo .gL+*{margin-top:12px}
 html.largo .k4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))!important}
 html.largo .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
 html.largo .filtros{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))!important}
-html.largo .graf{max-width:none}
+html.largo .graf{max-width:820px}
 html.largo .barraLote{max-width:1180px!important}
 html.largo #lista>.lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;background:none;border:0;box-shadow:none;overflow:visible;border-radius:0}
 html.largo #lista>.lista>*{background:var(--sf);border:1px solid var(--ln)!important;border-radius:14px;box-shadow:var(--sombra)}
@@ -173,3 +173,24 @@ html.largo .gC .ladoE>*{margin-top:0!important}
 html.largo .gC .ladoD{position:sticky;top:84px;display:flex;flex-direction:column;gap:12px;min-width:0}
 html.largo .gC .ladoD>*{margin:0!important}
 html.largo .caixa{max-width:1156px}
+html.largo .card.atencao{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+html.largo .card.atencao>.ins:nth-child(2){border-top:0;padding-top:0}
+/* cartão alto ao lado de um baixo: fica do mesmo tamanho, com "Ver mais" */
+html.largo .cortado{overflow:hidden;position:relative}
+html.largo .cortado>.verMais{position:absolute;left:0;right:0;bottom:0;height:74px;border:0;cursor:pointer;display:flex;align-items:flex-end;justify-content:center;gap:6px;padding:0 0 14px;
+  background:linear-gradient(to bottom,rgba(255,255,255,0),var(--sf) 62%);color:var(--azul);font:inherit;font-size:13px;font-weight:700;border-radius:0 0 16px 16px}
+html.largo .cortado>.verMais svg.ic{width:15px;height:15px}
+html.largo .bl.cortado>.verMais{background:linear-gradient(to bottom,rgba(238,242,247,0),var(--bg) 62%)}
+html[data-tema="escuro"].largo .cortado>.verMais{background:linear-gradient(to bottom,rgba(18,21,29,0),var(--sf) 62%)}
+html[data-tema="escuro"].largo .bl.cortado>.verMais{background:linear-gradient(to bottom,rgba(11,13,18,0),var(--bg) 62%)}
+.vmFundo{position:fixed;inset:0;z-index:90;background:rgba(15,27,61,.38);display:flex;align-items:flex-start;justify-content:center;padding:40px 24px;overflow:auto}
+.vmCaixa{position:relative;width:100%;max-width:900px;background:var(--bg);border-radius:20px;padding:22px 18px 18px;box-shadow:0 24px 60px rgba(15,27,61,.3)}
+.vmCaixa>*:not(.vmFechar){margin:0!important}
+.vmFechar{position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;border-radius:10px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.vmFechar svg.ic{width:16px;height:16px}
+/* listas longas em 2 colunas (ex.: Standby · selecionados) */
+html.largo .card.duas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px;align-items:start}
+html.largo .card.duas>.ct,html.largo .card.duas>.cs,html.largo .card.duas>.vazio2{grid-column:1/-1}
+html.largo .gL>.par{align-self:stretch}
+html.largo .gL>.bl.par>:last-child{flex:1}
+html.largo .gL>.cheio svg:not(.ic),html.largo .gL>.bl.cheio svg:not(.ic){max-height:300px}

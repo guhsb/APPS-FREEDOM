@@ -176,7 +176,19 @@
       fonte(ctx, 11.5); ctx.fillStyle = C.tx3; return y + paragrafo(ctx, b.t, x, y + 12, w, 16) + 4;
     },
     linha: function (ctx, b, x, y, w) {   // rótulo à esquerda, valor grande à direita
-      fonte(ctx, 12); ctx.fillStyle = C.tx3; texto(ctx, b.r, x, y + 18, w * 0.55);
+      fonte(ctx, 12); ctx.fillStyle = C.tx3; texto(ctx, b.r, x, y + 18, b.extra ? w * 0.36 : w * 0.55);
+      if (b.extra) {   // valor + variação na mesma linha, na mesma cor ("R$ 955.796,25  ▲ 5,2%"), diminuindo junto se não couber
+        var tam = 18, maxW = w * 0.62, ext;
+        for (; tam > 12; tam -= 0.5) {
+          fonte(ctx, tam, 800); var wv = ctx.measureText(b.v).width;
+          fonte(ctx, tam * 0.72, 700); ext = ctx.measureText(b.extra).width;
+          if (wv + 8 + ext <= maxW) break;
+        }
+        ctx.fillStyle = b.c ? cor(b.c) : C.tx;
+        fonte(ctx, tam * 0.72, 700); ctx.textAlign = 'right'; ctx.fillText(b.extra, x + w, y + 20);
+        fonte(ctx, tam, 800); ctx.fillText(b.v, x + w - ext - 8, y + 20); ctx.textAlign = 'left';
+        return y + 32;
+      }
       fonte(ctx, 18, 800); ctx.fillStyle = b.c ? cor(b.c) : C.tx; texto(ctx, b.v, x + w, y + 20, w * 0.45, 'right');
       return y + 32;
     },

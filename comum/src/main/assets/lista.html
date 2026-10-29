@@ -35,7 +35,12 @@ body{padding-bottom:90px}
   font:inherit;font-weight:700;font-size:15px;box-shadow:0 10px 26px rgba(232,75,138,.35)}
 .fab svg.ic{width:20px;height:20px}
 /* ---------- Kanban (Windows e Mac): arrastar o cartão muda o status ---------- */
-body.kb{max-width:none!important;margin:0!important}
+body.kb,html.largo body.kb{max-width:none!important;margin:0!important}
+html.largo body.kb{padding:0 22px}
+html.largo .kanban{gap:10px}
+html.largo .col{min-width:180px;max-height:calc(100vh - 200px)}
+html.largo .col h4{font-size:12.5px;padding:12px 12px 9px}
+html.largo .kb .filtros{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .vis{display:inline-flex;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:3px;margin:0 0 10px;gap:2px}
 .vis button{border:0;background:transparent;color:var(--tx2);font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;display:flex;align-items:center;gap:6px;cursor:pointer}
 .vis button.on{background:var(--sf3);color:var(--tx);font-weight:700}

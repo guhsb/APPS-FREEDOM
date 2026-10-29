@@ -52,7 +52,7 @@ var Dash = (function () {
   X.ins = function (c, ic, t, x) { return '<div class="ins"><div class="ic2" style="background:var(--' + c + '-s);color:var(--' + c + ')">' + ic + '</div><p><b>' + t + '</b>' + (x ? '<br>' + x : '') + '</p></div>'; };
   X.atencao = function (lista) {
     if (!lista.length) return '';
-    return '<div class="sec"><h2>O que merece atenção</h2><span>gerado dos dados</span></div><div class="card">' + lista.join('') + '</div>';
+    return '<div class="sec"><h2>O que merece atenção</h2><span>gerado dos dados</span></div><div class="card atencao">' + lista.join('') + '</div>';
   };
   /** Barras horizontais: itens [nome, valor, %, extra, dataAttr]. */
   X.barras = function (itens, cor, fmt) {

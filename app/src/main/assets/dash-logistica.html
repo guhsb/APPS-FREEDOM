@@ -106,7 +106,7 @@ function resumo() {
     ['Mais de 30 dias', velhos.length, 'pedidos · ' + X.k(velhos.reduce(function (a, i) { return a + i.v; }, 0)), velhos.length ? 'neg' : ''],
     ['Pedidos grandes', grandes.length, '≥ R$ 50 mil · ' + X.k(grandes.reduce(function (a, i) { return a + i.v; }, 0))]]);
   h += X.card('Idade das pendências', 'Há quanto tempo o valor pendente espera', X.faixa(d.faixas.map(function (f, i) { return [f[0], f[1], CORES_IDADE[i]]; }), 30) +
-    X.legenda(d.faixas.map(function (f, i) { return [f[0], f[1], CORES_IDADE[i]]; }), X.k));
+    X.legenda(d.faixas.map(function (f, i) { return [f[0], f[1], CORES_IDADE[i]]; }), X.k), 'inteiro');
   var ins = [], vm = variacao(31);
   if (vm && vm.de > 0 && Math.abs(vm.dif) / vm.de >= 0.05) ins.push(X.ins(vm.dif > 0 ? 'laranja' : 'verde', vm.dif > 0 ? '▲' : '▼', 'Standby ' + (vm.dif > 0 ? 'subiu ' : 'caiu ') + Math.round(Math.abs(vm.dif) / vm.de * 100) + '% no período',
     X.k(vm.de) + ' (' + X.dm(vm.desde) + ') → ' + X.k(d.sb || d.serie[d.serie.length - 1].sb) + ' hoje' + (d.sel ? ' · ' + d.sel + ' seleções ativas' : '')));

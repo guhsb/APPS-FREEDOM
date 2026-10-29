@@ -363,7 +363,7 @@ var LG = (function () {
     h += X.abas(CATS.map(function (c) { var n = sels.filter(function (x) { return x.category === c[0]; }).length; return [c[0], c[1] + (n ? ' <small>' + n + '</small>' : '')]; }), s.cat, 'sbcat').replace(/data-sbcat=/g, 'data-act="sbCat" data-v=');
     var cat = CATS.filter(function (c) { return c[0] === s.cat; })[0];
     var ja = {}; sels.forEach(function (x) { if (x.category === s.cat) ja[x.item_value] = 1; });
-    h += '<div class="card"><p class="ct">Adicionar ' + cat[2] + '</p><input class="inp" id="sbBusca" placeholder="Buscar ' + cat[2] + '" value="' + F.esc(s.busca[s.cat] || '') + '" style="margin:6px 0 8px">' +
+    h += '<div class="card inteiro"><p class="ct">Adicionar ' + cat[2] + '</p><input class="inp" id="sbBusca" placeholder="Buscar ' + cat[2] + '" value="' + F.esc(s.busca[s.cat] || '') + '" style="margin:6px 0 8px">' +
       bloco(s, 'op', function (o) { var it = lista(o.items).filter(function (v) { return !ja[v]; }); return it.length ? sel('sbAdd', it, '', 'Selecione para adicionar') : '<div class="vazio2">Nenhuma sugestão encontrada.</div>'; }) + '</div>';
     h += bloco(s, 'sel', function () {
       var l = sels.filter(function (x) { return x.category === s.cat; });
@@ -371,7 +371,7 @@ var LG = (function () {
         return '<div class="lin"><div class="c"><b>' + F.esc(x.item_value) + '</b><span>' + X.int(x.matching_orders) + ' pedidos' + (x.is_active ? '' : ' · <b style="color:var(--tx-laranja)">Sem correspondência na PEND atual</b>') + '</span>' +
           '<input class="inp" data-sbmot="' + x.id + '" id="sbMot' + x.id + '" maxlength="500" placeholder="Motivo" value="' + F.esc(x.reason || '') + '" style="margin-top:6px;padding:7px 10px;font-size:13px"></div>' +
           '<div class="v">' + X.k(x.value) + '<br><button class="lnk ro" data-act="sbRem" data-v="' + x.id + '" style="margin-top:6px">Remover</button></div></div>';
-      }).join('') : '<div class="vazio2">Nenhuma seleção.</div>');
+      }).join('') : '<div class="vazio2">Nenhuma seleção.</div>', 'duas inteiro');
     });
     if (window.standbyEvolucao) h += standbyEvolucao();
     return h;
@@ -424,7 +424,7 @@ var LG = (function () {
         '<p class="cs" style="margin:-4px 0 8px">Enviado em ' + X.dh(atual.created_at) + ' por ' + F.esc(atual.created_by || '—') + '. Snapshot imutável.</p>' +
         '<button class="btn cl" data-act="relPng" style="width:100%;margin-bottom:12px">' + F.ic('imagem') + ' Gerar imagem do Relatório (PNG)</button>';
     });
-    h += '<div class="card"><p class="ct">Listas operacionais de produtos</p><p class="cs">Adicione um produto da PEND em "Em produção" ou "Sem estoque"</p><input class="inp" id="relBusca" placeholder="Buscar produto" value="' + F.esc(s.busca || '') + '" style="margin-bottom:8px">' +
+    h += '<div class="card inteiro"><p class="ct">Listas operacionais de produtos</p><p class="cs">Adicione um produto da PEND em "Em produção" ou "Sem estoque"</p><input class="inp" id="relBusca" placeholder="Buscar produto" value="' + F.esc(s.busca || '') + '" style="margin-bottom:8px">' +
       bloco(s, 'op', function (o) { var it = lista(o.items); return it.length ? sel('relProd', it, s.prodSel, 'Selecione para adicionar') : '<div class="vazio2">Nenhuma sugestão encontrada.</div>'; }) +
       '<div class="acoes" style="justify-content:flex-start"><button class="btn az" data-act="relAdd" data-v="IN_PRODUCTION">＋ Em produção</button><button class="btn pe" data-act="relAdd" data-v="OUT_OF_STOCK">＋ Sem estoque</button></div></div>';
     h += bloco(s, 'prods', function (p) {

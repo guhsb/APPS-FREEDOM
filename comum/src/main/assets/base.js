@@ -374,7 +374,7 @@ F.aoColarImagem = function (fn) {
     var g = document.createElement('div'); g.className = 'gL';
     var blocos = [];
     for (var n = 0; n < l.length; n++) {
-      var k = l[n]; k.classList.remove('cheio');
+      var k = l[n]; k.classList.remove('cheio'); k.classList.remove('par');
       if (k.classList.contains('sec') && l[n + 1]) {
         var b = document.createElement('div'); b.className = 'bl'; b.appendChild(k);
         while (l[n + 1] && !l[n + 1].classList.contains('sec') && !/\b(tabs|filtro|hero|k4|sla|rod|kpis|acoes|dashbt)\b/.test(l[n + 1].className)) b.appendChild(l[++n]);
@@ -385,13 +385,47 @@ F.aoColarImagem = function (fn) {
     blocos.forEach(function (k) { k.classList.remove('cheio'); g.appendChild(k); });
     c.appendChild(g);
     // linhas curtas (filtros, botões, avisos) e o que ficaria sozinho na linha ocupam a largura toda: sem buraco
-    var col = 0, ant = null;
+    var col = 0, ant = null, pares = [];
     blocos.forEach(function (k) {
-      var cheio = !k.classList.contains('bl') && (CHEIO.test(k.className) || !k.className || k.getBoundingClientRect().height < 80);
+      var cheio = k.querySelector('.atencao') || k.classList.contains('inteiro') || k.querySelector(':scope>.inteiro') ||
+        (!k.classList.contains('bl') && (CHEIO.test(k.className) || !k.className || k.getBoundingClientRect().height < 110));
       if (cheio) { k.classList.add('cheio'); if (col === 1 && ant) ant.classList.add('cheio'); col = 0; ant = null; return; }
-      if (col === 0) { ant = k; col = 1; } else { col = 0; ant = null; }
+      if (col === 0) { ant = k; col = 1; } else { pares.push([ant, k]); col = 0; ant = null; }
     });
     if (col === 1 && ant) ant.classList.add('cheio');
+    // em cada par: o maior fica na esquerda; se for bem maior, fica do tamanho do outro com "Ver mais"
+    pares.forEach(function (pr) {
+      var a = pr[0], b = pr[1], ha = a.offsetHeight, hb = b.offsetHeight;
+      a.classList.add('par'); b.classList.add('par');   // o menor estica até a altura do outro: sem vazio embaixo
+      if (hb > ha) { g.insertBefore(b, a); var t = a; a = b; b = t; t = ha; ha = hb; hb = t; }
+      var lim = Math.max(hb, 340);
+      if (ha > lim * 1.35 && ha - lim > 160) cortar(a, lim);
+    });
+  }
+  function cortar(el, lim) {
+    el.classList.add('cortado'); el.style.maxHeight = lim + 'px'; el.dataset.lim = lim;
+    var bt = document.createElement('button'); bt.className = 'verMais'; bt.type = 'button';
+    bt.innerHTML = 'Ver mais' + (F.ic ? F.ic('baixo') : '');
+    bt.onclick = function (ev) { ev.stopPropagation(); abrirInteiro(el); };
+    el.appendChild(bt);
+  }
+  function abrirInteiro(el) {
+    var lugar = document.createElement('div'); lugar.style.height = el.offsetHeight + 'px'; lugar.className = el.className.replace('cortado', '');
+    el.parentNode.replaceChild(lugar, el);
+    var bt = el.querySelector(':scope>.verMais'); if (bt) bt.remove();
+    el.classList.remove('cortado'); el.style.maxHeight = '';
+    var f = document.createElement('div'); f.className = 'vmFundo';
+    f.innerHTML = '<div class="vmCaixa"><button class="vmFechar" type="button" aria-label="Fechar">' + '<span style="font-size:22px;line-height:1">×</span>' + '</button></div>';
+    var cx = f.firstChild; cx.appendChild(el);
+    document.body.appendChild(f); document.body.style.overflow = 'hidden';
+    function fechar() {
+      document.removeEventListener('keydown', tecla); f.remove(); document.body.style.overflow = '';
+      if (lugar.parentNode) { lugar.parentNode.replaceChild(el, lugar); cortar(el, +el.dataset.lim || 340); }
+    }
+    function tecla(ev) { if (ev.key === 'Escape') fechar(); }
+    document.addEventListener('keydown', tecla);
+    f.addEventListener('click', function (ev) { if (ev.target === f || ev.target.closest('.vmFechar')) fechar(); });
+    try { if (F.entrar) F.entrar(cx); } catch (e) { }
   }
   var ocupado = false;
   function agrupar(c) {

@@ -110,7 +110,7 @@ Base.paraImagem = function () {
     }) });
   }
   var mc = mesComparado(d, x.d), linhas = [{ tipo: 'linha', r: 'Total de ' + (mes.nome || 'mês'), v: F.brl(mes.valor) }];
-  if (mc) linhas.push({ tipo: 'linha', r: 'Mês passado até ' + mc.ate, v: F.brl(mc.antes) + '  ' + pctVar(mc.v), c: mc.v >= 0 ? 'verde' : 'vermelho' });
+  if (mc) linhas.push({ tipo: 'linha', r: 'Mês passado até ' + mc.ate, v: F.brl(mc.antes), extra: pctVar(mc.v), c: mc.v >= 0 ? 'verde' : 'vermelho' });
   linhas.push({ tipo: 'linha', r: 'Standby', v: F.brl(d.standby), c: 'laranja' }, { tipo: 'linha', r: 'PEND faturável (equipe)', v: F.brl(d.pend), c: 'violeta' });
   bl.push({ tipo: 'secao', t: 'Mês e pendências' });
   bl.push({ tipo: 'card', blocos: linhas });

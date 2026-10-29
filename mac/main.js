@@ -491,7 +491,7 @@ const ponte = {
   irAba: (wc, id) => {
     sino(false);
     if (aba === id && id === 'site' && vSite) vSite.webContents.loadURL(SITE + '/');
-    else if (aba === id && id === 'helpdesk' && paginaApp === 'sub') { voltarHelpdesk(); js(vApp.webContents, 'window.F && F.entrar && F.entrar()'); }
+    else if (aba === id && id === 'helpdesk' && (paginaApp === 'sub' || helpSub === 'config')) { voltarHelpdesk(); js(vApp.webContents, 'window.F && F.entrar && F.entrar()'); }
     else selecionar(id);
   },
   irSub: (wc, id) => irSub(id),
@@ -500,6 +500,7 @@ const ponte = {
     else if (nome === 'chamado') { sino(false); abrirTela('novo.html'); }
     else if (nome === 'claro' || nome === 'escuro') { ponte.definirTema(wc, nome); atualizarBarra(); }
     else if (nome === 'sair') ponte.sair();
+    else if (nome === 'config' && vApp && aba === 'helpdesk' && helpSub === 'config') { sino(false); voltarHelpdesk(); }
     else if (nome === 'config' && vApp && abasDisponiveis().includes('helpdesk')) { sino(false); vApp.webContents.loadURL(url('helpdesk.html') + '?config=1'); paginaApp = 'sub'; helpSub = 'config'; selecionar('helpdesk'); atualizarBarra(); }
   },
   sino: (wc, abrir, x) => { if (x > 0) sinoX = x; sino(!!abrir); },

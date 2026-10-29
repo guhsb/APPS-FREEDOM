@@ -352,7 +352,7 @@ namespace Freedom
                 b.Click += (s, e) =>
                 {
                     if (aba == id && id == "site") AbrirUrlSite(Api.SITE + "/");
-                    else if (aba == id && id == "helpdesk" && paginaApp == "sub") VoltarHelpdesk();
+                    else if (aba == id && id == "helpdesk" && (paginaApp == "sub" || helpSub == "config")) VoltarHelpdesk();
                     else Selecionar(id);
                 };
                 nav.Controls.Add(b);
@@ -531,6 +531,7 @@ namespace Freedom
                 case "config":
                     if (webApp == null || !AbaDisponivel("helpdesk")) break;
                     Sino(false);
+                    if (aba == "helpdesk" && helpSub == "config") { VoltarHelpdesk(); break; }   // clicar no nome de novo fecha as configurações
                     webApp.CoreWebView2.Navigate(ASSET + "helpdesk.html?config=1"); paginaApp = "sub"; helpSub = "config";
                     Selecionar("helpdesk"); AtualizarShell(); break;
             }
@@ -633,7 +634,7 @@ namespace Freedom
             {
                 if (e.Uri.StartsWith(ASSET))
                 {
-                    if (w == webApp) paginaApp = e.Uri.Contains("login.html") ? "login" : e.Uri.Contains("helpdesk.html") ? "helpdesk" : "sub";
+                    if (w == webApp) paginaApp = e.Uri.Contains("login.html") ? "login" : e.Uri.Contains("helpdesk.html") && !e.Uri.Contains("config=1") ? "helpdesk" : "sub";
                     return;
                 }
                 e.Cancel = true;
