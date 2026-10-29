@@ -44,6 +44,8 @@ namespace Freedom
         readonly WebView2 webRail = new WebView2 { Dock = DockStyle.Left, Width = 78, Visible = false };
         WebView2 webSino;
         bool sinoAberto;
+        float escala = 1f;   // zoom de tela do Windows (1 = 100%)
+        int Px(double v) { return (int)Math.Round(v * escala); }
         int sinoX = -1;   // centro do sino (na barra de cima), para a setinha da janelinha apontar para ele
         string helpSub = "inicio";
         readonly Dictionary<string, string> subs = new Dictionary<string, string>();   // página -> partes (abas) que ela tem
@@ -65,6 +67,9 @@ namespace Freedom
         public Janela(bool oculto)
         {
             inicioOculto = oculto;
+            // Windows com zoom de tela (125%, 150%…): as barras do WebView2 crescem junto, então a altura/largura também
+            try { using (var g = CreateGraphics()) escala = Math.Max(1f, g.DpiX / 96f); } catch (Exception) { escala = 1f; }
+            webTopo.Height = Px(76); webRail.Width = Px(78);
             ponte = new Ponte(this);
             Text = "Freedom";
             BackColor = FUNDO;
@@ -548,7 +553,7 @@ namespace Freedom
         {
             if (abrir && webSino == null)
             {
-                var w = new WebView2 { DefaultBackgroundColor = FUNDO, Visible = false, Size = new Size(450, 580) };
+                var w = new WebView2 { DefaultBackgroundColor = FUNDO, Visible = false, Size = new Size(Px(450), Px(580)) };
                 Controls.Add(w);
                 webSino = w;
                 try { await Preparar(w); w.CoreWebView2.Navigate(ASSET + "avisos.html?popup=1&fundo=1&recorte=1"); } catch (Exception) { webSino = null; try { Controls.Remove(w); w.Dispose(); } catch (Exception) { } return; }
@@ -565,22 +570,23 @@ namespace Freedom
         void PosicionarSino()
         {
             if (webSino == null) return;
-            int w = 450, h = Math.Min(600, Math.Max(320, ClientSize.Height - 80));
-            int cx = sinoX > 0 ? sinoX : ClientSize.Width - 330;
-            int x = Math.Max(8, Math.Min(ClientSize.Width - w - 8, cx - w + 70));   // a janelinha fica embaixo do sino, alinhada pela direita
-            webSino.Bounds = new Rectangle(x, 60, w, h);   // encosta na barra de cima: a setinha sai de dentro dela
-            int seta = Math.Max(24, Math.Min(w - 34, cx - x));
-            Js(webSino, "window.seta&&seta(" + seta + ")");
+            // medidas em pixels da tela (a página usa px de CSS: multiplica pelo zoom do Windows)
+            int w = Px(450), h = Math.Min(Px(600), Math.Max(Px(320), ClientSize.Height - Px(80)));
+            int cx = sinoX > 0 ? Px(sinoX) : ClientSize.Width - Px(330);
+            int x = Math.Max(Px(8), Math.Min(ClientSize.Width - w - Px(8), cx - w + Px(70)));   // a janelinha fica embaixo do sino, alinhada pela direita
+            webSino.Bounds = new Rectangle(x, Px(60), w, h);   // encosta na barra de cima: a setinha sai de dentro dela
+            int seta = Math.Max(Px(24), Math.Min(w - Px(34), cx - x));
+            Js(webSino, "window.seta&&seta(" + (int)Math.Round(seta / escala) + ")");
             // a janela do WebView2 não fica transparente: recorta o formato do cartão (cantos curvos + setinha)
             try
             {
-                const int T = 10, R = 16;
+                int T = Px(10), R = Px(16), b = Px(11);
                 var p = new System.Drawing.Drawing2D.GraphicsPath();
                 p.AddArc(0, T, R * 2, R * 2, 180, 90); p.AddArc(w - R * 2 - 1, T, R * 2, R * 2, 270, 90);
                 p.AddArc(w - R * 2 - 1, h - R * 2 - 1, R * 2, R * 2, 0, 90); p.AddArc(0, h - R * 2 - 1, R * 2, R * 2, 90, 90); p.CloseFigure();
                 var rg = new Region(p);
                 var t = new System.Drawing.Drawing2D.GraphicsPath();
-                t.AddPolygon(new[] { new Point(seta - 11, T + 1), new Point(seta, 0), new Point(seta + 11, T + 1) });
+                t.AddPolygon(new[] { new Point(seta - b, T + 1), new Point(seta, 0), new Point(seta + b, T + 1) });
                 rg.Union(t);
                 var velho = webSino.Region; webSino.Region = rg; if (velho != null) velho.Dispose();
             }
@@ -629,7 +635,10 @@ namespace Freedom
                 "try{if(location.host==='" + HOST + "'){window.App=chrome.webview.hostObjects.sync.App;}}catch(e){}");
             c.Settings.AreDevToolsEnabled = false;
             c.Settings.IsStatusBarEnabled = false;
-            c.Settings.IsZoomControlEnabled = true;
+            // barras (cima, esquerda) e sino têm tamanho fixo: sem Ctrl+roda/Ctrl+"+" nelas, senão o conteúdo cresce e corta
+            bool barra = w == webTopo || w == webRail || w == webSino;
+            c.Settings.IsZoomControlEnabled = !barra;
+            if (barra) try { w.ZoomFactor = 1; } catch (Exception) { }
             c.NavigationStarting += (s, e) =>
             {
                 if (e.Uri.StartsWith(ASSET))
@@ -851,7 +860,7 @@ namespace Freedom
             if (caixaPainel == null)
             {
                 caixaPainel = new Panel { Dock = DockStyle.Fill, BackColor = FUNDO };
-                chips = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 52, Padding = new Padding(16, 12, 16, 0), BackColor = FUNDO, WrapContents = false };
+                chips = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Px(52), Padding = new Padding(16, 12, 16, 0), BackColor = FUNDO, WrapContents = false };
                 caixaPainel.Controls.Add(chips);
                 conteudo.Controls.Add(caixaPainel);
                 caixaPainel.BringToFront();
