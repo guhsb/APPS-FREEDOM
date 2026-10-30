@@ -1178,6 +1178,10 @@ class Tela : Activity() {
         @JavascriptInterface
         fun nome(): String = nomeApp()
 
+        /** As telas usam para saber se estão no celular (barra flutuante, câmera, sem kanban…). */
+        @JavascriptInterface
+        fun plataforma(): String = "android"
+
         /** Números de um painel (aba Painel / widget). */
         @JavascriptInterface
         fun dadosPainel(id: String): String {

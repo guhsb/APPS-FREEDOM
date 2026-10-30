@@ -107,7 +107,7 @@ document.getElementById('btVoltar').onclick = function () { try { App.voltar(); 
 document.getElementById('btAt').onclick = function () { recarregar(); };
 
 // Kanban só no computador (Windows e Mac): na tela do celular as colunas não cabem
-var desktop = false; try { desktop = App.plataforma() !== 'android'; } catch (e) { }
+var desktop = F.plataforma() !== 'android' && F.plataforma() !== '';
 var kanban = false; try { kanban = desktop && localStorage.getItem('kanban') === '1'; } catch (e) { }
 var STATUS_CHIPS = [['', 'Todos'], ['OPEN', 'Abertos'], ['IN_PROGRESS', 'Em andamento'], ['WAITING', 'Aguardando'],
   ['WAITING_SUPPLIER', 'Aguard. fornecedor'], ['PENDING_APPROVAL', 'Aguard. aprovação'], ['REOPENED', 'Reabertos'], ['RESOLVED', 'Resolvidos']];

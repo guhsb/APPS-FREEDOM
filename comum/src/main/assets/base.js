@@ -87,6 +87,13 @@ var F = {
   }
 };
 
+/** 'android' | 'windows' | 'mac' (versões antigas do app no Android não têm App.plataforma: usa o navegador) */
+F.plataforma = function () {
+  try { if (window.App && App.plataforma) return String(App.plataforma()); } catch (e) { }
+  return /Android/i.test(navigator.userAgent) ? 'android' : '';
+};
+
+
 // ---- acesso ao Helpdesk do site pelo app (mesmos endereços que o site usa) ----
 F._req = Math.floor(Math.random() * 1e6) * 1000; F._pend = {};   // número único por tela
 /** F.api('GET', '/helpdesk/...', corpo?) -> Promise({status, json, texto}) */
@@ -305,7 +312,7 @@ var Base = {
   });
   window.addEventListener('focus', function () { ultAcoes = ''; agendarAcoes(); });
   // celular: a barra de baixo flutua por cima; um espaço no fim para nada ficar escondido atrás dela
-  try { if (window.App && App.plataforma && App.plataforma() === 'android') document.documentElement.classList.add('barraFlutuante'); } catch (e) { }
+  if (F.plataforma() === 'android') document.documentElement.classList.add('barraFlutuante');
 })();
 
 // ---- Ctrl+V de print: a imagem copiada vira um arquivo PNG (Print_AAAAMMDD_HHMMSS.png) ----

@@ -99,7 +99,7 @@ function montar() {
     document.addEventListener('drop', function (ev) { ev.preventDefault(); document.getElementById('btAnexo').classList.remove('sobre'); if (!enviando && ev.dataTransfer) adicionar(ev.dataTransfer.files); });
   }
 }
-function temArrastar() { try { return App.plataforma() !== 'android'; } catch (e) { return false; } }
+function temArrastar() { var p = F.plataforma(); return p !== 'android' && p !== ''; }
 
 function adicionar(lista) {
   var ruins = [];

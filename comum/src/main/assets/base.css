@@ -204,3 +204,6 @@ html.largo.chamadoFixo .gC .ladoD{position:static;max-height:none;overflow-y:aut
 html.largo.chamadoFixo .ladoD .rod{display:none}
 html.largo.chamadoFixo .ladoD .card{padding:14px}
 html.largo.chamadoFixo .ladoD .op h3{margin-top:2px}
+/* celular: o que fica preso embaixo sobe acima da barra flutuante */
+html.barraFlutuante .fab{bottom:96px!important}
+html.barraFlutuante .barraLote{bottom:86px!important;border-radius:14px;left:10px;right:10px}

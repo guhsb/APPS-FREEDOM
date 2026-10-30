@@ -59,7 +59,7 @@ var PRIO_TXT = { LOW: 'Baixa', MEDIUM: 'Média', NORMAL: 'Normal', HIGH: 'Alta',
 var ultimo = '', diagAberto = false, cfgAberta = false;
 // PC: as configurações abrem pelo nome do usuário (canto de cima), numa tela só delas (helpdesk.html?config=1)
 var SO_CFG = /config=1/.test(location.search), PC = true;
-try { PC = App.plataforma() !== 'android'; } catch (e) { }
+PC = F.plataforma() !== 'android';
 if (SO_CFG) { cfgAberta = true; document.querySelector('.topo h1').textContent = 'Configurações'; }   // configurações começam minimizadas
 // trocar o tema remonta a tela no Android: volta com as configurações abertas
 try { if (localStorage.getItem('cfgAbrir')) { cfgAberta = true; localStorage.removeItem('cfgAbrir'); } } catch (e) { }
