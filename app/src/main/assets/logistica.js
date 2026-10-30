@@ -278,7 +278,35 @@ var LG = (function () {
       return !(fx.ini && dt < fx.ini) && !(fx.fim && dt > fx.fim) && !(vmin != null && v < vmin) && !(vmax != null && v > vmax); });
   }
   function carregarVp() { var s = st('vp'); s.todos = null; if (fxAtivo(s.fx)) vpTodos().then(redesenhar, falhou); return buscar(s, 'd', '/logistics/pending/order-values' + X.q({ page: s.pag || 1, page_size: 50, sort_by: s.ord || 'order_date', sort_direction: s.dir || 'desc', search: (s.busca || '').trim() })); }
-  function linhaVp(i) { return '<div class="lin"><div class="c"><b>' + F.esc(i.customer || '—') + '</b><span>Pedido ' + F.esc(i.order_number) + ' · ' + F.dataBR(i.order_date) + '</span><span class="bdg la">Pendente</span></div><div class="v">' + brl(i.value) + '</div></div>'; }
+  /** Dias desde a data do pedido (pendente há quanto tempo). */
+  function diasPend(i) {
+    if (i.pending_days != null) return F.n(i.pending_days);
+    var d = i.order_date ? new Date(String(i.order_date).slice(0, 10) + 'T12:00:00') : null; if (!d || isNaN(d)) return null;
+    return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+  }
+  function produtosPed(pr) {
+    return '<div class="itens2">' + (pr === undefined || pr === 'c' ? '<div class="vazio2">Carregando produtos…</div>' : pr === 'e' ? '<div class="vazio2">Não consegui abrir os produtos.</div>' :
+      (lista(pr.products).map(function (x) { return '<div class="row"><span>' + F.esc(x.product) + (x.product_code ? ' <small style="color:var(--tx3)">' + F.esc(x.product_code) + '</small>' : '') + '<br><small style="color:var(--tx3)">' + F.esc(x.family || '') + ' · ' + qtd(x.quantity) + ' un</small></span><b>' + brl(x.value) + '</b></div>'; }).join('') || '<div class="vazio2">Nenhum produto neste pedido.</div>')) + '</div>';
+  }
+  /** Valor Pedido: igual ao de Pedidos (rede, dias pendente e os itens do pedido). */
+  function linhaVp(i) {
+    var s = st('vp'), ab = s.ab && s.ab[i.order_number], dd = diasPend(i);
+    var corD = dd == null ? '' : dd > 30 ? 'var(--tx-vermelho)' : dd > 15 ? 'var(--tx-laranja)' : 'var(--tx3)';
+    var nIt = F.n(i.item_count || i.items_count || i.product_count);
+    return '<div class="lin"><div class="c"><b>' + F.esc(i.customer || '—') + '</b><span>Pedido ' + F.esc(i.order_number) + ' · ' + F.dataBR(i.order_date) + (i.network ? ' · ' + F.esc(i.network) : '') + '</span>' +
+      '<span class="bdg la">Pendente</span>' +
+      '<div class="ac2"><button class="lnk" data-act="vpItens" data-v="' + F.esc(i.order_number) + '">' + (ab ? 'Ocultar itens' : nIt ? 'Ver ' + nIt + ' ite' + (nIt === 1 ? 'm' : 'ns') : 'Ver itens') + '</button></div>' +
+      (ab ? produtosPed(s.prods && s.prods[i.order_number]) : '') +
+      '</div><div class="v">' + brl(i.value) + (dd != null ? '<small style="display:block;font-size:12px;font-weight:700;margin-top:3px;color:' + corD + '">' + dd + (dd === 1 ? ' dia' : ' dias') + ' pendente</small>' : '') + '</div></div>';
+  }
+  function itensVp(n) {
+    var s = st('vp'); s.ab = s.ab || {}; s.prods = s.prods || {};
+    s.ab[n] = !s.ab[n]; redesenhar();
+    if (s.ab[n] && (s.prods[n] === undefined || s.prods[n] === 'e')) {
+      s.prods[n] = 'c';
+      X.get('/logistics/pending/orders/' + encodeURIComponent(n)).then(function (j) { s.prods[n] = j; }).catch(function () { s.prods[n] = 'e'; }).then(redesenhar);
+    }
+  }
   function telaVp() {
     var s = st('vp'); if (s.d == null && !s._cd) carregarVp();
     var sm = s.d && s.d.summary || {}, h = '';
@@ -698,8 +726,8 @@ var LG = (function () {
       var it = filtraVp(todos), fx = s.fx || {}, tot = it.reduce(function (a, i) { return a + F.n(i.value); }, 0);
       var bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Valor dos pedidos pendentes', valor: tot, pill: it.length + (it.length === 1 ? ' pedido' : ' pedidos'), sub: it.length ? 'Ticket médio ' + F.brl(tot / it.length) : '' }] }];
       bl = bl.concat(descFiltros([s.busca ? 'busca "' + s.busca.trim() + '"' : ''].concat(faixa(fx))));
-      bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.42], ['Pedido', 'l', 0.14], ['Data', 'l', 0.19], ['Valor', 'r', 0.25, 1]],
-        linhas: it.map(function (i) { return [i.customer || '—', i.order_number, F.dataBR(i.order_date), F.brl(i.value)]; }) });
+      bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.38], ['Pedido', 'l', 0.13], ['Data', 'l', 0.17], ['Dias', 'r', 0.1], ['Valor', 'r', 0.22, 1]],
+        linhas: it.map(function (i) { var dd = diasPend(i); return [i.customer || '—', i.order_number, F.dataBR(i.order_date), dd == null ? '—' : String(dd), F.brl(i.value)]; }) });
       F.gerarImagem({ titulo: 'Valor Pedido', sub: 'Logística · ' + quandoImg(), arquivo: 'freedom-logistica-valor-pedido', blocos: bl });
     }).catch(function (e) { if (b) { b.disabled = false; b.lastChild.textContent = ' Gerar imagem (PNG)'; } falhou(e); });
   }
@@ -751,7 +779,7 @@ var LG = (function () {
   var ACT = {
     pedCls: function (v) { var s = st('ped'); s.cls = s.cls === v ? '' : v; s.n = 40; carregarPed(); },
     pedMais: function () { st('ped').n = (st('ped').n || 40) + 60; redesenhar(); },
-    pedItens: itensPed, pedEditar: editarPed,
+    pedItens: itensPed, vpItens: itensVp, pedEditar: editarPed,
     pedTroca: function (v, t) { trocarPed(v, t.getAttribute('data-c')); },
     pedVarios: function () { var s = st('ped'); s.varios = !s.varios; s.marc = {}; redesenhar(); },
     pedMarca: function (v, t) { var s = st('ped'); if (t.checked) s.marc[v] = 1; else delete s.marc[v]; redesenhar(); },
