@@ -159,11 +159,14 @@ var EQ = (function () {
   }
   /** Quem aparece em cada setor: a pessoa no setor dela e também nos outros setores onde tem trecho de função. */
   function presencas(s) {
-    var l = [];
+    var l = [], ids = {};
+    setores().forEach(function (o) { ids[o.id] = 1; });
     setores().forEach(function (o) {
       o.pessoas.forEach(function (p) {
         var tem = (p.funcoes || []).length, tr = trechos(p, s.id, o.id);
-        if (o.id === s.id && (!tem || tr.length || !(p.funcoes || []).some(function (x) { return (x[3] || o.id) !== o.id; }))) l.push({ p: p, dono: o, tr: tr, casa: true });
+        // função apontando para um setor que não existe mais neste dia conta como do próprio setor (senão a pessoa some e não dá para editar)
+        var fora = (p.funcoes || []).some(function (x) { var a = x[3] && ids[x[3]] ? x[3] : o.id; return a !== o.id; });
+        if (o.id === s.id && (!tem || tr.length || !fora)) l.push({ p: p, dono: o, tr: tr, casa: true });
         else if (o.id !== s.id && tr.length) l.push({ p: p, dono: o, tr: tr, casa: false });
       });
     });
@@ -308,6 +311,7 @@ var EQ = (function () {
       var n; try { n = JSON.parse(r.result); } catch (e) { n = null; }
       if (!n || !n.dias) { X.erroModal('Esse arquivo não é uma cópia do quadro de equipe.'); return; }
       q = n; DIAS.forEach(function (d) { q.dias[d[0]] = q.dias[d[0]] || { setores: [] }; });
+      q.faltas = q.faltas || {}; if (!q.pausaGeral) q.pausaGeral = [['08:30', '08:40']];   // cópias antigas não têm
       gravar(); X.fechar(); F.toast('Quadro restaurado'); redesenhar();
     };
     r.onerror = function () { X.erroModal('Não consegui ler o arquivo.'); };

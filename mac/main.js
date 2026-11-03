@@ -19,7 +19,7 @@ const Controle = require('./core/controle');
 const SITE_HOST = 'relatorios.cbfreedom.com.br';
 const WWW = path.join(__dirname, 'www');
 const TELAS = ['lista.html', 'novo.html', 'dash-helpdesk.html'];
-const NAV = 78, TOPO = 76;   // layout novo: atalhos na esquerda e abas em pílula no topo (shell.html, modo mac)
+let NAV = 78; const TOPO = 76;   // layout novo: atalhos na esquerda e abas em pílula no topo (shell.html, modo mac)
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
@@ -99,6 +99,7 @@ function criarJanela() {
   janela = new BrowserWindow({ width: 1180, height: 800, minWidth: 820, minHeight: 560, show: false, backgroundColor: corFundo(), title: 'Freedom',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false } });
   janela.loadURL(url('shell.html') + '?modo=mac');
+  protegerNavegacao(janela.webContents, true);   // link/arquivo solto na barra não troca a tela (nem ganha o App)
   janela.webContents.on('did-finish-load', atualizarBarra);
   janela.on('close', e => { if (!saindo) { e.preventDefault(); janela.hide(); } });
   janela.on('resize', posicionar);
@@ -510,6 +511,8 @@ const ponte = {
   acaoShell: (wc, nome) => {
     if (nome === 'imagem' || nome === 'excel' || nome === 'atualizar') { const v = vistaAtual(); if (v) js(v.webContents, "window.acaoRail && acaoRail('" + nome + "')"); }
     else if (nome === 'chamado') { sino(false); abrirTela('novo.html'); }
+    else if (nome === 'railAbrir' || nome === 'railFechar') { NAV = nome === 'railAbrir' ? 262 : 78; posicionar(); }   // atalhos abertos empurram as telas
+    else if (nome === 'busca') { sino(false); if (aba === 'site') selecionar(abasDisponiveis().includes('helpdesk') ? 'helpdesk' : aba); const v = aba !== 'site' ? vistaAtual() : null; if (v) js(v.webContents, 'window.abrirBusca && abrirBusca()'); }
     else if (nome === 'claro' || nome === 'escuro') { ponte.definirTema(wc, nome); atualizarBarra(); }
     else if (nome === 'sair') ponte.sair();
     else if (nome === 'config' && vApp && aba === 'helpdesk' && helpSub === 'config') { sino(false); voltarHelpdesk(); }
@@ -658,6 +661,8 @@ const ponte = {
 
 ipcMain.on('app', (e, metodo, args) => {
   let r = null;
+  // só as telas do próprio app (www) usam o App; qualquer outra página fica sem resposta
+  try { const fu = decodeURI((e.senderFrame && e.senderFrame.url) || ''); if (!fu.startsWith('file://' + WWW)) { e.returnValue = null; return; } } catch (x) { e.returnValue = null; return; }
   try {
     const f = ponte[metodo];
     if (typeof f === 'function') {

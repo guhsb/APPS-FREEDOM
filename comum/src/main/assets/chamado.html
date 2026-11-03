@@ -486,8 +486,11 @@ document.addEventListener('click', function (ev) {
   if (o && window.dados) { abertoOp = o.getAttribute('data-op'); render(dados); return; }
   if (ev.target.closest && ev.target.closest('#opFechar')) { abertoOp = null; if (window.dados) render(dados); return; }
   var m = ev.target; if (!m.classList || !m.classList.contains('opModal') || !document.documentElement.classList.contains('largo')) return;
+  if (desceuEm !== m) return;   // arrastou a seleção do texto até o fundo: não fecha (perderia o que foi escrito)
   var b = document.getElementById(m.getAttribute('data-cancel')); if (b) b.click();
 });
+var desceuEm = null;
+document.addEventListener('mousedown', function (ev) { desceuEm = ev.target; }, true);
 function ligar(d) {
   var t = d.ticket || {};
   function on(id, f) { var el = document.getElementById(id); if (el) el.onclick = f; }
@@ -603,7 +606,7 @@ window.chamadoAcao = function (id, tipo, ok, msg) {
     enviando = false;
     var tx = document.getElementById('texto');
     tx.disabled = false;
-    if (ok) { tx.value = ''; ajustar(); mostrarToast(msg || 'Resposta enviada'); }
+    if (ok) { tx.value = ''; rascunho(''); ajustar(); mostrarToast(msg || 'Resposta enviada'); }
     else mostrarToast(msg);
     atualizarBotao();
   } else if (tipo === 'anexo') {
@@ -624,7 +627,24 @@ window.recebidoHelpdesk = function () { carregar(true); };
 var tx = document.getElementById('texto'), be = document.getElementById('btEnviar');
 function ajustar() { tx.style.height = 'auto'; tx.style.height = Math.min(140, tx.scrollHeight + 2) + 'px'; }
 function atualizarBotao() { be.disabled = enviando || !tx.value.trim(); }
-tx.addEventListener('input', function () { ajustar(); atualizarBotao(); });
+/** Rascunho da resposta: fica guardado no aparelho até enviar (fechou o chamado no meio, volta escrito). */
+function rascunho(v) {
+  try {
+    var k = 'rasc_' + ID;
+    if (v === undefined) return localStorage.getItem(k) || '';
+    if (v && v.trim()) localStorage.setItem(k, v); else localStorage.removeItem(k);
+  } catch (e) { return ''; }
+}
+var rascTm = 0;
+tx.addEventListener('input', function () { ajustar(); atualizarBotao(); clearTimeout(rascTm); rascTm = setTimeout(function () { rascunho(tx.value); }, 400); });
+(function () {
+  var r = rascunho();
+  if (r) { tx.value = r; setTimeout(function () { ajustar(); atualizarBotao(); }, 0); mostrarToast('Rascunho da sua resposta recuperado'); }
+  // rascunhos com mais de 30 dias saem sozinhos
+  try { var marca = JSON.parse(localStorage.getItem('rasc_datas') || '{}'), agora = Date.now(); marca[ID] = agora;
+    Object.keys(marca).forEach(function (k) { if (agora - marca[k] > 30 * 864e5) { localStorage.removeItem('rasc_' + k); delete marca[k]; } });
+    localStorage.setItem('rasc_datas', JSON.stringify(marca)); } catch (e) { }
+})();
 be.onclick = function () {
   var v = tx.value.trim(); if (!v || enviando) return;
   enviando = true; tx.disabled = true; atualizarBotao();

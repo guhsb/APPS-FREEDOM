@@ -16,7 +16,7 @@
   }
 
   function dataHora(s) {
-    var d = s ? new Date(s) : null; if (!d || isNaN(d)) return '';
+    var d = s ? (window.F && F.data ? F.data(s) : new Date(s)) : null; if (!d || isNaN(d)) return '';   // o site manda UTC sem 'Z'
     var p = function (n) { return ('0' + n).slice(-2); };
     return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }

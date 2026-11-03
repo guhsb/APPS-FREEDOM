@@ -157,6 +157,9 @@ var Dash = (function () {
     try {
       if (v === undefined) { var s = localStorage.getItem('dc_' + k); return s ? JSON.parse(s) : null; }
       localStorage.setItem('dc_' + k, JSON.stringify({ t: Date.now(), d: v }));
+      // guarda só as 40 telas mais recentes (cada busca/página vira uma entrada; sem limite enchia o armazenamento)
+      var idx = JSON.parse(localStorage.getItem('dcidx') || '[]').filter(function (x) { return x !== k; }); idx.unshift(k);
+      idx.slice(40).forEach(function (x) { localStorage.removeItem('dc_' + x); }); localStorage.setItem('dcidx', JSON.stringify(idx.slice(0, 40)));
     } catch (e) { try { localStorage.removeItem('dc_' + k); } catch (x) { } return null; }
   };
   X.lembrar = function (k, v) { try { if (v === undefined) return localStorage.getItem('dash_' + k); localStorage.setItem('dash_' + k, v); } catch (e) { return null; } };

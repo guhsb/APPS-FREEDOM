@@ -44,6 +44,7 @@ namespace Freedom
         readonly WebView2 webRail = new WebView2 { Dock = DockStyle.Left, Width = 78, Visible = false };
         WebView2 webSino;
         bool sinoAberto;
+        bool railAberta;
         float escala = 1f;   // zoom de tela do Windows (1 = 100%)
         int Px(double v) { return (int)Math.Round(v * escala); }
         int sinoX = -1;   // centro do sino (na barra de cima), para a setinha da janelinha apontar para ele
@@ -68,7 +69,7 @@ namespace Freedom
         {
             inicioOculto = oculto;
             // Windows com zoom de tela (125%, 150%…): as barras do WebView2 crescem junto, então a altura/largura também
-            try { using (var g = CreateGraphics()) escala = Math.Max(1f, g.DpiX / 96f); } catch (Exception) { escala = 1f; }
+            try { using (var g = Graphics.FromHwnd(IntPtr.Zero)) escala = Math.Max(1f, g.DpiX / 96f); } catch (Exception) { escala = 1f; }   // não usa CreateGraphics(): criaria a janela antes da hora
             webTopo.Height = Px(76); webRail.Width = Px(78);
             ponte = new Ponte(this);
             Text = "Freedom";
@@ -533,6 +534,15 @@ namespace Freedom
                 case "chamado": Sino(false); helpSub = ""; AbrirTela("novo.html"); break;
                 case "claro": case "escuro": DefinirTema(nome); break;
                 case "sair": ponte.sair(); break;
+                case "railAbrir": case "railFechar":
+                    railAberta = nome == "railAbrir";
+                    webRail.Width = Px(railAberta ? 262 : 78);   // aberta: empurra a tela do meio para a direita
+                    break;
+                case "busca":   // Ctrl+K: a busca abre na tela do meio (o site não tem)
+                    Sino(false);
+                    if (aba == "site") Selecionar(AbaDisponivel("helpdesk") ? "helpdesk" : aba);
+                    if (aba != "site") Js(WebAtual(), "window.abrirBusca&&abrirBusca()");
+                    break;
                 case "config":
                     if (webApp == null || !AbaDisponivel("helpdesk")) break;
                     Sino(false);
@@ -569,7 +579,7 @@ namespace Freedom
         }
         void PosicionarSino()
         {
-            if (webSino == null) return;
+            if (webSino == null || !sinoAberto) return;   // fechado: nada a reposicionar (Abrir chama de novo)
             // medidas em pixels da tela (a página usa px de CSS: multiplica pelo zoom do Windows)
             int w = Px(450), h = Math.Min(Px(600), Math.Max(Px(320), ClientSize.Height - Px(80)));
             int cx = sinoX > 0 ? Px(sinoX) : ClientSize.Width - Px(330);
@@ -581,13 +591,16 @@ namespace Freedom
             try
             {
                 int T = Px(10), R = Px(16), b = Px(11);
-                var p = new System.Drawing.Drawing2D.GraphicsPath();
-                p.AddArc(0, T, R * 2, R * 2, 180, 90); p.AddArc(w - R * 2 - 1, T, R * 2, R * 2, 270, 90);
-                p.AddArc(w - R * 2 - 1, h - R * 2 - 1, R * 2, R * 2, 0, 90); p.AddArc(0, h - R * 2 - 1, R * 2, R * 2, 90, 90); p.CloseFigure();
-                var rg = new Region(p);
-                var t = new System.Drawing.Drawing2D.GraphicsPath();
-                t.AddPolygon(new[] { new Point(seta - b, T + 1), new Point(seta, 0), new Point(seta + b, T + 1) });
-                rg.Union(t);
+                Region rg;
+                using (var p = new System.Drawing.Drawing2D.GraphicsPath())
+                using (var t = new System.Drawing.Drawing2D.GraphicsPath())
+                {
+                    p.AddArc(0, T, R * 2, R * 2, 180, 90); p.AddArc(w - R * 2 - 1, T, R * 2, R * 2, 270, 90);
+                    p.AddArc(w - R * 2 - 1, h - R * 2 - 1, R * 2, R * 2, 0, 90); p.AddArc(0, h - R * 2 - 1, R * 2, R * 2, 90, 90); p.CloseFigure();
+                    rg = new Region(p);
+                    t.AddPolygon(new[] { new Point(seta - b, T + 1), new Point(seta, 0), new Point(seta + b, T + 1) });
+                    rg.Union(t);
+                }
                 var velho = webSino.Region; webSino.Region = rg; if (velho != null) velho.Dispose();
             }
             catch (Exception) { }
@@ -643,7 +656,14 @@ namespace Freedom
             {
                 if (e.Uri.StartsWith(ASSET))
                 {
-                    if (w == webApp) paginaApp = e.Uri.Contains("login.html") ? "login" : e.Uri.Contains("helpdesk.html") && !e.Uri.Contains("config=1") ? "helpdesk" : "sub";
+                    if (w == webApp)
+                    {
+                        paginaApp = e.Uri.Contains("login.html") ? "login" : e.Uri.Contains("/helpdesk.html") && !e.Uri.Contains("config=1") ? "helpdesk" : "sub";   // "/": dash-helpdesk.html não é o início
+                        // o atalho aceso da esquerda segue a tela que abriu (também no Voltar)
+                        var u = e.Uri; var hs = u.Contains("config=1") ? "config" : u.Contains("/helpdesk.html") ? "inicio" : u.Contains("dash-helpdesk.html") ? "dash" : "";
+                        if (u.Contains("lista.html")) { var h = u.Contains("#") ? u.Substring(u.IndexOf('#') + 1).Split('&')[0] : ""; hs = h == "" ? "meus" : h; }
+                        if (hs != helpSub) { helpSub = hs; try { BeginInvoke((Action)AtualizarShell); } catch (Exception) { } }
+                    }
                     return;
                 }
                 e.Cancel = true;

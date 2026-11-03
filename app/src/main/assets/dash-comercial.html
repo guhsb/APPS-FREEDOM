@@ -20,6 +20,8 @@ var X = Dash;
 
 // filtros extras (iguais aos do site): período livre, vários gestores/vendedores, categoria, rede e situação do pedido
 var FX = { ini: '', fim: '', ger: [], ven: [], cat: [], rede: [], st: [] };
+// volta com o último período e filtros usados neste aparelho
+try { var fSalvo = JSON.parse(Dash.lembrar('com_filtro') || 'null'); if (fSalvo) { if (fSalvo.periodo) periodo = fSalvo.periodo; if (fSalvo.FX) FX = Object.assign(FX, fSalvo.FX); if (fSalvo.ger) gestorSel = fSalvo.ger; } } catch (e) { }
 function datas() {
   var h = X.hoje();
   if (periodo === 'pers') return [FX.ini || X.mes(h, 0)[0], FX.fim || h];
@@ -49,10 +51,12 @@ var mostrado = '';   // de qual filtro é o que está na tela
 function carregar(forcar) {
   if (carregandoAgora && !forcar) return;
   carregandoAgora = true; var meu = ++pedido;
+  try { Dash.lembrar('com_filtro', JSON.stringify({ periodo: periodo, FX: FX, ger: gestorSel })); } catch (e) { }
   document.getElementById('btAt').classList.add('gira');
   var pr = me ? Promise.resolve(me) : X.get('/auth/me');
   pr.then(function (m) {
     me = m; P = X.perfil(m);
+    if (!window._gestorIni) { window._gestorIni = 1; if (P.tipo !== 'dir') gestorSel = ''; }   // equipe guardada só vale para diretor
     var dt = datas(), q = '?start_date=' + dt[0] + '&end_date=' + dt[1] + fx();
     var chave = 'com|' + (m.login || m.email || m.display_name || '') + '|' + periodo + '|' + gestorSel + '|' + vendSel + '|' + JSON.stringify(FX);
     // 1) abre na hora com o que foi carregado da última vez (se for deste mesmo login e filtro)

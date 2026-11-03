@@ -32,9 +32,12 @@ function carregar(forcar) {
     var qs = Array.isArray(a.queues) ? a.queues : [];
     if (a.can_access === false || !qs.length) { semSetor(); return; }
     var dt = datas(), q = '?start_date=' + dt[0] + '&end_date=' + dt[1] + (setor ? '&queue_id=' + setor : '');
+    var chave = 'hd|' + q;
+    if (!d) { var salvo = X.cache(chave); if (salvo && salvo.d) { d = salvo.d; desenhar(); } }   // abre na hora com o último
     return Promise.all([X.get('/helpdesk/dashboard/overview' + q), X.opc('/helpdesk/workspace/tickets?view=queues&page_size=50' + (setor ? '&queue_id=' + setor : ''))]).then(function (r) {
       if (meu !== pedido) return;
       d = { o: r[0], tk: (r[1].items || r[1].tickets || []).filter(function (t) { return FECH.indexOf(t.status) < 0; }), ini: dt[0], fim: dt[1] };
+      X.cache(chave, d);
       document.getElementById('aviso').innerHTML = '';
       desenhar();
     });
@@ -129,8 +132,20 @@ function insights() {
 
 function filas() {
   var h = '', qs = (d.o.queues || []).slice().sort(function (a, b) { return F.n(b.breached) - F.n(a.breached) || F.n(b.active) - F.n(a.active); });
-  if (qs.length > 1) h += X.card('Comparando seus setores', 'Ordenado por vencidos', '<div class="row" style="font-size:11.5px;color:var(--tx3);font-weight:700"><span>SETOR</span><span>ATIVOS · VENC. · SLA · 1ª RESP.</span></div>' +
-    qs.map(function (q) { return '<div class="row"><span><b>' + F.esc(X.cap(q.queue_name)) + '</b></span><b style="font-weight:600">' + F.n(q.active) + ' · <span style="color:var(--tx-' + (F.n(q.breached) ? 'rosa' : 'verde') + ')">' + F.n(q.breached) + '</span> · ' + (q.resolution_percent != null ? Math.round(q.resolution_percent) + '%' : '—') + ' · ' + dur(q.first_response_minutes) + '</b></div>'; }).join(''));
+  if (qs.length > 1) {
+    // tabela de verdade (uma coluna para cada número), alinhada à direita
+    var G = 'display:grid;grid-template-columns:minmax(90px,1fr) repeat(3,minmax(34px,auto)) minmax(52px,auto);gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--ln);font-size:13.5px';
+    var cel = function (t, cor) { return '<span style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums' + (cor ? ';color:var(--tx-' + cor + ')' : '') + '">' + t + '</span>'; };
+    h += X.card('Comparando seus setores', 'Ordenado por vencidos',
+      '<div style="' + G + ';border-top:0;padding-top:4px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--tx3)"><span>SETOR</span>' +
+      ['ATIVOS', 'VENC.', 'SLA', '1ª RESP.'].map(function (t) { return '<span style="text-align:right">' + t + '</span>'; }).join('') + '</div>' +
+      qs.map(function (q) {
+        return '<div style="' + G + '"><b style="min-width:0;overflow-wrap:anywhere;line-height:1.25">' + F.esc(X.cap(q.queue_name)) + '</b>' +
+          cel(F.n(q.active)) + cel(F.n(q.breached), F.n(q.breached) ? 'rosa' : 'verde') +
+          cel(q.resolution_percent != null ? Math.round(q.resolution_percent) + '%' : '—', q.resolution_percent != null ? corSla(q.resolution_percent) : '') +
+          cel(dur(q.first_response_minutes)) + '</div>';
+      }).join(''));
+  }
   qs.forEach(function (q) {
     h += X.card(F.esc(q.queue_name), F.n(q.opened) + ' abertos · ' + F.n(q.resolved) + ' resolvidos · ' + F.n(q.active) + ' ativos',
       '<div class="k4" style="margin:0"><div class="k" style="box-shadow:none;background:var(--sf2)"><span>1ª resposta</span><b style="font-size:17px">' + dur(q.first_response_minutes) + '</b><em style="color:var(--tx-' + corSla(q.first_response_percent) + ')">● ' + (q.first_response_percent != null ? Math.round(q.first_response_percent) + '% no prazo' : 'sem SLA') + '</em></div>' +

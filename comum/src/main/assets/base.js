@@ -366,7 +366,7 @@ F.aoColarImagem = function (fn) {
       else if (k.classList.contains('gC')) [].forEach.call(k.children, function (x) { [].push.apply(l, [].slice.call(x.children)); });
       else l.push(k);
     });
-    return l.filter(function (x) { return x.tagName !== 'SCRIPT' && x.tagName !== 'STYLE'; });
+    return l.filter(function (x) { return x.tagName !== 'SCRIPT' && x.tagName !== 'STYLE' && !x.classList.contains('vmFundo'); });
   }
   function grupoChamado(c, l) {
     var E = document.createElement('div'), D = document.createElement('div'), g = document.createElement('div');
@@ -388,6 +388,12 @@ F.aoColarImagem = function (fn) {
     g.style.height = Math.max(260, window.innerHeight - g.getBoundingClientRect().top - baixo) + 'px';
   }
   window.addEventListener('resize', function () { alturaChamado(); });
+  F.alturaChamado = alturaChamado;
+  // a caixa de resposta cresce (várias linhas) ou um aviso aparece em cima: a conversa encolhe junto
+  try {
+    var ro = new ResizeObserver(function () { alturaChamado(); });
+    ['caixa', 'aviso'].forEach(function (id) { var el = document.getElementById(id); if (el) ro.observe(el); });
+  } catch (e) { }
   function grupoCartoes(c, l) {
     var g = document.createElement('div'); g.className = 'gL';
     var blocos = [];
@@ -435,20 +441,27 @@ F.aoColarImagem = function (fn) {
     var f = document.createElement('div'); f.className = 'vmFundo';
     f.innerHTML = '<div class="vmCaixa"><button class="vmFechar" type="button" aria-label="Fechar">' + '<span style="font-size:22px;line-height:1">×</span>' + '</button></div>';
     var cx = f.firstChild; cx.appendChild(el);
-    document.body.appendChild(f); document.body.style.overflow = 'hidden';
+    // fica dentro da própria tela (no grupo dos cartões): os cliques continuam chegando na tela (abrir item, vendedor…)
+    (lugar.closest('.gL') || document.body).appendChild(f); document.body.style.overflow = 'hidden';
+    var vigia = setInterval(function () { if (!document.contains(f)) fechar(); }, 400);   // a tela redesenhou por baixo
     function fechar() {
-      document.removeEventListener('keydown', tecla); f.remove(); document.body.style.overflow = '';
+      clearInterval(vigia); document.removeEventListener('keydown', tecla); f.remove(); document.body.style.overflow = '';
       if (lugar.parentNode) { lugar.parentNode.replaceChild(el, lugar); cortar(el, +el.dataset.lim || 340); }
     }
     function tecla(ev) { if (ev.key === 'Escape') fechar(); }
     document.addEventListener('keydown', tecla);
-    f.addEventListener('click', function (ev) { if (ev.target === f || ev.target.closest('.vmFechar')) fechar(); });
+    var desceu = null;   // só fecha se apertou e soltou no fundo (arrastar para selecionar texto não fecha)
+    f.addEventListener('mousedown', function (ev) { desceu = ev.target; });
+    f.addEventListener('click', function (ev) { if ((ev.target === f && desceu === f) || ev.target.closest('.vmFechar')) fechar(); });
     try { if (F.entrar) F.entrar(cx); } catch (e) { }
   }
   var ocupado = false;
   function agrupar(c) {
     if (!c || ocupado) return;
     ocupado = true;
+    // mover os cartões tira o foco do campo onde a pessoa digita: guarda e devolve no fim
+    var foco = document.activeElement && c.contains(document.activeElement) ? document.activeElement : null, ss = null, se = null, sy = window.scrollY;
+    try { if (foco && foco.selectionStart != null) { ss = foco.selectionStart; se = foco.selectionEnd; } } catch (e) { }
     try {
       trocarCarregando(c);
       var l = itens(c);
@@ -462,7 +475,13 @@ F.aoColarImagem = function (fn) {
       var velhos = [].slice.call(c.querySelectorAll(':scope>.gL,:scope>.gC'));
       if (/chamado\.html/.test(location.pathname) && l.some(function (x) { return x.classList.contains('tl'); })) grupoChamado(c, l); else grupoCartoes(c, l);
       velhos.forEach(function (x) { x.remove(); });
-    } catch (e) { } finally { ocupado = false; }
+    } catch (e) { } finally {
+      ocupado = false;
+      if (foco && document.contains(foco) && document.activeElement !== foco) {
+        try { foco.focus({ preventScroll: true }); if (ss != null && foco.setSelectionRange) foco.setSelectionRange(ss, se); } catch (e) { }
+        if (window.scrollY !== sy) window.scrollTo(0, sy);
+      }
+    }
   }
   function alvos() { return ['conteudo', 'c', 'lista'].map(function (id) { return document.getElementById(id); }).filter(Boolean); }
   function tudo() { alvos().forEach(function (c) { if (c.id === 'lista') trocarCarregando(c); else agrupar(c); }); }
@@ -473,4 +492,110 @@ F.aoColarImagem = function (fn) {
     tudo();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ligar); else ligar();
+})();
+
+// ---- Ctrl+K (PC): busca rápida de chamado ou de tela, de qualquer lugar do app ----
+(function () {
+  var pl = F.plataforma(); if (pl !== 'windows' && pl !== 'mac') return;
+  if (/(shell|avisos|login)\.html/.test(location.pathname)) return;
+  var aberto = null, seq = 0, tm = 0;
+  var IC2 = { tela: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/>', chamado: '<path d="M4 5h16v11H9.5L5 19.5z"/>', mais: '<path d="M12 5v14M5 12h14"/>', cfg: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>' };
+  function S2(d) { return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; }
+  function semAcento(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** Telas que dá para abrir (só as abas que o login tem). */
+  function telas() {
+    var e = {}; try { e = JSON.parse(App.shell() || '{}'); } catch (x) { }
+    var l = (e.abas || []).map(function (a) { return { t: a[1], s: 'Aba', ic: 'tela', ir: function () { App.irAba(a[0]); } }; });
+    if (e.helpdesk !== false && (e.abas || []).some(function (a) { return a[0] === 'helpdesk'; })) {
+      [['fila', 'Fila de atendimento'], ['comigo', 'Comigo'], ['meus', 'Meus chamados'], ['dash', 'Dashboard do atendimento']].forEach(function (x) {
+        l.push({ t: x[1], s: 'Helpdesk', ic: 'tela', ir: function () { App.irAba('helpdesk'); App.irSub(x[0]); } });
+      });
+      l.push({ t: 'Abrir chamado', s: 'Helpdesk', ic: 'mais', ir: function () { App.acaoShell('chamado'); } });
+      l.push({ t: 'Configurações', s: 'Avisos, aparência, versão', ic: 'cfg', ir: function () { App.acaoShell('config'); } });
+    }
+    return l;
+  }
+  function css() {
+    if (document.getElementById('bkCss')) return;
+    var st = document.createElement('style'); st.id = 'bkCss';
+    st.textContent = '.bkF{position:fixed;inset:0;z-index:200;background:rgba(15,27,61,.32);display:flex;justify-content:center;align-items:flex-start;padding:70px 20px 20px;animation:bkA .15s ease}' +
+      '.bkC{width:100%;max-width:620px;background:var(--sf);border-radius:18px;box-shadow:0 24px 70px rgba(15,27,61,.35);overflow:hidden;animation:bkB .2s cubic-bezier(.3,.7,.2,1)}' +
+      '.bkI{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--ln)}.bkI svg{width:20px;height:20px;color:var(--tx3)}' +
+      '.bkI input{flex:1;border:0;outline:0;background:none;font:inherit;font-size:16px;color:var(--tx)}.bkI kbd{font:inherit;font-size:11px;color:var(--tx3);border:1px solid var(--ln2);border-radius:6px;padding:2px 6px}' +
+      '.bkL{max-height:min(460px,calc(100vh - 180px));overflow:auto;padding:6px}.bkS{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--tx3);padding:10px 10px 4px}' +
+      '.bkR{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:11px;cursor:pointer}.bkR.on{background:var(--sf3)}.bkR .q{width:32px;height:32px;border-radius:9px;background:var(--sf2);border:1px solid var(--ln);display:flex;align-items:center;justify-content:center;color:var(--tx2);flex:none}' +
+      '.bkR .q svg{width:16px;height:16px}.bkR b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bkR small{display:block;font-size:12px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bkR>div{min-width:0;flex:1}' +
+      '.bkR em{font-style:normal;font-size:11px;font-weight:700;border-radius:99px;padding:2px 8px;background:var(--sf3);color:var(--tx2);flex:none}.bkV{padding:16px;text-align:center;color:var(--tx3);font-size:13px}' +
+      '.bkP{display:flex;gap:14px;padding:9px 16px;border-top:1px solid var(--ln);font-size:11.5px;color:var(--tx3)}' +
+      '@keyframes bkA{from{opacity:0}}@keyframes bkB{from{opacity:0;transform:translateY(-8px) scale(.98)}}';
+    document.head.appendChild(st);
+  }
+  var lista = [], sel = 0;
+  function desenhar(chamados, buscando) {
+    var q = semAcento(aberto.inp.value.trim()), tl = telas().filter(function (x) { return !q || semAcento(x.t + ' ' + x.s).indexOf(q) >= 0; });
+    lista = [];
+    var h = '';
+    if (q.length >= 2) {
+      h += '<div class="bkS">CHAMADOS</div>';
+      if (buscando && !(chamados || []).length) h += '<div class="bkV">Buscando…</div>';
+      else if (!(chamados || []).length) h += '<div class="bkV">Nenhum chamado com "' + F.esc(aberto.inp.value.trim()) + '".</div>';
+      (chamados || []).forEach(function (c) {
+        lista.push({ ir: function () { App.abrirSite('/helpdesk/tickets/' + c.id); } });
+        var st = F.STATUS && F.STATUS[c.status] ? F.STATUS[c.status][0] : (c.status || '');
+        h += '<div class="bkR" data-i="' + (lista.length - 1) + '"><span class="q">' + S2(IC2.chamado) + '</span><div><b>' + F.esc(c.protocol || ('#' + c.id)) + ' · ' + F.esc(c.title || '') + '</b><small>' + F.esc(c.queue_name || c.requester_name || '') + '</small></div>' + (st ? '<em>' + F.esc(st) + '</em>' : '') + '</div>';
+      });
+    }
+    if (tl.length) {
+      h += '<div class="bkS">IR PARA</div>';
+      tl.slice(0, q ? 8 : 12).forEach(function (x) { lista.push(x); h += '<div class="bkR" data-i="' + (lista.length - 1) + '"><span class="q">' + S2(IC2[x.ic] || IC2.tela) + '</span><div><b>' + F.esc(x.t) + '</b><small>' + F.esc(x.s) + '</small></div></div>'; });
+    }
+    if (!h) h = '<div class="bkV">Digite o número do chamado, o título ou o nome de uma tela.</div>';
+    aberto.l.innerHTML = h; sel = Math.min(sel, Math.max(0, lista.length - 1)); marcar();
+  }
+  function marcar() { [].forEach.call(aberto.l.querySelectorAll('.bkR'), function (r) { var on = +r.getAttribute('data-i') === sel; r.classList.toggle('on', on); if (on && r.scrollIntoView) r.scrollIntoView({ block: 'nearest' }); }); }
+  function buscarChamados() {
+    var q = aberto.inp.value.trim(), meu = ++seq; if (q.length < 2) { desenhar([], false); return; }
+    desenhar([], true);
+    var s = encodeURIComponent(q), urls = ['/helpdesk/tickets?view=requester&page=1&page_size=8&search=' + s, '/helpdesk/workspace/tickets?view=queues&page=1&page_size=8&search=' + s, '/helpdesk/workspace/tickets?view=assigned&page=1&page_size=8&search=' + s];
+    Promise.all(urls.map(function (u) { return F.api('GET', u).then(function (r) { return r.status === 200 && r.json ? (r.json.items || []) : []; }, function () { return []; }); })).then(function (rs) {
+      if (meu !== seq || !aberto) return;
+      var vistos = {}, todos = [];
+      rs.forEach(function (l) { l.forEach(function (c) { if (c && !vistos[c.id]) { vistos[c.id] = 1; todos.push(c); } }); });
+      todos.sort(function (a, b) { return String(b.updated_at || '').localeCompare(String(a.updated_at || '')); });
+      desenhar(todos.slice(0, 10), false);
+    });
+  }
+  function fechar() { if (!aberto) return; aberto.f.remove(); aberto = null; }
+  function ir(i) { var x = lista[i]; if (!x) return; fechar(); try { x.ir(); } catch (e) { } }
+  window.abrirBusca = function () {
+    if (aberto) { aberto.inp.focus(); aberto.inp.select(); return; }
+    css();
+    var f = document.createElement('div'); f.className = 'bkF';
+    f.innerHTML = '<div class="bkC"><div class="bkI">' + S2('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>') + '<input placeholder="Buscar chamado (número ou título) ou tela…" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></div>' +
+      '<div class="bkL"></div><div class="bkP"><span>↑ ↓ escolher</span><span>Enter abrir</span><span>Esc fechar</span></div></div>';
+    document.body.appendChild(f);
+    aberto = { f: f, inp: f.querySelector('input'), l: f.querySelector('.bkL') };
+    sel = 0; desenhar([], false); aberto.inp.focus();
+    aberto.inp.addEventListener('input', function () { sel = 0; clearTimeout(tm); desenhar([], aberto.inp.value.trim().length >= 2); tm = setTimeout(buscarChamados, 280); });
+    aberto.inp.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') { ev.preventDefault(); fechar(); }
+      else if (ev.key === 'ArrowDown') { ev.preventDefault(); sel = Math.min(lista.length - 1, sel + 1); marcar(); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); sel = Math.max(0, sel - 1); marcar(); }
+      else if (ev.key === 'Enter') { ev.preventDefault(); ir(sel); }
+    });
+    f.addEventListener('mousedown', function (ev) { if (ev.target === f) fechar(); });
+    aberto.l.addEventListener('click', function (ev) { var r = ev.target.closest('.bkR'); if (r) ir(+r.getAttribute('data-i')); });
+    aberto.l.addEventListener('mousemove', function (ev) { var r = ev.target.closest('.bkR'); if (r && +r.getAttribute('data-i') !== sel) { sel = +r.getAttribute('data-i'); marcar(); } });
+  };
+  document.addEventListener('keydown', function (ev) { if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) { ev.preventDefault(); window.abrirBusca(); } });
+})();
+
+// trocou de login: apaga o que ficou guardado da pessoa anterior (telas abertas na hora, listas e rascunhos)
+(function () {
+  if (!/login\.html/.test(location.pathname)) return;
+  try {
+    var apagar = [];
+    for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (/^(dc_|lc_|rasc_|lista_f_|hd_semacesso|dash_log_filtros|dash_com_filtro)/.test(k)) apagar.push(k); }
+    apagar.forEach(function (k) { localStorage.removeItem(k); });
+  } catch (e) { }
 })();

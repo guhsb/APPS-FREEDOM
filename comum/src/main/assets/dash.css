@@ -161,3 +161,9 @@ input.ckRem{width:20px;height:20px;flex:0 0 auto;margin:0 4px 0 0;accent-color:v
 .eqPes .hr .fn{background:var(--violeta-s, #ece7fd);color:var(--tx-violeta, #5b3fd0)}
 .eqPes.visita{background:linear-gradient(90deg,var(--violeta-s),transparent 60%);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:10px}
 .eqGeral{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;font-size:13.5px}.eqGeral svg.ic{width:16px;height:16px;vertical-align:-3px;color:var(--violeta)}
+.lin .v small.motV{white-space:normal;max-width:340px;margin:6px 0 0 auto;font-size:14px;color:var(--tx2);line-height:1.35}.lin .v small.motV b{font-weight:700;color:var(--tx);font-size:14.5px}
+.lin.temMot{flex-wrap:wrap}
+.lin.temMot .v{max-width:46%}
+.motL{display:none;flex-basis:100%;font-size:14px;color:var(--tx2);line-height:1.35;background:var(--sf2);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;margin-top:2px}
+.motL b{color:var(--tx);font-weight:700}
+@media (max-width:600px){.lin .v small.motV{display:none}.motL{display:block}.lin.temMot .v{max-width:none}}

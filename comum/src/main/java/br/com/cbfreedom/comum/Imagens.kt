@@ -68,12 +68,14 @@ class Imagens : ContentProvider() {
         fun compartilharArquivo(c: Context, dados: ByteArray, nome: String, tipo: String) {
             val dir = pasta(c)
             dir.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 3600_000L) it.delete() }
-            val f = File(dir, nome.replace(Regex("[^A-Za-z0-9À-ú._ -]"), "_"))
+            var limpo = nome.replace(Regex("[^A-Za-z0-9À-ú._ -]"), "_").trim()
+            if (limpo.isBlank() || limpo.trim('.').isEmpty()) limpo = "arquivo"   // "", "." ou ".." apontariam para a própria pasta
+            val f = File(dir, limpo)
             f.writeBytes(dados)
             val uri = Uri.Builder().scheme("content").authority(autoridade(c)).appendPath(f.name).build()
             val envio = Intent(Intent.ACTION_SEND).setType(tipo).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             envio.clipData = android.content.ClipData.newRawUri(f.name, uri)
-            c.startActivity(Intent.createChooser(envio, "Abrir ou enviar a planilha").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            c.startActivity(Intent.createChooser(envio, "Abrir ou enviar").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
         }
 
         /** Arquivo vazio para a câmera gravar a foto (content://…/Foto_AAAAMMDD_HHMMSS.jpg). */
@@ -106,10 +108,16 @@ class Imagens : ContentProvider() {
 
     override fun onCreate() = true
 
-    override fun getType(uri: Uri) = when {
-        uri.lastPathSegment?.endsWith(".jpg") == true -> "image/jpeg"
-        uri.lastPathSegment?.endsWith(".xlsx") == true -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        else -> "image/png"
+    // tipo pela extensão (PDF da conversa, planilha, foto…); antes tudo que não era jpg/xlsx saía como PNG
+    override fun getType(uri: Uri): String {
+        val ext = (uri.lastPathSegment ?: "").substringAfterLast('.', "").lowercase()
+        return when (ext) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "pdf" -> "application/pdf"
+            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            else -> android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+        }
     }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {

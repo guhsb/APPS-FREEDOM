@@ -208,7 +208,8 @@ namespace Freedom
         public void irAba(string id) { Ui(() => j.IrAbaShell(id ?? "")); }
         public void irSub(string id) { Ui(() => j.IrSub(id ?? "")); }
         public void acaoShell(string nome) { Ui(() => j.AcaoShell(nome ?? "")); }
-        public void sino(bool abrir, object x) { int px = 0; try { px = Convert.ToInt32(x); } catch (Exception) { } Ui(() => j.Sino(abrir, px)); }
+        public void sino(bool abrir, [System.Runtime.InteropServices.Optional] object x) {   // avisos.html chama só App.sino(false)
+            int px = 0; try { px = Convert.ToInt32(x); } catch (Exception) { } Ui(() => j.Sino(abrir, px)); }
         public void marcarLidos() { Ui(j.MarcarLidos); }
         public void subAbas(string json) { Ui(() => j.SubAbas(json)); }
 

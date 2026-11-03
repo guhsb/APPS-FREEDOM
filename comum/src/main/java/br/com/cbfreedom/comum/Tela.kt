@@ -1377,7 +1377,6 @@ class Tela : Activity() {
         @JavascriptInterface
         fun buscarPainel(id: String, inicio: String, fim: String) {
             val app = applicationContext
-            val alvo = websPainel[id]
             Thread {
                 val p = Freedom.porId(id)
                 var dados: JSONObject? = null
@@ -1389,7 +1388,8 @@ class Tela : Activity() {
                     try { dados = p?.buscarPeriodo(api, inicio, fim) } finally { api.sair() }
                     if (dados == null) erro = "este painel não tem escolha de período"
                 } catch (e: Exception) { erro = Api.mensagem(e) }
-                js(alvo, "window.painelPeriodo && painelPeriodo(" + (dados?.toString() ?: "null") + "," + JSONObject.quote(erro) + ")")
+                val cod = "window.painelPeriodo && painelPeriodo(" + (dados?.toString() ?: "null") + "," + JSONObject.quote(erro) + ")"
+                runOnUiThread { js(websPainel[id], cod) }   // o mapa das telas só é mexido na thread da tela
             }.start()
         }
 
@@ -1458,7 +1458,7 @@ class Tela : Activity() {
                 if (dados == null) { toast("Arquivo inválido"); return@Thread }
                 val ok = try { Arquivos.salvar(app, dados, Arquivos.nome(nome, mime), mime) } catch (_: Exception) { false }
                 toast(if (ok) "Salvo em Downloads ($nome)" else "Não consegui salvar em Downloads")
-                runOnUiThread { try { Imagens.compartilharArquivo(this@Tela, dados, nome, mime) } catch (_: Exception) { } }
+                runOnUiThread { try { Imagens.compartilharArquivo(this@Tela, dados, nome, mime) } catch (_: Exception) { toast("Salvo, mas não consegui abrir o compartilhar") } }
             }.start()
         }
 

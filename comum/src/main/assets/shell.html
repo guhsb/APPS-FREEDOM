@@ -28,16 +28,30 @@ html[data-tema=escuro] .marca{background:#fff}
 .usu b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.usu small{display:block;font-size:11px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .usu div{min-width:0}.usu{cursor:pointer;transition:box-shadow .2s,background .2s}.usu:hover{box-shadow:0 0 0 2px var(--rosa-s),var(--sombra)}.usu.on{box-shadow:0 0 0 2px var(--rosa),var(--sombra)}
 @media (max-width:1000px){.usu div{display:none}.usu{padding:5px}.pilulas b{padding:9px 12px}}
-/* ---- atalhos da esquerda ---- */
-.rail{height:100vh;box-sizing:border-box;padding:8px 0 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
-.g{background:var(--sf);border-radius:999px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sombra)}
-.g i{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--tx2);cursor:pointer;transition:background .25s,color .25s;font-style:normal}
-.g i:hover{background:var(--sf3);color:var(--tx)}.g i.on{background:var(--tx);color:var(--sf)}html[data-tema=escuro] .g i.on{color:#0b0d12}
-.g i.ro{color:var(--rosa)}.g i.pede{background:var(--rosa);color:#fff}
+/* ---- atalhos da esquerda: fechada = só ícones; aberta = os mesmos grupos esticados, com os nomes ---- */
+.rail{height:100vh;box-sizing:border-box;padding:8px 0 16px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.g{background:var(--sf);border-radius:25px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sombra);width:50px;box-sizing:border-box;overflow:hidden;flex:none;transition:width .38s cubic-bezier(.3,.8,.2,1),border-radius .38s}
+html.aberta .g{width:222px;border-radius:20px}
+.g .sec{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--tx3);height:0;opacity:0;overflow:hidden;padding-left:10px;white-space:nowrap;margin:0 0 -4px;transition:opacity .2s,height .3s,margin .3s}
+html.aberta .g .sec{height:14px;opacity:1;margin:4px 0 2px;transition-delay:.1s}
+.it{position:relative;display:flex;align-items:center;gap:12px;height:38px;min-height:38px;flex:none;box-sizing:border-box;border-radius:19px;padding:0 0 0 10px;color:var(--tx2);cursor:pointer;white-space:nowrap;font-size:13.5px;font-weight:600;transition:background .25s,color .25s}
+.it:hover{background:var(--sf3);color:var(--tx)}
+.it.on{background:var(--tx);color:var(--sf)}html[data-tema=escuro] .it.on{color:#0b0d12}
+.it.ro{color:var(--rosa)}.it.pede{background:var(--rosa);color:#fff}
+.it .tx{opacity:0;transition:opacity .15s}html.aberta .it .tx{opacity:1;transition-delay:.12s}
+.icw{position:relative;display:flex;flex:none}
+.bol{position:absolute;top:-7px;right:-9px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:99px;background:var(--rosa);color:#fff;font-size:9.5px;font-weight:800;font-style:normal;display:flex;align-items:center;justify-content:center;border:2px solid var(--sf);transition:opacity .2s,transform .2s}
+html.aberta .bol{opacity:0;transform:scale(.4)}
+.cnt{margin-left:auto;margin-right:10px;font-style:normal;font-size:11.5px;font-weight:800;min-width:22px;height:20px;padding:0 7px;box-sizing:border-box;border-radius:99px;background:var(--rosa-s);color:var(--tx-rosa);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+html.aberta .cnt{opacity:1;transition-delay:.12s}
+.it.on .cnt{background:rgba(255,255,255,.18);color:#fff}
+.abre{width:38px;height:38px;border-radius:50%;background:var(--sf);box-shadow:var(--sombra);color:var(--tx2);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:6px;flex:none;transition:transform .38s,background .2s}
+.abre:hover{background:var(--sf3);color:var(--tx)}html.aberta .abre{transform:rotate(180deg)}
 .mola{flex:1}
+.subs{overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 380px);scrollbar-width:none}.subs::-webkit-scrollbar{display:none}
 /* Mac: tudo numa página (as telas ficam por cima, à direita e embaixo do topo) */
-.fixa{position:fixed;left:0;top:76px;bottom:0;width:78px}.fixa .rail{height:calc(100vh - 76px)}
-.chipsP{position:fixed;left:78px;right:0;top:76px;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px}
+.fixa{position:fixed;left:0;top:76px;bottom:0;width:78px;transition:width .38s}html.aberta .fixa{width:262px}.fixa .rail{height:calc(100vh - 76px)}
+.chipsP{position:fixed;left:78px;transition:left .38s}html.aberta .chipsP{left:262px}.chipsP{right:0;top:76px;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px}
 .chipsP b{border:1px solid var(--ln);background:var(--sf);color:var(--tx2);border-radius:99px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600}.chipsP b.on{background:var(--tx);color:var(--sf);border-color:var(--tx)}
 .subs{overflow:auto;max-height:calc(100vh - 330px);scrollbar-width:none}.subs::-webkit-scrollbar{display:none}
 </style></head><body>
@@ -79,23 +93,48 @@ function esc(t) { return F.esc(t == null ? '' : String(t)); }
 function topo(e) {
   var h = '<div class="topo"><div class="marca"><img src="logo.png" alt="Freedom"></div><div class="pilulas" id="pil"><span class="ind" id="ind"></span>' +
     (e.abas || []).map(function (a) { return '<b data-aba="' + esc(a[0]) + '"' + (a[0] === e.aba ? ' class="on"' : '') + '>' + esc(a[1]) + '</b>'; }).join('') + '</div>' +
-    '<div class="botoes"><span class="bt' + (e.sino ? ' on' : '') + '" id="btSino" title="Avisos">' + S(ACOES.sino) + '<span class="selo' + (e.naoLidos ? '' : ' zero') + '">' + (e.naoLidos > 99 ? '99+' : (e.naoLidos || 0)) + '</span></span>' +
+    '<div class="botoes"><span class="bt" id="btBusca" title="Buscar chamado ou tela (Ctrl+K)">' + S('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>') + '</span><span class="bt' + (e.sino ? ' on' : '') + '" id="btSino" title="Avisos">' + S(ACOES.sino) + '<span class="selo' + (e.naoLidos ? '' : ' zero') + '">' + (e.naoLidos > 99 ? '99+' : (e.naoLidos || 0)) + '</span></span>' +
     '<span class="bt" id="btAtual" title="Atualizar esta tela">' + S(ACOES.atualizar) + '</span></div>' +
     '<div class="usu' + (e.helpSub === 'config' ? ' on' : '') + '" id="btUsu" title="Configurações · ' + esc(e.email) + '"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>' + esc(e.email || '') + '</small></div></div></div>';
   return h;
 }
+var aberta = false; try { aberta = localStorage.getItem('railAberta') === '1'; } catch (x) { }
+if (aberta) document.documentElement.classList.add('aberta');
+var SECS = { helpdesk: 'HELPDESK', comercial: 'COMERCIAL', logistica: 'LOGÍSTICA', admin: 'ADMIN', painel: 'PAINEL' };
+/** Quantos chamados em cada atalho do Helpdesk (os mesmos números do Início). */
+function numeros() {
+  try {
+    var h = JSON.parse(App.helpdesk() || '{}'), r = h.resumo || {}, ws = r.workspace || {}, rq = r.requester || {};
+    return { fila: ws.open, comigo: ws.assigned_to_me_active, meus: rq.active };
+  } catch (x) { return {}; }
+}
+function item(id, attr, ic, tx, cls, n) {
+  n = Math.round(+n || 0);
+  return '<div class="it ' + (cls || '') + '" data-' + attr + '="' + esc(id) + '" title="' + esc(tx) + (n ? ' · ' + n : '') + '"><span class="icw">' + S(ic) + (n ? '<i class="bol">' + (n > 99 ? '99+' : n) + '</i>' : '') + '</span>' +
+    '<span class="tx">' + esc(tx) + '</span>' + (n ? '<em class="cnt">' + (n > 999 ? '999+' : n) + '</em>' : '') + '</div>';
+}
 function rail(e) {
-  var h = '<div class="rail"><div class="g"><i data-r="claro" title="Modo claro"' + (e.tema !== 'escuro' ? ' class="on"' : '') + '>' + S(ACOES.sol) + '</i><i data-r="escuro" title="Modo escuro"' + (e.tema === 'escuro' ? ' class="on"' : '') + '>' + S(ACOES.lua) + '</i></div>';
-  var subs = [], atual = '';
-  if (e.aba === 'helpdesk') { subs = HELP; atual = e.helpSub || 'inicio'; }
+  var h = '<div class="rail"><span class="abre" data-r="railToggle" title="' + (aberta ? 'Fechar atalhos' : 'Abrir atalhos') + '">' + S('<path d="M9 6l6 6-6 6"/>') + '</span>';
+  h += '<div class="g"><div class="sec">APARÊNCIA</div>' + item('claro', 'r', ACOES.sol, 'Modo claro', e.tema !== 'escuro' ? 'on' : '') + item('escuro', 'r', ACOES.lua, 'Modo escuro', e.tema === 'escuro' ? 'on' : '') + '</div>';
+  var subs = [], atual = '', num = {};
+  if (e.aba === 'helpdesk') { subs = HELP; atual = e.helpSub || 'inicio'; num = numeros(); }
   else if (e.sub && e.sub.lista) { subs = e.sub.lista; atual = e.sub.atual; }
-  if (subs.length) h += '<div class="g subs">' + subs.map(function (s) { return '<i data-s="' + esc(s[0]) + '" title="' + esc(s[1]) + '"' + (s[0] === atual ? ' class="on"' : '') + '>' + S(IC[s[0]] || IC.pontos) + '</i>'; }).join('') + '</div>';
+  if (subs.length) h += '<div class="g subs"><div class="sec">' + (SECS[e.aba] || 'ATALHOS') + '</div>' + subs.map(function (s) {
+    return item(s[0], 's', IC[s[0]] || IC.pontos, e.aba === 'helpdesk' && s[0] === 'inicio' ? 'Início' : e.aba === 'helpdesk' && s[0] === 'dash' ? 'Dashboard' : s[1], s[0] === atual ? 'on' : '', num[s[0]]);
+  }).join('') + '</div>';
   var ac = e.acoes || {}, temImg = e.aba !== 'site' && ac.img !== false, temXls = e.aba === 'comercial' && ac.xls !== false;
-  h += '<div class="g">' + (temImg ? '<i data-r="imagem" title="Gerar imagem (PNG)">' + S(ACOES.imagem) + '</i>' : '') +
-    (temXls ? '<i data-r="excel" title="Exportar Excel">' + S(ACOES.excel) + '</i>' : '') +
-    (e.helpdesk ? '<i data-r="chamado" class="ro" title="Abrir chamado">' + S(ACOES.chamado) + '</i>' : '') + '</div>';
-  h += '<div class="mola"></div><div class="g"><i data-r="sair" title="' + (sairPede ? 'Toque de novo para sair' : 'Sair / trocar login') + '"' + (sairPede ? ' class="pede"' : '') + '>' + S(ACOES.sair) + '</i></div></div>';
+  var acoes = (temImg ? item('imagem', 'r', ACOES.imagem, 'Gerar imagem (PNG)') : '') + (temXls ? item('excel', 'r', ACOES.excel, 'Exportar Excel') : '') +
+    (e.helpdesk ? item('chamado', 'r', ACOES.chamado, 'Abrir chamado', 'ro') : '');
+  if (acoes) h += '<div class="g"><div class="sec">AÇÕES</div>' + acoes + '</div>';
+  h += '<div class="mola"></div><div class="g">' + item('sair', 'r', ACOES.sair, sairPede ? 'Toque de novo para sair' : 'Sair / trocar login', sairPede ? 'pede' : '') + '</div></div>';
   return h;
+}
+function railAlternar() {
+  aberta = !aberta;
+  try { localStorage.setItem('railAberta', aberta ? '1' : ''); } catch (x) { }
+  document.documentElement.classList.toggle('aberta', aberta);
+  try { App.acaoShell(aberta ? 'railAbrir' : 'railFechar'); } catch (x) { }
+  desenhar(true);
 }
 function posInd() {
   var on = document.querySelector('#pil b.on'), ind = document.getElementById('ind'); if (!ind) return;
@@ -103,7 +142,7 @@ function posInd() {
   ind.style.left = on.offsetLeft + 'px'; ind.style.width = on.offsetWidth + 'px';
 }
 function desenhar(forcar) {
-  var e = est(), k = JSON.stringify(e) + sairPede;
+  var e = est(), k = JSON.stringify(e) + sairPede + (MODO !== 'topo' && e.aba === 'helpdesk' ? JSON.stringify(numeros()) : '');
   if (!forcar && k === ultimo) return; ultimo = k;
   document.documentElement.setAttribute('data-tema', e.tema === 'escuro' ? 'escuro' : 'claro');
   if (MODO === 'mac') {
@@ -125,15 +164,17 @@ window.shellAtualizar = function () { desenhar(); };
 window.temaMudou = function () { desenhar(true); };
 window.addEventListener('resize', posInd);
 document.addEventListener('click', function (ev) {
-  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-s],[data-r],[data-pn],#btSino,#btAtual,#btUsu') : null; if (!t) return;
+  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-s],[data-r],[data-pn],#btSino,#btAtual,#btUsu,#btBusca') : null; if (!t) return;
   try {
     if (t.hasAttribute('data-pn')) { App.painelShell(t.getAttribute('data-pn')); return; }
     if (t.id === 'btSino') { var rb = t.getBoundingClientRect(); App.sino(!t.classList.contains('on'), Math.round(rb.left + rb.width / 2)); return; }
     if (t.id === 'btUsu') { App.acaoShell('config'); return; }
+    if (t.id === 'btBusca') { App.acaoShell('busca'); return; }
     if (t.id === 'btAtual') { t.classList.add('gira'); setTimeout(function () { t.classList.remove('gira'); }, 900); App.acaoShell('atualizar'); return; }
     if (t.hasAttribute('data-aba')) { App.irAba(t.getAttribute('data-aba')); return; }
     if (t.hasAttribute('data-s')) { [].forEach.call(document.querySelectorAll('[data-s]'), function (x) { x.classList.toggle('on', x === t); }); App.irSub(t.getAttribute('data-s')); return; }
     var r = t.getAttribute('data-r');
+    if (r === 'railToggle') { railAlternar(); return; }
     if (r === 'sair') {
       if (Date.now() - sairPede < 4000) { sairPede = 0; App.acaoShell('sair'); return; }
       sairPede = Date.now(); desenhar(true); setTimeout(function () { sairPede = 0; desenhar(true); }, 4000); return;
@@ -142,5 +183,10 @@ document.addEventListener('click', function (ev) {
   } catch (x) { }
 });
 desenhar(true); setInterval(desenhar, 15000);
+window.recebidoHelpdesk = function () { desenhar(); };
+// a janela do app precisa saber a largura certa dos atalhos ao abrir
+if (MODO !== 'topo' && aberta) { try { App.acaoShell('railAbrir'); } catch (x) { } }
+// Ctrl+K: busca rápida (abre na tela do meio)
+document.addEventListener('keydown', function (ev) { if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) { ev.preventDefault(); try { App.acaoShell('busca'); } catch (x) { } } });
 </script>
 </body></html>

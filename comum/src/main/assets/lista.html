@@ -99,6 +99,9 @@ window.addEventListener('hashchange', function () { location.reload(); });
 var modo = partes[0] || 'meus';
 var f = { status: '', priority: '', queue: '', sla: '', sort: '', busca: '', sem: '' };
 partes.slice(1).forEach(function (p) { var kv = p.split('='); if (kv[0] in f) f[kv[0]] = decodeURIComponent(kv[1] || ''); });
+// sem filtro no endereço (atalho comum): volta com os filtros que a pessoa deixou nesta lista
+if (partes.length === 1) { try { var fsv = JSON.parse(localStorage.getItem('lista_f_' + modo) || 'null'); if (fsv) Object.keys(f).forEach(function (k) { if (k !== 'busca' && fsv[k] != null) f[k] = fsv[k]; }); } catch (e) { } }
+function guardarFiltrosLista() { if (partes.length > 1) return; try { var o = {}; Object.keys(f).forEach(function (k) { if (k !== 'busca') o[k] = f[k]; }); localStorage.setItem('lista_f_' + modo, JSON.stringify(o)); } catch (e) { } }
 var pagina = 1, itens = [], total = null, maisBrutos = false, autoPag = 0, carregando = false, setores = {}, pessoas = {}, acesso = null, pedido = 0;
 
 document.getElementById('btVoltar').innerHTML = F.ic('seta');
@@ -131,6 +134,8 @@ function cabeca() {
     h += '<select id="fSla"><option value="">Todo SLA</option>' + ['AT_RISK', 'BREACHED', 'ON_TRACK', 'MET', 'NOT_CONFIGURED'].map(function (k) {
       return '<option value="' + k + '"' + (f.sla === k ? ' selected' : '') + '>' + F.SLA[k] + '</option>'; }).join('') + '</select>';
     var qs = acesso && acesso.queues ? acesso.queues : [];
+    // setor guardado que não aparece mais (perdeu o setor, ou só tem um): tira, senão a lista fica vazia sem jeito de limpar
+    if (acesso && f.queue && !(qs.length > 1 && qs.some(function (q) { return String(q.id) === String(f.queue); }))) { f.queue = ''; setTimeout(recarregar, 0); }
     if (qs.length > 1) h += '<select id="fSetor"><option value="">Todos os setores</option>' + qs.map(function (q) {
       return '<option value="' + q.id + '"' + (String(f.queue) === String(q.id) ? ' selected' : '') + '>' + F.esc(q.name) + '</option>'; }).join('') + '</select>';
     h += '<label><input type="checkbox" id="fSort"' + (f.sort === 'sla' ? ' checked' : '') + '>Mais urgentes (SLA)</label>';
@@ -179,24 +184,38 @@ function caminho() {
   return q;
 }
 
-function recarregar() { pagina = 1; itens = []; total = null; autoPag = 0; if (kanban) buscarKanban(); else buscar(); }
+function recarregar() { guardarFiltrosLista(); pagina = 1; itens = []; total = null; autoPag = 0; if (kanban) buscarKanban(); else buscar(); }
 
 function buscar() {
   var meu = ++pedido;
   carregando = true;
   document.getElementById('btAt').classList.add('gira');
-  if (pagina === 1) document.getElementById('lista').innerHTML = '<div class="carregando"><i></i>Carregando…</div>';
-  F.api('GET', caminho()).then(function (r) {
+  var cam = caminho(), daCache = false;
+  if (pagina === 1) {
+    // abre na hora com a última lista igual a esta; a nova entra quando o site responder
+    var salvo = null; try { salvo = JSON.parse(localStorage.getItem('lc_' + cam) || 'null'); } catch (e) { }
+    if (salvo && salvo.items && !soSem()) { itens = salvo.items.slice(); total = salvo.total; maisBrutos = false; daCache = true; desenhar(itens.length); }
+    else document.getElementById('lista').innerHTML = '<div class="carregando"><i></i>Carregando…</div>';
+  }
+  F.api('GET', cam).then(function (r) {
     if (meu !== pedido) return;          // chegou depois de outro filtro
     carregando = false;
     document.getElementById('btAt').classList.remove('gira');
     var av = document.getElementById('aviso');
     if (r.status !== 200 || !r.json) {
       av.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(F.erroApi(r, 'Não consegui carregar os chamados')) + '</span><button onclick="recarregar()">Tentar</button></div>';
-      if (pagina === 1) document.getElementById('lista').innerHTML = '';
+      if (pagina === 1 && !daCache) document.getElementById('lista').innerHTML = '';
       return;
     }
     av.innerHTML = '';
+    if (daCache) { itens = []; daCache = false; }
+    if (pagina === 1) {
+      try {
+        localStorage.setItem('lc_' + cam, JSON.stringify({ items: r.json.items || [], total: r.json.total }));
+        var idx = JSON.parse(localStorage.getItem('lc_idx') || '[]').filter(function (k) { return k !== cam; }); idx.unshift(cam);
+        idx.slice(30).forEach(function (k) { localStorage.removeItem('lc_' + k); }); localStorage.setItem('lc_idx', JSON.stringify(idx.slice(0, 30)));
+      } catch (e) { }
+    }
     var brutos = r.json.items || [];
     var tot = typeof r.json.total === 'number' ? r.json.total : null;
     maisBrutos = tot != null ? pagina * 20 < tot : brutos.length >= 20;
@@ -349,8 +368,9 @@ function verTodosKb(col) {
   function fechar() { document.removeEventListener('keydown', tecla); f.remove(); document.body.style.overflow = ''; }
   function tecla(ev) { if (ev.key === 'Escape') fechar(); }
   document.addEventListener('keydown', tecla);
+  var desceu = null; f.addEventListener('mousedown', function (ev) { desceu = ev.target; });
   f.addEventListener('click', function (ev) {
-    if (ev.target === f || ev.target.closest('.vmFechar')) { fechar(); return; }
+    if ((ev.target === f && desceu === f) || ev.target.closest('.vmFechar')) { fechar(); return; }
     var it = ev.target.closest('[data-id]'); if (it) { fechar(); try { App.abrirSite('/helpdesk/tickets/' + it.getAttribute('data-id')); } catch (e) { } }
   });
 }

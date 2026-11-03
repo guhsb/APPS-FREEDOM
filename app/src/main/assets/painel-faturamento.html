@@ -78,8 +78,9 @@ function diaMostrado(d) {
   return { x: x, idx: idx, ant: ant, semana: semana, ultimo: !sel || sel === ult.data };
 }
 /** Mês até o dia mostrado × mês passado até o mesmo dia (se o site mandou os dias do mês passado). */
+function hojeSP() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { return new Date().toISOString().slice(0, 10); } }
 function mesComparado(d, iso) {
-  if (!iso) return null;
+  iso = hojeSP();   // o "Total do mês" é sempre o mês de hoje: compara hoje × mesmo dia do mês passado (não o dia escolhido)
   var dias = d.dias || [], ano = +iso.slice(0, 4), mes = +iso.slice(5, 7), dia = +iso.slice(8, 10);
   var pa = mes === 1 ? ano - 1 : ano, pm = mes === 1 ? 12 : mes - 1;
   var pref = ano + '-' + ('0' + mes).slice(-2), prefA = pa + '-' + ('0' + pm).slice(-2);

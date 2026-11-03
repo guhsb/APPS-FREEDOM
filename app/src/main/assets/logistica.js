@@ -14,11 +14,36 @@ var LG = (function () {
   var RELST = { IN_PRODUCTION: 'Em produção', OUT_OF_STOCK: 'Sem estoque' };
 
   function st(k) { return S[k] || (S[k] = {}); }
-  function redesenhar() { if (window.desenharMantendo) desenharMantendo(); }
+  // filtros de cada aba ficam guardados no aparelho (abre do jeito que a pessoa deixou)
+  var FILTROS = ['busca', 'ord', 'dir', 'fx', 'f', 'cat', 'rede', 'modo', 'sub', 'prod', 'per', 'fam', 'cls'];   // ('ex' não: são as regras do site, não filtro)
+  try {
+    var fs0 = JSON.parse(X.lembrar('log_filtros') || '{}');
+    Object.keys(fs0).forEach(function (k) { var o = fs0[k] || {}; delete o.ex; S[k] = o; });
+    // período por atalho ("Hoje", "Este mês"…): recalcula as datas para hoje, não as do dia em que foi guardado
+    var sd = S.dia, h0 = X.hoje();
+    if (sd && sd.per && sd.f) {
+      if (sd.per === 'hoje') { sd.f.ini = h0; sd.f.fim = h0; }
+      else if (sd.per === '7') { sd.f.ini = X.iso(new Date(X.de(h0).getTime() - 6 * 864e5)); sd.f.fim = h0; }
+      else if (sd.per === 'mes') { sd.f.ini = X.mes(h0, 0)[0]; sd.f.fim = h0; }
+      else if (sd.per === 'ant') { var m0 = X.mes(h0, -1); sd.f.ini = m0[0]; sd.f.fim = m0[1]; }
+    }
+  } catch (e) { }
+  var tmFiltros = 0;
+  function guardarFiltros() {
+    clearTimeout(tmFiltros);
+    tmFiltros = setTimeout(function () {
+      var o = {};
+      Object.keys(S).forEach(function (k) { var a = {}, tem = false; FILTROS.forEach(function (f) { if (S[k][f] != null && S[k][f] !== '') { a[f] = S[k][f]; tem = true; } }); if (tem) o[k] = a; });
+      try { X.lembrar('log_filtros', JSON.stringify(o)); } catch (e) { }
+    }, 500);
+  }
+  function redesenhar() { guardarFiltros(); if (window.desenharMantendo) desenharMantendo(); }
   /** Busca e guarda em alvo[campo]; só a última chamada vale. */
   function buscar(alvo, campo, url) {
     var meu = ++seq; alvo['_s' + campo] = meu; alvo['_c' + campo] = true; alvo['_e' + campo] = null;
-    return X.get(url).then(function (j) { if (alvo['_s' + campo] !== meu) return; alvo[campo] = j; })
+    // abre na hora com o que veio da última vez (mesmo endereço) e troca quando o site responder
+    if (alvo[campo] == null) { var salvo = X.cache('l|' + url); if (salvo && salvo.d != null) alvo[campo] = salvo.d; }
+    return X.get(url).then(function (j) { if (alvo['_s' + campo] !== meu) return; alvo[campo] = j; X.cache('l|' + url, j); })
       .catch(function (e) { if (alvo['_s' + campo] !== meu) return; alvo['_e' + campo] = e.message || 'Não consegui carregar'; })
       .then(function () { if (alvo['_s' + campo] !== meu) return; alvo['_c' + campo] = false; redesenhar(); });
   }
@@ -146,18 +171,21 @@ var LG = (function () {
     var s = st('ped'), ef = p.effective_classification, ab = s.ab && s.ab[p.order_number], pr = s.prods && s.prods[p.order_number];
     var cor = ef === 'FINALIZADO' ? 'vd' : ef === 'EQUIPE' ? 'az' : 'la', fin = ef === 'FINALIZADO', atual = p.operational_classification || p.classification;
     var trocando = s.trocando === p.order_number;
-    var h = '<div class="lin">' + (s.varios && !fin ? '<input type="checkbox" class="chkPed" data-act="pedMarca" data-v="' + F.esc(p.order_number) + '"' + (s.marc[p.order_number] ? ' checked' : '') + ' style="width:20px;height:20px;margin-top:2px;accent-color:var(--rosa)">' : '') +
+    var h = '<div class="lin' + (p.reason ? ' temMot' : '') + '">' + (s.varios && !fin ? '<input type="checkbox" class="chkPed" data-act="pedMarca" data-v="' + F.esc(p.order_number) + '"' + (s.marc[p.order_number] ? ' checked' : '') + ' style="width:20px;height:20px;margin-top:2px;accent-color:var(--rosa)">' : '') +
       '<div class="c"><b>' + F.esc(p.customer || '—') + '</b><span>Pedido ' + F.esc(p.order_number) + ' · ' + F.dataBR(p.order_date) + ' · ' + F.esc(p.network || 'SEM REDE') + '</span>';
     if (fin) h += '<span class="bdg vd">Finalizado</span>';
     else h += '<div class="segm">' + opcoesCls().map(function (c) {
       return '<button data-act="pedTroca" data-v="' + F.esc(p.order_number) + '" data-c="' + F.esc(c) + '" class="' + (c === atual ? 'on ' + (c === 'EQUIPE' ? 'az' : 'la') : '') + '"' + (trocando ? ' disabled' : '') + '>' + F.esc(nomeCls(c)) + '</button>'; }).join('') + '</div>';
     h += (p.conference_status ? '<span class="bdg">' + F.esc(CONF[p.conference_status] || p.conference_status) + '</span>' : '') +
-      (p.reason ? '<span style="display:block;font-size:12.5px;color:var(--tx2);margin-top:4px">Motivo: <b>' + F.esc(p.reason) + '</b></span>' : '') +
+
       '<div class="ac2"><button class="lnk" data-act="pedItens" data-v="' + F.esc(p.order_number) + '">' + (ab ? 'Ocultar itens' : 'Ver ' + F.n(p.item_count) + ' itens') + '</button>' +
       (!fin ? '<button class="lnk ro" data-act="pedEditar" data-v="' + F.esc(p.order_number) + '">' + (p.reason ? 'Trocar motivo' : '+ Motivo') + '</button>' : '<span style="font-size:12px;color:var(--tx3)" title="Classificação definida pela conferência concluída.">Definido pela conferência</span>') + '</div>';
     if (ab) h += '<div class="itens2">' + (pr === undefined || pr === 'c' ? '<div class="vazio2">Carregando produtos…</div>' : pr === 'e' ? '<div class="vazio2">Não consegui abrir os produtos.</div>' :
       lista(pr.products).map(function (x) { return '<div class="row"><span>' + F.esc(x.product) + (x.product_code ? ' <small style="color:var(--tx3)">' + F.esc(x.product_code) + '</small>' : '') + '<br><small style="color:var(--tx3)">' + F.esc(x.family || '') + ' · ' + qtd(x.quantity) + ' un</small></span><b>' + brl(x.value) + '</b></div>'; }).join('')) + '</div>';
-    return h + '</div><div class="v">' + brl(p.value) + '</div></div>';
+    // motivo embaixo do valor (à direita), como pediram
+    // (no celular não cabe ao lado: vai numa linha inteira embaixo do pedido)
+    var mot = p.reason ? 'Motivo: <b>' + F.esc(p.reason) + '</b>' : '';
+    return h + '</div><div class="v">' + brl(p.value) + (mot ? '<small class="motV">' + mot + '</small>' : '') + '</div>' + (mot ? '<div class="motL">' + mot + '</div>' : '') + '</div>';
   }
   function pedPorNumero(n) { var d = st('ped').d; return lista(d && d.items).filter(function (x) { return x.order_number === n; })[0]; }
   /** Grava no site; devolve a promessa. */
@@ -281,8 +309,8 @@ var LG = (function () {
   /** Dias desde a data do pedido (pendente há quanto tempo). */
   function diasPend(i) {
     if (i.pending_days != null) return F.n(i.pending_days);
-    var d = i.order_date ? new Date(String(i.order_date).slice(0, 10) + 'T12:00:00') : null; if (!d || isNaN(d)) return null;
-    return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+    if (!i.order_date || !/^\d{4}-\d\d-\d\d/.test(String(i.order_date))) return null;
+    return X.idade(String(i.order_date).slice(0, 10));   // dias de calendário (horário de São Paulo)
   }
   function produtosPed(pr) {
     return '<div class="itens2">' + (pr === undefined || pr === 'c' ? '<div class="vazio2">Carregando produtos…</div>' : pr === 'e' ? '<div class="vazio2">Não consegui abrir os produtos.</div>' :
@@ -345,6 +373,9 @@ var LG = (function () {
   function telaCons() {
     var s = st('cons'), h = '';
     s.modo = s.modo || 'prod';
+    // voltou com produto/rede guardados: busca de novo (senão fica "Carregando…" para sempre)
+    if (s.modo === 'prod' && s.prod && s.res == null && !s._cres) { buscar(s, 'res', '/logistics/analysis/product' + X.q({ product: s.prod })); consPedidos(); }
+    if (s.modo === 'rede' && s.rede && s.rres == null && !s._crres) { buscar(s, 'rres', '/logistics/analysis/network' + X.q({ network: s.rede })); buscar(s, 'rprods', '/logistics/analysis/network/products' + X.q({ network: s.rede })); }
     h += '<div class="seg"><b data-act="consModo" data-v="prod"' + (s.modo === 'prod' ? ' class="on"' : '') + '>Produto</b><b data-act="consModo" data-v="rede"' + (s.modo === 'rede' ? ' class="on"' : '') + '>Rede</b></div>';
     if (s.modo === 'prod') {
       if (s.sug == null && !s._csug) buscar(s, 'sug', '/logistics/analysis/products' + X.q({ search: (s.busca || '').trim() }));
