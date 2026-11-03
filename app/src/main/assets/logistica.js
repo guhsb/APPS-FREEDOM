@@ -191,7 +191,7 @@ var LG = (function () {
   /** Grava no site; devolve a promessa. */
   function gravarPed(n, cls, motivo) {
     return X.enviar('PUT', '/logistics/pending/orders/' + encodeURIComponent(n) + '/control', { classification: cls, reason: motivo || null }, 'Este pedido não está mais disponível na lista de pendências.')
-      .then(function (j) { var p = pedPorNumero(n); if (p) { p.operational_classification = cls; p.classification = cls; p.effective_classification = cls; p.reason = motivo || null; } return j; });
+      .then(function (j) { var p = pedPorNumero(n); if (p) { p.operational_classification = cls; p.classification = cls; p.effective_classification = cls; p.reason = motivo || null; st('motVp').mapa = null; } return j; });
   }
   /** Um toque em Pendência/Equipe: troca na hora, mantendo o motivo. */
   function trocarPed(n, cls) {
@@ -317,15 +317,23 @@ var LG = (function () {
       (lista(pr.products).map(function (x) { return '<div class="row"><span>' + F.esc(x.product) + (x.product_code ? ' <small style="color:var(--tx3)">' + F.esc(x.product_code) + '</small>' : '') + '<br><small style="color:var(--tx3)">' + F.esc(x.family || '') + ' · ' + qtd(x.quantity) + ' un</small></span><b>' + brl(x.value) + '</b></div>'; }).join('') || '<div class="vazio2">Nenhum produto neste pedido.</div>')) + '</div>';
   }
   /** Valor Pedido: igual ao de Pedidos (rede, dias pendente e os itens do pedido). */
+  /** Motivo de cada pedido, pego da lista de Pedidos (mesmo número). Carrega uma vez sem filtro e usa o cache. */
+  function motivosVp() {
+    var m = st('motVp'); if (!m._ja) { m._ja = 1; buscar(m, 'd', '/logistics/pending/orders'); }   // uma vez (o Atualizar busca de novo)
+    var pd = st('ped').d; if (m.mapa && m.de === m.d && m.dp === pd) return m.mapa;   // só remonta quando os dados mudam
+    var r = {}; [m.d, pd].forEach(function (d) { lista(d && d.items).forEach(function (p) { if (p.order_number != null) r[p.order_number] = (p.reason || '').trim(); }); });
+    m.mapa = r; m.de = m.d; m.dp = pd; return r;
+  }
+  function motivoVp(i) { var r = motivosVp()[i.order_number]; return r || (i.reason || '').trim(); }
   function linhaVp(i) {
-    var s = st('vp'), ab = s.ab && s.ab[i.order_number], dd = diasPend(i);
+    var s = st('vp'), ab = s.ab && s.ab[i.order_number], dd = diasPend(i), mt = motivoVp(i), mot = mt ? 'Motivo: <b>' + F.esc(mt) + '</b>' : '';
     var corD = dd == null ? '' : dd > 30 ? 'var(--tx-vermelho)' : dd > 15 ? 'var(--tx-laranja)' : 'var(--tx3)';
     var nIt = F.n(i.item_count || i.items_count || i.product_count);
-    return '<div class="lin"><div class="c"><b>' + F.esc(i.customer || '—') + '</b><span>Pedido ' + F.esc(i.order_number) + ' · ' + F.dataBR(i.order_date) + (i.network ? ' · ' + F.esc(i.network) : '') + '</span>' +
+    return '<div class="lin' + (mot ? ' temMot' : '') + '"><div class="c"><b>' + F.esc(i.customer || '—') + '</b><span>Pedido ' + F.esc(i.order_number) + ' · ' + F.dataBR(i.order_date) + (i.network ? ' · ' + F.esc(i.network) : '') + '</span>' +
       '<span class="bdg la">Pendente</span>' +
       '<div class="ac2"><button class="lnk" data-act="vpItens" data-v="' + F.esc(i.order_number) + '">' + (ab ? 'Ocultar itens' : nIt ? 'Ver ' + nIt + ' ite' + (nIt === 1 ? 'm' : 'ns') : 'Ver itens') + '</button></div>' +
       (ab ? produtosPed(s.prods && s.prods[i.order_number]) : '') +
-      '</div><div class="v">' + brl(i.value) + (dd != null ? '<small style="display:block;font-size:12px;font-weight:700;margin-top:3px;color:' + corD + '">' + dd + (dd === 1 ? ' dia' : ' dias') + ' pendente</small>' : '') + '</div></div>';
+      '</div><div class="v">' + brl(i.value) + (dd != null ? '<small style="display:block;font-size:12px;font-weight:700;margin-top:3px;color:' + corD + '">' + dd + (dd === 1 ? ' dia' : ' dias') + ' pendente</small>' : '') + (mot ? '<small class="motV">' + mot + '</small>' : '') + '</div>' + (mot ? '<div class="motL">' + mot + '</div>' : '') + '</div>';
   }
   function itensVp(n) {
     var s = st('vp'); s.ab = s.ab || {}; s.prods = s.prods || {};
@@ -758,7 +766,7 @@ var LG = (function () {
       var bl = [{ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Valor dos pedidos pendentes', valor: tot, pill: it.length + (it.length === 1 ? ' pedido' : ' pedidos'), sub: it.length ? 'Ticket médio ' + F.brl(tot / it.length) : '' }] }];
       bl = bl.concat(descFiltros([s.busca ? 'busca "' + s.busca.trim() + '"' : ''].concat(faixa(fx))));
       bl.push({ tipo: 'tabela', titulo: 'Pedidos', d: it.length + ' pedido(s)', lim: 250, cols: [['Cliente', 'l', 0.38], ['Pedido', 'l', 0.13], ['Data', 'l', 0.17], ['Dias', 'r', 0.1], ['Valor', 'r', 0.22, 1]],
-        linhas: it.map(function (i) { var dd = diasPend(i); return [i.customer || '—', i.order_number, F.dataBR(i.order_date), dd == null ? '—' : String(dd), F.brl(i.value)]; }) });
+        linhas: it.map(function (i) { var dd = diasPend(i), r = [i.customer || '—', i.order_number, F.dataBR(i.order_date), dd == null ? '—' : String(dd), F.brl(i.value)], m = motivoVp(i); if (m) r.sub = 'Motivo: ' + m; return r; }) });
       F.gerarImagem({ titulo: 'Valor Pedido', sub: 'Logística · ' + quandoImg(), arquivo: 'freedom-logistica-valor-pedido', blocos: bl });
     }).catch(function (e) { if (b) { b.disabled = false; b.lastChild.textContent = ' Gerar imagem (PNG)'; } falhou(e); });
   }
@@ -904,7 +912,7 @@ var LG = (function () {
 
   /** Atualizar (botão do topo): recarrega a aba aberta. */
   function recarregar(aba) {
-    if (aba === 'ped') carregarPed(); if (aba === 'pend') carregarPend(); if (aba === 'vp') carregarVp();
+    if (aba === 'ped') carregarPed(); if (aba === 'pend') carregarPend(); if (aba === 'vp') { st('motVp')._ja = 0; carregarVp(); }
     if (aba === 'cons') { var c = st('cons'); c.sug = null; c.rank = null; c.redes = null; if (c.prod) mudou.consProd(c.prod); if (c.rede) mudou.consRede(c.rede); }
     if (aba === 'sb') { carregarSb(); st('sb').op = null; opcoesSb(); }
     if (aba === 'rel') { carregarRel(); st('rel').op = null; opcoesRel(); }

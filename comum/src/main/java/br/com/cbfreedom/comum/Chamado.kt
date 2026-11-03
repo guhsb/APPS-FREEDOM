@@ -295,6 +295,21 @@ object Chamado {
         return Pair(Api.BASE + "/helpdesk/tickets/$id/attachments/$anexo/download", cookie)
     }
 
+    /** Bytes do anexo para mostrar a foto no app (sem salvar em Downloads). */
+    fun bytesAnexo(c: Context, id: Int, anexo: Int): Pair<Int, ByteArray> = try {
+        val login = Store.login(c)
+        if (login == null) Pair(401, ByteArray(0)) else {
+            val hp = Helpdesk.prefs(c)
+            val caminho = "/helpdesk/tickets/$id/attachments/$anexo/download"
+            var api = Api(login.first, login.second, hp.getString("cookie", "") ?: "")
+            if (api.cookie.isEmpty()) { api.entrar(); hp.edit().putString("cookie", api.cookie).apply() }
+            var r = api.baixarBytes(caminho, LIMITE_VER)
+            if (r.first == 401) { api = Api(login.first, login.second); api.entrar(); hp.edit().putString("cookie", api.cookie).apply(); r = api.baixarBytes(caminho, LIMITE_VER) }
+            r
+        }
+    } catch (e: Exception) { Pair(0, ByteArray(0)) }
+    const val LIMITE_VER = 15 * 1024 * 1024
+
     /** Depois de mexer no chamado: atualiza a lista (a ação própria entra só no histórico, sem aviso). */
     @Suppress("UNUSED_PARAMETER")
     private fun depois(c: Context, id: Int) {

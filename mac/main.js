@@ -574,6 +574,9 @@ const ponte = {
       js(wc, 'window.F && F.toast && F.toast(' + Q('Salvo em Downloads: ' + path.basename(arq)) + ')');
     } catch (e) { js(wc, 'window.F && F.toast && F.toast(' + Q('Não consegui salvar: ' + e.message) + ')'); }
   },
+  verAnexo: (wc, seq, id, anexo) => {
+    Chamado.bytesAnexo(Number(id), Number(anexo)).then(r => js(wc, 'window.anexoBytes && anexoBytes(' + Number(seq) + ',' + r.status + ',"' + (r.status === 200 ? r.bytes.toString('base64') : '') + '")'));
+  },
   baixarAnexo: (wc, id, anexo, nome) => {
     Chamado.baixarAnexo(Number(id), Number(anexo), nome).then(arq => {
       if (arq) shell.showItemInFolder(arq); else js(wc, "window.F && F.toast && F.toast('Não consegui baixar o anexo')");

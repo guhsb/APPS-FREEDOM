@@ -331,6 +331,20 @@ const Chamado = {
     } catch (e) { return null; }
   },
 
+  /** Bytes do anexo para mostrar a foto no app (sem salvar em Downloads). */
+  async bytesAnexo(id, anexo) {
+    const LIMITE = 15 * 1024 * 1024;
+    try {
+      const login = Store.login(); if (!login) return { status: 401, bytes: Buffer.alloc(0) };
+      const hp = Helpdesk.P, caminho = '/helpdesk/tickets/' + id + '/attachments/' + anexo + '/download';
+      let api = new Api(login[0], login[1], hp.getStr('cookie', ''));
+      if (!api.cookie) { await api.entrar(); hp.editar().put('cookie', api.cookie).commit(); }
+      let r = await api.bytes(caminho, LIMITE);
+      if (r.status === 401) { api = new Api(login[0], login[1]); await api.entrar(); hp.editar().put('cookie', api.cookie).commit(); r = await api.bytes(caminho, LIMITE); }
+      return r;
+    } catch (e) { return { status: 0, bytes: Buffer.alloc(0) }; }
+  },
+
   depois() { setTimeout(() => Helpdesk.verificar(true).catch(() => null), 0); }
 };
 

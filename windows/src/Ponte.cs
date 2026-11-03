@@ -358,6 +358,17 @@ namespace Freedom
             });
         }
 
+        /// <summary>Foto do anexo para ver dentro do app: devolve em base64 (anexoBytes).</summary>
+        public void verAnexo(object seqO, object idO, object anexoO)
+        {
+            int seq = N(seqO), id = N(idO), anexo = N(anexoO);
+            Fundo(() =>
+            {
+                var r = Chamado.BytesAnexo(id, anexo);
+                j.JsApp("window.anexoBytes && anexoBytes(" + seq + "," + r.Status + ",\"" + (r.Status == 200 ? Convert.ToBase64String(r.Bytes) : "") + "\")");
+            });
+        }
+
         /// <summary>Acesso direto à API do Helpdesk (só endereços do Helpdesk).</summary>
         public void api(object reqO, string metodo, string caminho, string corpo)
         {

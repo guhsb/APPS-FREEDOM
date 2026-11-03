@@ -348,6 +348,24 @@ namespace Freedom
             catch (Exception) { return null; }
         }
 
+        public const int LIMITE_VER = 15 * 1024 * 1024;
+        /// <summary>Bytes do anexo para mostrar a foto no app (sem salvar em Downloads).</summary>
+        public static Api.Arquivo BytesAnexo(int id, int anexo)
+        {
+            try
+            {
+                var login = Store.Login();
+                if (login == null) return new Api.Arquivo { Status = 401 };
+                var hp = Helpdesk.P; var caminho = "/helpdesk/tickets/" + id + "/attachments/" + anexo + "/download";
+                var api = new Api(login.Value.Key, login.Value.Value, hp.GetString("cookie", ""));
+                if (api.Cookie.Length == 0) { api.Entrar(); hp.Edit().Put("cookie", api.Cookie).Commit(); }
+                var r = api.BaixarBytes(caminho, LIMITE_VER);
+                if (r.Status == 401) { api = new Api(login.Value.Key, login.Value.Value); api.Entrar(); hp.Edit().Put("cookie", api.Cookie).Commit(); r = api.BaixarBytes(caminho, LIMITE_VER); }
+                return r;
+            }
+            catch (Exception) { return new Api.Arquivo { Status = 0 }; }
+        }
+
         static void Depois() { Helpdesk.EmSegundoPlano(() => Helpdesk.Verificar(true)); }
     }
 }

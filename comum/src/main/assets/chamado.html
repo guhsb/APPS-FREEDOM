@@ -105,6 +105,46 @@ html.largo .gC .ladoD{max-height:calc(100vh - 84px - 140px);overflow-y:auto;over
 .colarPrint img{display:block;max-width:100%;max-height:55vh;margin:12px auto;border-radius:10px;border:1px solid var(--ln)}
 .colarPrint .cpb{display:flex;gap:8px;justify-content:flex-end}.colarPrint button{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}
 .colarPrint .n{background:var(--sf3);color:var(--tx)}.colarPrint .s{background:var(--rosa);color:#fff}
+/* anexos dentro da conversa e visor de foto (igual WhatsApp) */
+.msg.anxM{padding:8px}
+.msg.anxM .q{padding:0 4px}
+.fotoA{display:block;position:relative;width:250px;max-width:100%;aspect-ratio:4/3;border:0;padding:0;border-radius:12px;overflow:hidden;background:var(--sf3);cursor:zoom-in;color:var(--tx3);font:inherit}
+.fotoA img{width:100%;height:100%;object-fit:cover;display:block}
+.fotoA .ld{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;text-align:center;padding:10px}
+.fotoA .ld svg.ic{width:26px;height:26px}
+.anxN{display:block;font-size:12px;color:var(--tx3);margin:5px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+.arqA{display:flex;align-items:center;gap:10px;width:250px;max-width:100%;border:1px solid var(--ln);background:var(--sf2);border-radius:12px;padding:9px 10px;cursor:pointer;text-align:left;color:var(--tx);font:inherit}
+.arqA .ico{width:36px;height:36px;border-radius:10px;background:var(--sf3);display:flex;align-items:center;justify-content:center;flex:none;color:var(--tx2)}
+.arqA .ico svg.ic{width:18px;height:18px}
+.arqA b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.arqA small{display:block;font-size:11.5px;color:var(--tx3)}
+.arqA .tx{flex:1;min-width:0}
+.arqA>svg.ic{width:18px;height:18px;color:var(--tx3);flex:none}
+.anx .ico.mini{padding:0;overflow:hidden}.anx .ico.mini img{width:100%;height:100%;object-fit:cover;display:block}
+#visor{position:fixed;inset:0;z-index:9999;background:#07090f;display:flex;flex-direction:column;color:#fff;touch-action:pan-x pan-y pinch-zoom}
+#visor .vt{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px}
+#visor .vt .tx{flex:1;min-width:0}
+#visor .vt b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#visor .vt small{display:block;font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#visor .vb{width:42px;height:42px;border-radius:12px;border:0;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+#visor .vb svg.ic{width:20px;height:20px}
+#visor .vf{flex:1;min-height:0;position:relative;overflow:auto;display:flex;align-items:center;justify-content:center}
+#visor .vf img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;user-select:none;-webkit-user-drag:none}
+#visor .vf.zoom{display:block}
+#visor .vf.zoom img{max-width:none;max-height:none;cursor:zoom-out}
+#visor .vf .ld{color:rgba(255,255,255,.7);font-size:14px;text-align:center;padding:20px}
+#visor .nav{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2}
+#visor .nav.e{left:10px}#visor .nav.d{right:10px}
+#visor .vf.doc{display:block;background:#2a2f3a}
+#visor .pgs{display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 8px 24px;min-width:min-content}
+#visor .pg{background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.4);flex:none;display:flex;align-items:center;justify-content:center}
+#visor .pg canvas{display:block}
+#visor .pg .ld{color:#7b879e}
+#visor .txtV{margin:0 auto;max-width:900px;background:#fff;color:#0f1b3d;min-height:100%;box-sizing:border-box;padding:16px;font:13.5px/1.5 ui-monospace,Consolas,"Roboto Mono",monospace;white-space:pre-wrap;word-break:break-word;user-select:text}
+#visor .vb{font-size:22px;font-weight:700}
+.ico .ico{width:100%;height:100%;border-radius:inherit;display:flex;align-items:center;justify-content:center}
+.ico.tp{color:#fff!important;font-size:10.5px;font-weight:800;letter-spacing:.02em}
+#visor .vr{text-align:center;font-size:12px;color:rgba(255,255,255,.6);padding:8px 0 calc(12px + env(safe-area-inset-bottom))}
 </style></head><body>
 <div class="topo">
   <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
@@ -355,10 +395,12 @@ function render(d) {
   var sp2 = solucaoProposta(d), idSol = sp2.msg ? sp2.msg.id : null;
   h += '<div class="sec"><h2>Conversa</h2><span>' + itens.length + '</span></div><div class="tl">';
   var ultimoDia = '';
+  itens = comAnexos(itens);
   itens.forEach(function (it) {
     var dt = data(it.created_at), dd = dt ? diaTxt(dt) : '';
     if (dd && dd !== ultimoDia) { h += '<div class="dia">' + dd + '</div>'; ultimoDia = dd; }
     var a = it.actor || {}, quem = a.name || 'Sistema', eu = !!a.is_current_user;
+    if (it.type === 'ANEXO') { h += bolhaAnexo(it, quem, eu); return; }
     if (it.type === 'EVENT') {
       var ev = textoEvento(it);
       h += '<div class="ev">' + F.ic(ev[0]) + '<span><b>' + F.esc(eu ? 'Você' : quem) + '</b> ' + F.esc(ev[1]) + ' · ' + hora(it.created_at) + '</span></div>';
@@ -452,9 +494,11 @@ function desenharAnexos() {
   if (!anexos.length) { box.innerHTML = '<div class="vazio">Nenhum anexo neste chamado.</div>'; return; }
   box.innerHTML = '<div class="lista anx">' + anexos.map(function (a, i) {
     var nome = a.original_filename || a.filename || ('Anexo ' + (i + 1));
-    return '<div class="item" data-anexo="' + i + '"><div class="ico">' + F.ic('arquivo') + '</div><div class="tx"><div class="t1"><b>' + F.esc(nome) + '</b></div>' +
+    var ft = ehFoto(a), u = ft && !!(fotos[a.id] && fotos[a.id].url) ? fotos[a.id].url : '';
+    if (ft && fotos[a.id] == null) filaFoto(a);
+    return '<div class="item" data-anexo="' + i + '"><div class="ico' + (ft ? ' mini' : '') + '"' + (ft ? ' data-fid="' + a.id + '" data-mini="1"' : '') + '>' + (u ? '<img src="' + u + '" alt="">' : ft ? F.ic('imagem') : icoTipo(a)) + '</div><div class="tx"><div class="t1"><b>' + F.esc(nome) + '</b></div>' +
       '<p>' + tamanho(a.size_bytes) + (a.uploaded_by_name ? ' · ' + F.esc(a.uploaded_by_name) : '') + (a.created_at ? ' · ' + dataHora(a.created_at) : '') + '</p></div>' +
-      '<span class="seta">' + F.ic('baixar') + '</span></div>';
+      '<span class="seta" data-baixa="1" title="Baixar">' + F.ic('baixar') + '</span></div>';
   }).join('') + '</div>';
 }
 
@@ -523,7 +567,8 @@ function ligar(d) {
   if (box) box.onclick = function (ev) {
     var el = ev.target.closest ? ev.target.closest('[data-anexo]') : null; if (!el || !anexos) return;
     var a = anexos[parseInt(el.getAttribute('data-anexo'), 10)]; if (!a) return;
-    try { App.baixarAnexo(ID, a.id, a.original_filename || a.filename || 'anexo'); } catch (e) {}
+    if (abreNoApp(a) && podeVer() && !ev.target.closest('[data-baixa]')) { abrirVisor(a); return; }
+    baixar(a);
   };
 }
 
@@ -534,6 +579,213 @@ function carregar(silencioso) {
   if (!silencioso) document.getElementById('btAt').classList.add('gira');
   try { App.carregarChamado(ID); } catch (e) { carregando = false; }
 }
+// ---------------- anexos na conversa + visor de foto ----------------
+var EXT_FOTO = /\.(png|jpe?g|gif|webp|bmp)$/i, AUTO_MAX = 8 * 1048576;
+var fotos = {}, pedFoto = {}, seqFoto = 0, filaF = [], ocupadoF = false;
+function nomeAnx(a) { return a.original_filename || a.filename || a.file_name || 'anexo'; }
+function ehPdf(a) { return !!a && (/\.pdf$/i.test(nomeAnx(a)) || /pdf/i.test(a.content_type || a.mime_type || '')); }
+function ehTxt(a) { return !!a && (/\.(txt|csv|log)$/i.test(nomeAnx(a)) || /^text\/plain/i.test(a.content_type || a.mime_type || '')); }
+function abreNoApp(a) { return ehFoto(a) || ehPdf(a) || ehTxt(a); }
+function ehFoto(a) { return !!a && (EXT_FOTO.test(nomeAnx(a)) || /^image\/(png|jpe?g|gif|webp|bmp)/i.test(a.content_type || a.mime_type || '')); }
+function mimeFoto(a) { if (ehPdf(a)) return 'application/pdf'; if (ehTxt(a)) return 'text/plain'; var e = (nomeAnx(a).match(/\.([a-z0-9]+)$/i) || [])[1] || ''; e = e.toLowerCase(); return a.content_type && /^image\//.test(a.content_type) ? a.content_type : 'image/' + (e === 'jpg' ? 'jpeg' : e || 'jpeg'); }
+function podeVer() { try { return !!(window.App && App.verAnexo); } catch (e) { return false; } }
+function baixar(a) { try { App.baixarAnexo(ID, a.id, nomeAnx(a)); } catch (e) { } }
+/** Põe a foto na fila (uma por vez, para não pesar). grande = só quando a pessoa tocar. */
+function filaFoto(a, agora) {
+  if (!podeVer() || fotos[a.id] === 'c' || !!(fotos[a.id] && fotos[a.id].url)) return;
+  if (!agora && Number(a.size_bytes) > AUTO_MAX) { fotos[a.id] = 'g'; return; }
+  fotos[a.id] = 'c'; if (agora) filaF.unshift(a); else filaF.push(a); proximaFoto();
+}
+function proximaFoto() {
+  if (ocupadoF || !filaF.length) return;
+  var a = filaF.shift(); ocupadoF = true; var seq = ++seqFoto;
+  pedFoto[seq] = { a: a, t: setTimeout(function () { if (pedFoto[seq]) window.anexoBytes(seq, 0, ''); }, 90000) };
+  try { App.verAnexo(seq, ID, a.id); } catch (e) { delete pedFoto[seq]; ocupadoF = false; fotos[a.id] = 'e'; atualizarFoto(a.id); proximaFoto(); }
+}
+window.anexoBytes = function (seq, st, b64) {
+  var p = pedFoto[seq]; if (!p) return; delete pedFoto[seq]; clearTimeout(p.t);
+  var a = p.a, fim = function (v) { fotos[a.id] = v; ocupadoF = false; atualizarFoto(a.id); setTimeout(proximaFoto, 30); };
+  if (st !== 200 || !b64) { fim(st === 413 ? 'm' : 'e'); return; }
+  // vira um Blob (não deixa o texto enorme no HTML)
+  fetch('data:' + mimeFoto(a) + ';base64,' + b64).then(function (r) { return r.blob(); }).then(function (b) { fim({ url: URL.createObjectURL(b) }); })
+    .catch(function () { try { var bin = atob(b64), u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); fim({ url: URL.createObjectURL(new Blob([u8], { type: mimeFoto(a) })) }); } catch (e) { fim('e'); } });
+};
+function conteudoFoto(a, grande) {
+  var f = fotos[a.id];
+  if (!!(f && f.url)) return '<img src="' + f.url + '" alt="' + F.esc(nomeAnx(a)) + '">';
+  var txt = f === 'e' ? 'Não consegui abrir · toque para tentar' : f === 'm' ? 'Foto grande demais para ver aqui · toque para baixar' : f === 'g' ? 'Foto de ' + tamanho(a.size_bytes) + ' · toque para ver' : 'Carregando foto…';
+  return '<div class="ld">' + (grande ? '' : F.ic(f === 'e' ? 'alerta' : 'imagem')) + '<span>' + txt + '</span></div>';
+}
+function atualizarFoto(id) {
+  var a = (anexos || []).filter(function (x) { return x.id === id; })[0]; if (!a) return;
+  [].forEach.call(document.querySelectorAll('[data-fid="' + id + '"]'), function (el) {
+    if (el.getAttribute('data-mini')) { if (!!(fotos[id] && fotos[id].url)) el.innerHTML = '<img src="' + fotos[id].url + '" alt="">'; }
+    else el.innerHTML = conteudoFoto(a);
+  });
+  var v = document.getElementById('visor'); if (v && v.getAttribute('data-id') == String(id)) mostrarNoVisor();
+}
+/** Coloca cada anexo na conversa no horário em que foi enviado (o aviso "anexou…" vira o próprio anexo). */
+function comAnexos(itens) {
+  if (!anexos || !anexos.length) return itens;
+  var eus = {}, porNome = {};
+  itens.forEach(function (it) { var a = it.actor || {}; if (a.is_current_user && a.name) eus[a.name] = 1;
+    if (it.type === 'EVENT' && it.event_type === 'ATTACHMENT_ADDED') { var n = (it.metadata || {}).filename; if (n) (porNome[n] = porNome[n] || []).push(it); } });
+  var usados = {}, extra = anexos.map(function (a, i) {
+    var ev = (porNome[nomeAnx(a)] || []).filter(function (e) { return !usados[e.id]; })[0];
+    if (ev) usados[ev.id] = 1;
+    var ator = ev && ev.actor ? ev.actor : { name: a.uploaded_by_name || 'Alguém', is_current_user: !!eus[a.uploaded_by_name] };
+    return { type: 'ANEXO', anexo: a, ix: i, created_at: a.created_at || (ev && ev.created_at), actor: ator };
+  });
+  var base = itens.filter(function (it) { return !(it.type === 'EVENT' && usados[it.id]); });
+  var tempo = function (it) { var d = data(it.created_at); return d ? d.getTime() : 0; };
+  extra.sort(function (x, y) { return tempo(x) - tempo(y); });
+  var r = [], j = 0;
+  base.forEach(function (it) { while (j < extra.length && tempo(extra[j]) && tempo(extra[j]) < tempo(it)) r.push(extra[j++]); r.push(it); });
+  return r.concat(extra.slice(j));
+}
+function bolhaAnexo(it, quem, eu) {
+  var a = it.anexo, nome = nomeAnx(a), ft = ehFoto(a) && podeVer();
+  if (ft && fotos[a.id] == null) filaFoto(a);
+  var q = '<div class="q"><b>' + F.esc(eu ? 'Você' : quem) + '</b><span class="tag">anexo</span><em>' + hora(it.created_at) + '</em></div>';
+  var corpo = ft ? '<button class="fotoA" type="button" data-vfoto="' + a.id + '" data-fid="' + a.id + '" aria-label="Ver foto ' + F.esc(nome) + '">' + conteudoFoto(a) + '</button><span class="anxN">' + F.esc(nome) + ' · ' + tamanho(a.size_bytes) + '</span>'
+    : (function () { var ver = podeVer() && (ehPdf(a) || ehTxt(a));
+        return '<button class="arqA" type="button" ' + (ver ? 'data-vfoto' : 'data-barq') + '="' + a.id + '">' + icoTipo(a) + '<span class="tx"><b>' + F.esc(nome) + '</b><small>' + tipoTxt(a) + ' · ' + tamanho(a.size_bytes) + ' · ' + (ver ? 'toque para abrir' : 'toque para baixar') + '</small></span>' + F.ic(ver ? 'olho' : 'baixar') + '</button>'; })();
+  return '<div class="msg anxM' + (eu ? ' eu' : '') + '">' + q + corpo + '</div>';
+}
+/** Selo do tipo do arquivo (PDF, XLS, DOC, TXT…), com a cor de cada um. */
+function extAnx(a) { return ((nomeAnx(a).match(/\.([a-z0-9]{1,5})$/i) || [])[1] || '').toUpperCase(); }
+function tipoTxt(a) { var e = extAnx(a); return { PDF: 'PDF', XLS: 'Excel', XLSX: 'Excel', CSV: 'Planilha', DOC: 'Word', DOCX: 'Word', TXT: 'Texto' }[e] || (e || 'Arquivo'); }
+function icoTipo(a) {
+  var e = extAnx(a), c = /^PDF$/.test(e) ? '#dc2626' : /^(XLSX?|CSV)$/.test(e) ? '#0e9f6e' : /^DOCX?$/.test(e) ? '#3b5bfd' : /^(TXT|LOG)$/.test(e) ? '#7b879e' : '';
+  return c ? '<span class="ico tp" style="background:' + c + '">' + F.esc(e.slice(0, 4)) + '</span>' : '<span class="ico">' + F.ic('arquivo') + '</span>';
+}
+function anexoPorId(id) { return (anexos || []).filter(function (x) { return String(x.id) === String(id); })[0]; }
+function listaFotos() { return (anexos || []).filter(ehFoto); }
+function abrirVisor(a) {
+  var v = document.getElementById('visor');
+  if (!v) { v = document.createElement('div'); v.id = 'visor'; v.setAttribute('role', 'dialog'); document.body.appendChild(v); }
+  v.setAttribute('data-id', a.id);
+  var f = fotos[a.id]; if (f == null || f === 'g' || f === 'e') { fotos[a.id] = null; filaFoto(a, true); }
+  v.removeAttribute('data-pronto'); zoomPdf = 1; mostrarNoVisor();
+}
+function mostrarNoVisor() {
+  var v = document.getElementById('visor'); if (!v) return;
+  var a = anexoPorId(v.getAttribute('data-id')); if (!a) { fecharVisor(); return; }
+  var doc = ehPdf(a) || ehTxt(a), f = fotos[a.id];
+  if (doc && v.getAttribute('data-pronto') === String(a.id)) return;   // já está aberto: não refaz
+  var l = doc ? [] : listaFotos(), i = l.indexOf(a);
+  var meio = !(f && f.url) ? '<div class="ld">' + (f === 'm' ? 'Arquivo grande demais para ver aqui. Use o botão de baixar.' : f === 'e' ? 'Não consegui abrir o arquivo.' : 'Carregando ' + (ehPdf(a) ? 'PDF' : ehTxt(a) ? 'texto' : 'foto') + '…') + '</div>'
+    : ehPdf(a) ? '<div class="pgs" id="pdfPgs"><div class="ld">Abrindo o PDF…</div></div>' : ehTxt(a) ? '<pre class="txtV" id="txtV">Carregando…</pre>'
+    : '<img src="' + f.url + '" alt="' + F.esc(nomeAnx(a)) + '" data-vis="zoom">';
+  v.innerHTML = '<div class="vt"><button class="vb" type="button" data-vis="fechar" aria-label="Fechar">' + F.ic('x') + '</button><div class="tx"><b>' + F.esc(nomeAnx(a)) + '</b><small>' +
+    F.esc([a.uploaded_by_name, a.created_at ? dataHora(a.created_at) : '', tamanho(a.size_bytes)].filter(Boolean).join(' · ')) + '</small></div>' +
+    (ehPdf(a) && !!(f && f.url) ? '<button class="vb" type="button" data-vis="menos" aria-label="Diminuir" title="Diminuir">−</button><button class="vb" type="button" data-vis="mais" aria-label="Aumentar" title="Aumentar">+</button>' : '') +
+    '<button class="vb" type="button" data-vis="baixar" aria-label="Baixar" title="Baixar">' + F.ic('baixar') + '</button></div>' +
+    '<div class="vf' + (doc ? ' doc' : '') + '">' + meio +
+    (l.length > 1 && i > 0 ? '<button class="nav e" type="button" data-vis="ant" aria-label="Anterior">‹</button>' : '') +
+    (l.length > 1 && i < l.length - 1 ? '<button class="nav d" type="button" data-vis="prox" aria-label="Próxima">›</button>' : '') + '</div>' +
+    '<div class="vr" id="vRod">' + (l.length > 1 ? (i + 1) + ' de ' + l.length + ' fotos' : '&nbsp;') + '</div>';
+  if (doc && !!(f && f.url)) { v.setAttribute('data-pronto', a.id); if (ehPdf(a)) mostrarPdf(a, f.url); else mostrarTxt(f.url); }
+}
+// ---- PDF (pdf.js, só carrega quando abre um PDF) e texto ----
+var zoomPdf = 1, pdfVez = 0;
+function carregarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (carregarPdfJs.p) return carregarPdfJs.p;
+  var sc = function (src) { return new Promise(function (ok, erro) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { erro(new Error('não carregou ' + src)); }; document.head.appendChild(s); }); };
+  // em file:// (Android/Mac) o worker separado não abre: roda o leitor junto da tela
+  carregarPdfJs.p = (location.protocol === 'file:' ? sc('pdfjs.worker.min.js') : Promise.resolve()).then(function () { return sc('pdfjs.min.js'); }).then(function () {
+    if (!window.pdfjsLib) throw new Error('PDF indisponível');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs.worker.min.js'; return pdfjsLib;
+  });
+  carregarPdfJs.p.catch(function () { carregarPdfJs.p = null; });
+  return carregarPdfJs.p;
+}
+function mostrarPdf(a, url) {
+  var vez = ++pdfVez, caixa = document.getElementById('pdfPgs'); if (!caixa) return;
+  var erro = function () { if (vez === pdfVez && caixa.isConnected) caixa.innerHTML = '<div class="ld">Não consegui abrir este PDF. Use o botão de baixar.</div>'; };
+  Promise.all([carregarPdfJs(), fetch(url).then(function (r) { return r.arrayBuffer(); })]).then(function (r) {
+    return r[0].getDocument({ data: new Uint8Array(r[1]), isEvalSupported: false, disableFontFace: false }).promise;
+  }).then(function (pdf) {
+    if (vez !== pdfVez || !caixa.isConnected) { pdf.destroy(); return; }
+    caixa._pdf = pdf; desenharPaginas(caixa, pdf, vez);
+  }).catch(erro);
+}
+/** Cria um espaço por página e só desenha as que estão perto da tela (PDF grande não trava). */
+function desenharPaginas(caixa, pdf, vez) {
+  pdf.getPage(1).then(function (p1) {
+    if (vez !== pdfVez || !caixa.isConnected) return;
+    var larg = Math.max(200, caixa.clientWidth - 16) * zoomPdf, v1 = p1.getViewport({ scale: 1 }), esc = larg / v1.width;
+    caixa.innerHTML = ''; caixa._esc = esc;
+    var rod = document.getElementById('vRod'); if (rod) rod.textContent = pdf.numPages + (pdf.numPages === 1 ? ' página' : ' páginas');
+    for (var n = 1; n <= pdf.numPages; n++) { var d = document.createElement('div'); d.className = 'pg'; d.setAttribute('data-pg', n); d.style.width = Math.round(v1.width * esc) + 'px'; d.style.height = Math.round(v1.height * esc) + 'px'; caixa.appendChild(d); }
+    var fila = [], rodando = false;
+    var proxima = function () {
+      if (rodando || !fila.length || vez !== pdfVez || !caixa.isConnected) return; rodando = true;
+      var el = fila.shift(), n = +el.getAttribute('data-pg');
+      pdf.getPage(n).then(function (pg) {
+        var vp = pg.getViewport({ scale: esc }), dpr = Math.min(2, window.devicePixelRatio || 1);
+        var k = Math.min(dpr, Math.sqrt(9e6 / (vp.width * vp.height)));   // limite de memória por página
+        var cv = document.createElement('canvas'); cv.width = Math.floor(vp.width * k); cv.height = Math.floor(vp.height * k);
+        cv.style.width = Math.round(vp.width) + 'px'; cv.style.height = Math.round(vp.height) + 'px';
+        el.style.width = cv.style.width; el.style.height = cv.style.height;
+        return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp, transform: k !== 1 ? [k, 0, 0, k, 0, 0] : null }).promise.then(function () { el.innerHTML = ''; el.appendChild(cv); });
+      }).catch(function () { el.innerHTML = '<div class="ld">Página ' + n + ' não abriu</div>'; }).then(function () { rodando = false; proxima(); });
+    };
+    var ver = function () {
+      if (vez !== pdfVez || !caixa.isConnected) return;
+      var vf = caixa.closest('.vf'), r = vf.getBoundingClientRect();
+      [].forEach.call(caixa.children, function (el) { if (el._ok) return; var b = el.getBoundingClientRect(); if (b.bottom > r.top - 900 && b.top < r.bottom + 900) { el._ok = 1; fila.push(el); } });
+      proxima();
+    };
+    var vf = caixa.closest('.vf'); vf.onscroll = function () { clearTimeout(ver.t); ver.t = setTimeout(ver, 80); }; ver();
+  });
+}
+function zoomarPdf(d) {
+  var caixa = document.getElementById('pdfPgs'); if (!caixa || !caixa._pdf) return;
+  var nz = Math.max(1, Math.min(3, Math.round((zoomPdf + d) * 2) / 2)); if (nz === zoomPdf) return;
+  var vf = caixa.closest('.vf'), rel = vf.scrollHeight ? vf.scrollTop / vf.scrollHeight : 0;
+  zoomPdf = nz; vf.classList.toggle('largo2', nz > 1); desenharPaginas(caixa, caixa._pdf, ++pdfVez);
+  setTimeout(function () { vf.scrollTop = rel * vf.scrollHeight; }, 60);
+}
+function mostrarTxt(url) {
+  fetch(url).then(function (r) { return r.arrayBuffer(); }).then(function (b) {
+    var u8 = new Uint8Array(b), t;
+    try { t = new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) { t = new TextDecoder('windows-1252').decode(u8); }   // arquivo salvo no Bloco de Notas antigo
+    var el = document.getElementById('txtV'); if (el) el.textContent = t.length > 400000 ? t.slice(0, 400000) + '\n\n… (continua: baixe para ver tudo)' : (t || '(arquivo vazio)');
+  }).catch(function () { var el = document.getElementById('txtV'); if (el) el.textContent = 'Não consegui abrir este texto.'; });
+}
+function passarFoto(d) { var v = document.getElementById('visor'); if (!v) return; var l = listaFotos(), i = l.indexOf(anexoPorId(v.getAttribute('data-id'))) + d; if (i >= 0 && i < l.length) abrirVisor(l[i]); }
+/** Fecha a foto aberta (o Voltar do Android chama isto). Devolve true se tinha uma aberta. */
+window.fecharVisor = function () { var v = document.getElementById('visor'); if (!v) return false; var c = document.getElementById('pdfPgs'); if (c && c._pdf) try { c._pdf.destroy(); } catch (e) { } pdfVez++; v.remove(); return true; };
+document.addEventListener('click', function (ev) {
+  var t = ev.target, el;
+  if (!t.closest) return;
+  if ((el = t.closest('[data-vfoto]'))) { var a = anexoPorId(el.getAttribute('data-vfoto')); if (a) { if (fotos[a.id] === 'm') baixar(a); else abrirVisor(a); } return; }
+  if ((el = t.closest('[data-barq]'))) { var b = anexoPorId(el.getAttribute('data-barq')); if (b) baixar(b); return; }
+  if (!(el = t.closest('#visor'))) return;
+  var k = t.closest('[data-vis]'), acao = k && k.getAttribute('data-vis'), at = anexoPorId(el.getAttribute('data-id'));
+  if (acao === 'fechar') fecharVisor();
+  else if (acao === 'baixar' && at) baixar(at);
+  else if (acao === 'mais') zoomarPdf(0.5);
+  else if (acao === 'menos') zoomarPdf(-0.5);
+  else if (acao === 'ant') passarFoto(-1);
+  else if (acao === 'prox') passarFoto(1);
+  else if (acao === 'zoom') { var vf = t.closest('.vf'), r = vf.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width, py = (ev.clientY - r.top) / r.height;
+    vf.classList.toggle('zoom'); if (vf.classList.contains('zoom')) { vf.scrollLeft = Math.max(0, t.naturalWidth * px - r.width / 2); vf.scrollTop = Math.max(0, t.naturalHeight * py - r.height / 2); } }
+  else if (t.classList.contains('vf') || t.classList.contains('vr')) fecharVisor();   // tocou fora da foto
+}, true);
+document.addEventListener('keydown', function (ev) {
+  if (!document.getElementById('visor')) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); fecharVisor(); }
+  else if (ev.key === 'ArrowLeft') passarFoto(-1); else if (ev.key === 'ArrowRight') passarFoto(1);
+}, true);
+(function () {   // arrastar para o lado troca de foto (celular)
+  var x0 = null, y0 = 0;
+  document.addEventListener('touchstart', function (ev) { var vf = ev.target.closest && ev.target.closest('#visor .vf'); x0 = vf && !vf.classList.contains('zoom') && !vf.classList.contains('doc') && ev.touches.length === 1 ? ev.touches[0].clientX : null; y0 = x0 == null ? 0 : ev.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', function (ev) { if (x0 == null) return; var t = ev.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) passarFoto(dx < 0 ? 1 : -1); else if (dy > 110 && Math.abs(dy) > Math.abs(dx) * 1.5) fecharVisor(); }, { passive: true });
+})();
 function carregarAnexos() { try { App.anexosChamado(ID); } catch (e) {} }
 /** Ctrl+V com print copiado: manda a imagem como anexo do chamado (mostra a prévia antes). */
 var printSeq = 0, printEspera = {};
@@ -592,9 +844,12 @@ window.chamadoCarregado = function (id, ok, msg, d) {
 };
 window.chamadoAnexos = function (id, ok, msg, lista) {
   if (id !== ID) return;
+  var antes = JSON.stringify((anexos || []).map(function (a) { return a.id; }));
   anexos = ok ? (lista || []) : [];
   if (!ok) mostrarToast(msg);
-  desenharAnexos();
+  // os anexos entram na conversa, na ordem: redesenha só se mudou (sem pular a rolagem)
+  if (dados && JSON.stringify(anexos.map(function (a) { return a.id; })) !== antes) { var fim = perto(); render(dados); if (fim) window.scrollTo(0, document.body.scrollHeight); }
+  else desenharAnexos();
 };
 window.chamadoEnviandoAnexo = function (id, nome) {
   if (id !== ID) return;

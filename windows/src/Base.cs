@@ -304,6 +304,28 @@ namespace Freedom
             return Executar(r, tudo, "multipart/form-data; boundary=" + limite);
         }
 
+        /// <summary>GET que devolve os bytes (ver anexo dentro do app). Passou do limite = 413.</summary>
+        public Arquivo BaixarBytes(string caminho, int limite)
+        {
+            var r = Abrir(BASE + caminho, "GET");
+            r.Accept = "*/*"; r.Timeout = 60000; r.ReadWriteTimeout = 60000;
+            HttpWebResponse resp;
+            try { resp = (HttpWebResponse)r.GetResponse(); }
+            catch (WebException e) { if (e.Response == null) throw; resp = (HttpWebResponse)e.Response; }
+            using (resp)
+            {
+                if ((int)resp.StatusCode != 200) return new Arquivo { Status = (int)resp.StatusCode };
+                if (resp.ContentLength > limite) return new Arquivo { Status = 413 };
+                using (var ent = resp.GetResponseStream())
+                using (var ms = new MemoryStream())
+                {
+                    var buf = new byte[16384]; int n;
+                    while ((n = ent.Read(buf, 0, buf.Length)) > 0) { ms.Write(buf, 0, n); if (ms.Length > limite) return new Arquivo { Status = 413 }; }
+                    return new Arquivo { Status = 200, Bytes = ms.ToArray() };
+                }
+            }
+        }
+
         /// <summary>Baixa um arquivo do site (anexos) para o destino. Devolve o código HTTP.</summary>
         public int Baixar(string caminho, string destino)
         {

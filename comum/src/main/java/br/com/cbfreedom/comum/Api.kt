@@ -130,6 +130,27 @@ class Api(private val email: String, private val senha: String, cookieInicial: S
         }
     }
 
+    /** GET que devolve os bytes (ver anexo dentro do app). Passou do limite = código 413. */
+    fun baixarBytes(caminho: String, limite: Int): Pair<Int, ByteArray> {
+        val c = abrir(caminho)
+        try {
+            c.instanceFollowRedirects = false
+            c.readTimeout = 60_000
+            c.setRequestProperty("Accept", "*/*")
+            val cod = c.responseCode
+            if (cod != 200) { c.errorStream?.close(); return Pair(cod, ByteArray(0)) }
+            if (c.contentLengthLong > limite) return Pair(413, ByteArray(0))
+            val saida = java.io.ByteArrayOutputStream()
+            c.inputStream.use { ent ->
+                val buf = ByteArray(16384)
+                while (true) { val n = ent.read(buf); if (n < 0) break; saida.write(buf, 0, n); if (saida.size() > limite) return Pair(413, ByteArray(0)) }
+            }
+            return Pair(200, saida.toByteArray())
+        } finally {
+            c.disconnect()
+        }
+    }
+
     /** POST que devolve um arquivo (Exportar Excel): (código, bytes, Content-Disposition). */
     fun baixarPost(caminho: String, corpo: JSONObject, accept: String): Triple<Int, ByteArray, String> {
         val c = abrir(caminho)

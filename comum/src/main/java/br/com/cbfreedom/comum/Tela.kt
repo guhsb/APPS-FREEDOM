@@ -618,7 +618,7 @@ class Tela : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val s = webSite
-        if (aba == ABA_HELPDESK && paginaApp == "sub") { voltarApp(); return }
+        if (aba == ABA_HELPDESK && paginaApp == "sub") { webApp.evaluateJavascript("(window.fecharVisor&&fecharVisor())?1:0") { r -> if (r != "1") runOnUiThread { voltarApp() } }; return }   // foto aberta: fecha só ela
         if (aba == ABA_PAINEL) painelAtual?.let { websPainel[it] }?.let { if (it.canGoBack()) { it.goBack(); return } }
         if (DASH.containsKey(aba)) webDash?.let { w -> w.evaluateJavascript("(function(){var m=document.getElementById('mfundo');if(m){m.parentNode.removeChild(m);return 1}return 0})()") { r -> if (r != "1") runOnUiThread { selecionar(ABA_HELPDESK) } }; return }
         if (aba == ABA_SITE && s != null && avisoSite?.visibility == View.VISIBLE) {
@@ -1357,6 +1357,17 @@ class Tela : Activity() {
 
         @JavascriptInterface
         fun anexarChamado(id: Int) = runOnUiThread { escolherAnexo(id) }
+
+        /** Foto do anexo para ver dentro do app: devolve em base64 para a tela (anexoBytes). */
+        @JavascriptInterface
+        fun verAnexo(seq: Int, id: Int, anexo: Int) {
+            val app = applicationContext
+            Thread {
+                val r = Chamado.bytesAnexo(app, id, anexo)
+                val b64 = if (r.first == 200) android.util.Base64.encodeToString(r.second, android.util.Base64.NO_WRAP) else ""
+                runOnUiThread { webApp.evaluateJavascript("window.anexoBytes && anexoBytes($seq,${r.first},\"$b64\")", null) }
+            }.start()
+        }
 
         @JavascriptInterface
         fun baixarAnexo(id: Int, anexo: Int, nome: String) = runOnUiThread { this@Tela.baixarAnexo(id, anexo, nome) }

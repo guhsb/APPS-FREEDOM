@@ -173,6 +173,15 @@ class Api {
     return { status: r.status, body: await r.text() };
   }
 
+  /** GET que devolve os bytes (ver anexo dentro do app). Passou do limite = 413. */
+  async bytes(caminho, limite) {
+    const r = await this.executar('GET', BASE + caminho, null, null, '*/*');
+    if (r.status !== 200) { await r.arrayBuffer().catch(() => null); return { status: r.status, bytes: Buffer.alloc(0) }; }
+    if (Number(r.headers.get('content-length') || 0) > limite) { try { r.body && r.body.cancel && r.body.cancel(); } catch (e) { } return { status: 413, bytes: Buffer.alloc(0) }; }
+    const b = Buffer.from(await r.arrayBuffer());
+    return b.length > limite ? { status: 413, bytes: Buffer.alloc(0) } : { status: 200, bytes: b };
+  }
+
   /** Baixa um arquivo do site para o destino. Devolve o código HTTP. */
   async baixar(caminho, destino) {
     const r = await this.executar('GET', BASE + caminho, null, null, '*/*');
