@@ -30,28 +30,28 @@ html[data-tema=escuro] .marca{background:#fff}
 @media (max-width:1000px){.usu div{display:none}.usu{padding:5px}.pilulas b{padding:9px 12px}}
 /* ---- atalhos da esquerda: fechada = só ícones; aberta = os mesmos grupos esticados, com os nomes ---- */
 .rail{height:100vh;box-sizing:border-box;padding:8px 0 16px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.g{background:var(--sf);border-radius:25px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sombra);width:50px;box-sizing:border-box;overflow:hidden;flex:none;transition:width .38s cubic-bezier(.3,.8,.2,1),border-radius .38s}
+.g{background:var(--sf);border-radius:25px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sombra);width:50px;box-sizing:border-box;overflow:hidden;flex:none;transition:width .26s cubic-bezier(.2,.8,.2,1),border-radius .26s;will-change:width}
 html.aberta .g{width:222px;border-radius:20px}
 .g .sec{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--tx3);height:0;opacity:0;overflow:hidden;padding-left:10px;white-space:nowrap;margin:0 0 -4px;transition:opacity .2s,height .3s,margin .3s}
-html.aberta .g .sec{height:14px;opacity:1;margin:4px 0 2px;transition-delay:.1s}
+.g .sec{display:none}   /* sem títulos (Aparência, Helpdesk…): abrir e fechar só alarga, nada sobe ou desce */
 .it{position:relative;display:flex;align-items:center;gap:12px;height:38px;min-height:38px;flex:none;box-sizing:border-box;border-radius:19px;padding:0 0 0 10px;color:var(--tx2);cursor:pointer;white-space:nowrap;font-size:13.5px;font-weight:600;transition:background .25s,color .25s}
 .it:hover{background:var(--sf3);color:var(--tx)}
 .it.on{background:var(--tx);color:var(--sf)}html[data-tema=escuro] .it.on{color:#0b0d12}
 .it.ro{color:var(--rosa)}.it.pede{background:var(--rosa);color:#fff}
-.it .tx{opacity:0;transition:opacity .15s}html.aberta .it .tx{opacity:1;transition-delay:.12s}
+.it .tx{opacity:0;transition:opacity .1s}html.aberta .it .tx{opacity:1;transition:opacity .16s .08s}
 .icw{position:relative;display:flex;flex:none}
 .bol{position:absolute;top:-7px;right:-9px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:99px;background:var(--rosa);color:#fff;font-size:9.5px;font-weight:800;font-style:normal;display:flex;align-items:center;justify-content:center;border:2px solid var(--sf);transition:opacity .2s,transform .2s}
 html.aberta .bol{opacity:0;transform:scale(.4)}
 .cnt{margin-left:auto;margin-right:10px;font-style:normal;font-size:11.5px;font-weight:800;min-width:22px;height:20px;padding:0 7px;box-sizing:border-box;border-radius:99px;background:var(--rosa-s);color:var(--tx-rosa);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
-html.aberta .cnt{opacity:1;transition-delay:.12s}
+html.aberta .cnt{opacity:1;transition-delay:.08s}
 .it.on .cnt{background:rgba(255,255,255,.18);color:#fff}
-.abre{width:38px;height:38px;border-radius:50%;background:var(--sf);box-shadow:var(--sombra);color:var(--tx2);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:6px;flex:none;transition:transform .38s,background .2s}
+.abre{width:38px;height:38px;border-radius:50%;background:var(--sf);box-shadow:var(--sombra);color:var(--tx2);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:6px;flex:none;transition:transform .26s,background .2s}
 .abre:hover{background:var(--sf3);color:var(--tx)}html.aberta .abre{transform:rotate(180deg)}
 .mola{flex:1}
 .subs{overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 380px);scrollbar-width:none}.subs::-webkit-scrollbar{display:none}
 /* Mac: tudo numa página (as telas ficam por cima, à direita e embaixo do topo) */
-.fixa{position:fixed;left:0;top:76px;bottom:0;width:78px;transition:width .38s}html.aberta .fixa{width:262px}.fixa .rail{height:calc(100vh - 76px)}
-.chipsP{position:fixed;left:78px;transition:left .38s}html.aberta .chipsP{left:262px}.chipsP{right:0;top:76px;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px}
+.fixa{position:fixed;left:0;top:76px;bottom:0;width:78px;transition:width .26s}html.aberta .fixa{width:262px}.fixa .rail{height:calc(100vh - 76px)}
+.chipsP{position:fixed;left:78px;transition:left .26s}html.aberta .chipsP{left:262px}.chipsP{right:0;top:76px;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px}
 .chipsP b{border:1px solid var(--ln);background:var(--sf);color:var(--tx2);border-radius:99px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600}.chipsP b.on{background:var(--tx);color:var(--sf);border-color:var(--tx)}
 .subs{overflow:auto;max-height:calc(100vh - 330px);scrollbar-width:none}.subs::-webkit-scrollbar{display:none}
 </style></head><body>
@@ -129,13 +129,24 @@ function rail(e) {
   h += '<div class="mola"></div><div class="g">' + item('sair', 'r', ACOES.sair, sairPede ? 'Toque de novo para sair' : 'Sair / trocar login', sairPede ? 'pede' : '') + '</div></div>';
   return h;
 }
-function railAlternar() {
-  aberta = !aberta;
+/** Abre/fecha os atalhos sem redesenhar (a animação corre inteira).
+   Abrir: primeiro alarga o espaço e depois estica os grupos. Fechar: encolhe os grupos e só no fim devolve o espaço. */
+var railTm = 0;
+function railAlternar(quer) {
+  var nova = quer == null ? !aberta : !!quer; if (nova === aberta) return;
+  aberta = nova; clearTimeout(railTm);
   try { localStorage.setItem('railAberta', aberta ? '1' : ''); } catch (x) { }
-  document.documentElement.classList.toggle('aberta', aberta);
-  try { App.acaoShell(aberta ? 'railAbrir' : 'railFechar'); } catch (x) { }
-  desenhar(true);
+  var bt = document.querySelector('[data-r="railToggle"]'); if (bt) bt.title = aberta ? 'Fechar atalhos' : 'Abrir atalhos';
+  if (aberta) {
+    try { App.acaoShell('railAbrir'); } catch (x) { }
+    requestAnimationFrame(function () { requestAnimationFrame(function () { document.documentElement.classList.add('aberta'); }); });
+  } else {
+    document.documentElement.classList.remove('aberta');
+    railTm = setTimeout(function () { try { App.acaoShell('railFechar'); } catch (x) { } }, 260);
+  }
 }
+window.railAlternar = railAlternar;
+document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { ev.preventDefault(); try { App.acaoShell('esc'); } catch (x) { } } });
 function posInd() {
   var on = document.querySelector('#pil b.on'), ind = document.getElementById('ind'); if (!ind) return;
   if (!on) { ind.style.width = '0'; return; }

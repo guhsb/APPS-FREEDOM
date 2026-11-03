@@ -261,6 +261,18 @@ var Base = {
       if (e.hasAttribute('data-aba')) e.setAttribute('aria-selected', e.classList.contains('on') ? 'true' : 'false');
     });
   };
+  // Esc "sai das coisas": se a tela não tinha nada aberto (janela, busca, foto…), o app fecha o sino/atalhos ou volta
+  var escAberto = false, ESC_ABERTOS = '.opModal,#mfundo,#visor,.vmFundo,.bkF,#modal.on,.mFundo,[role=dialog]';
+  window.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var a = document.activeElement, campo = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+    escAberto = !!document.querySelector(ESC_ABERTOS) || (campo && a.tagName !== 'SELECT' && !!a.value) || a && a.isContentEditable;
+    if (escAberto && campo && !document.querySelector(ESC_ABERTOS)) a.blur();   // texto escrito: só sai do campo, não perde nada
+  }, true);
+  window.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape' || ev.defaultPrevented || escAberto || ev.repeat) return;
+    try { if (window.App && App.acaoShell) App.acaoShell('esc'); } catch (e) { }
+  });
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') { var m = document.getElementById('mfundo'); if (m) { m.parentNode.removeChild(m); ev.preventDefault(); } return; }
     if (ev.key !== 'Enter' && ev.key !== ' ') return;

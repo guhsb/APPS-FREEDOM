@@ -512,6 +512,11 @@ const ponte = {
     if (nome === 'imagem' || nome === 'excel' || nome === 'atualizar') { const v = vistaAtual(); if (v) js(v.webContents, "window.acaoRail && acaoRail('" + nome + "')"); }
     else if (nome === 'chamado') { sino(false); abrirTela('novo.html'); }
     else if (nome === 'railAbrir' || nome === 'railFechar') { NAV = nome === 'railAbrir' ? 262 : 78; posicionar(); }   // atalhos abertos empurram as telas
+    else if (nome === 'esc') {   // Esc sem nada aberto na tela: fecha o sino, depois os atalhos, depois volta da tela aberta
+      if (sinoAberto) sino(false);
+      else if (NAV > 78) js(janela.webContents, 'window.railAlternar && railAlternar(false)');
+      else if (aba === 'helpdesk' && paginaApp === 'sub') voltarApp();
+    }
     else if (nome === 'busca') { sino(false); if (aba === 'site') selecionar(abasDisponiveis().includes('helpdesk') ? 'helpdesk' : aba); const v = aba !== 'site' ? vistaAtual() : null; if (v) js(v.webContents, 'window.abrirBusca && abrirBusca()'); }
     else if (nome === 'claro' || nome === 'escuro') { ponte.definirTema(wc, nome); atualizarBarra(); }
     else if (nome === 'sair') ponte.sair();

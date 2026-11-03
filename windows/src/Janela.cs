@@ -538,6 +538,11 @@ namespace Freedom
                     railAberta = nome == "railAbrir";
                     webRail.Width = Px(railAberta ? 262 : 78);   // aberta: empurra a tela do meio para a direita
                     break;
+                case "esc":   // Esc sem nada aberto na tela: fecha o sino, depois os atalhos, depois volta da tela aberta
+                    if (sinoAberto) { Sino(false); break; }
+                    if (railAberta) { Js(webRail, "window.railAlternar&&railAlternar(false)"); break; }
+                    if (aba == "helpdesk" && paginaApp == "sub") VoltarApp();
+                    break;
                 case "busca":   // Ctrl+K: a busca abre na tela do meio (o site não tem)
                     Sino(false);
                     if (aba == "site") Selecionar(AbaDisponivel("helpdesk") ? "helpdesk" : aba);
