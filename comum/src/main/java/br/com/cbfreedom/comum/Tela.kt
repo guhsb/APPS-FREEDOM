@@ -274,7 +274,7 @@ class Tela : Activity() {
             item.gravity = Gravity.CENTER
             item.isClickable = true
             item.contentDescription = rotulo
-            item.setPadding(dp(10), 0, dp(10), 0)
+            item.setPadding(dp(12), 0, dp(14), 0)
             val img = ImageView(this)
             img.setImageResource(icone)
             img.setColorFilter(ICONE_INATIVO)
@@ -283,6 +283,8 @@ class Tela : Activity() {
             txt.text = rotulo
             txt.textSize = 13.5f
             txt.maxLines = 1
+            txt.isSingleLine = true
+            txt.ellipsize = null
             txt.typeface = android.graphics.Typeface.DEFAULT_BOLD
             txt.setTextColor(ICONE_ATIVO)
             txt.visibility = View.GONE
@@ -333,9 +335,11 @@ class Tela : Activity() {
             par.second.visibility = if (ativa) View.VISIBLE else View.GONE
             val item = itensAba[id] ?: continue
             if (ativa) { val f = GradientDrawable(); f.cornerRadius = dp(24).toFloat(); f.setColor(PILULA_ATIVA); item.background = f } else item.background = null
+            // a aba aberta ocupa o tamanho do nome inteiro (nunca corta); as outras dividem o que sobra
             val lp = item.layoutParams as LinearLayout.LayoutParams
-            val peso = if (ativa) 2.3f else 1f
-            if (lp.weight != peso) { lp.weight = peso; item.layoutParams = lp }
+            val w = if (ativa) ViewGroup.LayoutParams.WRAP_CONTENT else 0
+            val peso = if (ativa) 0f else 1f
+            if (lp.width != w || lp.weight != peso) { lp.width = w; lp.weight = peso; item.layoutParams = lp }
         }
     }
 
@@ -435,6 +439,10 @@ class Tela : Activity() {
     private fun acaoMenu(nome: String) {
         when (nome) {
             "fecharMenu" -> fecharGaveta()
+            "config" -> {   // tocar no nome (menu ☰): abre as configurações, igual ao PC
+                fecharGaveta()
+                if (Acesso.helpdesk(this)) { webApp.loadUrl(ASSET + "helpdesk.html?config=1"); paginaApp = "sub"; selecionar(ABA_HELPDESK); entrar(webApp) }
+            }
             "esc" -> fecharGaveta()
             "imagem", "excel", "atualizar" -> { fecharGaveta(); js(webAtual(), "window.acaoRail&&acaoRail('$nome')") }
             "chamado" -> { fecharGaveta(); abrirTela("novo.html") }

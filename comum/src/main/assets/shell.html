@@ -57,9 +57,10 @@ html.aberta .cnt{opacity:1;transition-delay:.08s}
 /* ---- Android: gaveta do menu ☰ ---- */
 html.gaveta,html.gaveta body{overflow-y:auto;height:100%}
 .gv{min-height:100vh;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 14px 18px;display:flex;flex-direction:column;gap:12px}
-.gvTop{display:flex;align-items:center;gap:11px;padding:2px 2px 2px 4px}
+.gvTop{display:flex;align-items:center;gap:8px}
+.gvUsu{flex:1;min-width:0;display:flex;align-items:center;gap:11px;background:var(--sf);box-shadow:var(--sombra);border-radius:24px;padding:6px 12px 6px 6px}.gvUsu:active,.gvUsu.on{background:var(--sf3)}.gvUsu>svg{width:18px;height:18px;color:var(--tx3);flex:none;fill:none;stroke:currentColor;stroke-width:2}
 .gvTop .av{width:42px;height:42px;border-radius:50%;background:var(--rosa);color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;flex:none}
-.gvTop div{flex:1;min-width:0}.gvTop b{display:block;font-size:15.5px;color:var(--tx)}.gvTop small{display:block;font-size:12.5px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gvUsu div{flex:1;min-width:0}.gvTop b{display:block;font-size:15.5px;color:var(--tx)}.gvTop small{display:block;font-size:12.5px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gvX{width:40px;height:40px;border-radius:50%;background:var(--sf);box-shadow:var(--sombra);display:flex;align-items:center;justify-content:center;color:var(--tx2);flex:none}
 .gvBusca{display:flex;align-items:center;gap:10px;height:48px;border-radius:24px;background:var(--sf);box-shadow:var(--sombra);padding:0 16px;color:var(--tx3);font-size:14.5px}
 html.gaveta .g{width:auto;border-radius:22px;padding:6px}
@@ -148,7 +149,7 @@ var railTm = 0;
 /** Android: menu ☰ (gaveta da esquerda) com o mesmo conteúdo dos atalhos do Windows. */
 var NOMES_ABA = { admin: ['Admin', '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'], site: ['Site', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'] };
 function gaveta(e) {
-  var h = '<div class="gv"><div class="gvTop"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>' + esc(e.email || '') + '</small></div>' +
+  var h = '<div class="gv"><div class="gvTop"><div class="gvUsu' + (e.helpSub === 'config' ? ' on' : '') + '" id="btUsu"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>Configurações · ' + esc(e.email || '') + '</small></div>' + S('<path d="M9 6l6 6-6 6"/>') + '</div>' +
     '<span class="gvX" data-r="fecharMenu" aria-label="Fechar">' + S('<path d="M6 6l12 12M18 6L6 18"/>') + '</span></div>';
   if (e.helpdesk) h += '<div class="gvBusca" id="btBusca">' + S('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>') + '<span>Buscar chamado ou tela…</span></div>';
   var subs = [], atual = '', num = {};

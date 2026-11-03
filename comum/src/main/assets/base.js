@@ -477,7 +477,7 @@ F.aoColarImagem = function (fn) {
     try {
       trocarCarregando(c);
       var l = itens(c);
-      if (!raiz.classList.contains('largo') || c.id === 'lista' || (l.length === 1 && l[0].classList.contains('carregando'))) {
+      if (!raiz.classList.contains('largo') || c.id === 'lista' || c.hasAttribute('data-solto') || (l.length === 1 && l[0].classList.contains('carregando'))) {
         if (c.querySelector(':scope>.gL,:scope>.gC')) l.forEach(function (k) { k.classList.remove('cheio'); c.appendChild(k); });
         [].slice.call(c.querySelectorAll(':scope>.gL,:scope>.gC')).forEach(function (x) { x.remove(); });
         return;
