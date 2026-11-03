@@ -21,6 +21,10 @@ body{padding-bottom:90px}
 @media (min-width:560px){.chips{flex-wrap:wrap;overflow:visible;margin:0 0 8px;padding:0;-webkit-mask-image:none;mask-image:none}}
 .chips button{flex:none;background:var(--sf);border:1px solid var(--ln);color:var(--tx2);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:600}
 .chips button.on{background:var(--rosa);border-color:var(--rosa);color:#fff}
+.filtros.fechado{display:none}
+.btFx{flex:none;display:inline-flex;align-items:center;gap:5px;margin-left:auto;background:var(--sf2);color:var(--tx);border:1px solid var(--ln);border-radius:999px;padding:6px 10px;font:inherit;font-size:12.5px;font-weight:700}.btFx svg.ic{width:14px;height:14px}
+.btFx.ab{background:var(--tx);border-color:var(--tx);color:var(--sf)}
+.btFx em{font-style:normal;font-size:11px;font-weight:800;background:var(--rosa);color:#fff;border-radius:99px;padding:0 6px;min-width:16px;text-align:center}
 .filtros{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:6px}
 .filtros select{width:100%;background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:10px 8px;font:inherit;font-size:13px}
 .filtros label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2);background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:0 10px}
@@ -111,6 +115,7 @@ document.getElementById('btAt').onclick = function () { recarregar(); };
 
 // Kanban só no computador (Windows e Mac): na tela do celular as colunas não cabem
 var desktop = F.plataforma() !== 'android' && F.plataforma() !== '';
+var fxAberto = false;   // celular: filtros abertos?
 var kanban = false; try { kanban = desktop && localStorage.getItem('kanban') === '1'; } catch (e) { }
 var STATUS_CHIPS = [['', 'Todos'], ['OPEN', 'Abertos'], ['IN_PROGRESS', 'Em andamento'], ['WAITING', 'Aguardando'],
   ['WAITING_SUPPLIER', 'Aguard. fornecedor'], ['PENDING_APPROVAL', 'Aguard. aprovação'], ['REOPENED', 'Reabertos'], ['RESOLVED', 'Resolvidos']];
@@ -124,11 +129,15 @@ function cabeca() {
     '<button data-m="comigo" class="' + (modo === 'comigo' ? 'on' : '') + '">Comigo</button></div>';
   if (desktop) h += '<div class="vis" id="vis"><button data-v="lista" class="' + (kanban ? '' : 'on') + '">' + F.ic('lista') + 'Lista</button>' +
     '<button data-v="kanban" class="' + (kanban ? 'on' : '') + '">' + F.ic('colunas') + 'Kanban</button></div>';
-  h += '<div class="busca">' + F.ic('busca') + '<input id="busca" type="search" placeholder="Buscar por protocolo, título ou descrição" value="' + F.esc(f.busca) + '"></div>';
+  h += '<div class="busca">' + F.ic('busca') + '<input id="busca" type="search" placeholder="Buscar por protocolo, título ou descrição" value="' + F.esc(f.busca) + '">@@BTFX@@</div>';
+  // celular: os filtros ficam recolhidos num botão no começo da linha de status (a lista aparece logo)
+  var nFx = [f.priority, f.sla, f.queue, f.sort === 'sla' ? 1 : '', f.sem ? 1 : ''].filter(Boolean).length;
+  var btFx = desktop ? '' : '<button class="btFx' + (fxAberto ? ' ab' : '') + (nFx ? ' tem' : '') + '" id="btFx" type="button">' + F.ic('ajustes') + 'Filtros' + (nFx ? ' <em>' + nFx + '</em>' : '') + '</button>';
   h += '<div class="chips" id="chips"' + (kanban ? ' style="display:none"' : '') + '>' + STATUS_CHIPS.map(function (c) {
     return '<button data-s="' + c[0] + '" class="' + (f.status === c[0] ? 'on' : '') + '">' + c[1] + '</button>';
   }).join('') + '</div>';
-  h += '<div class="filtros"><select id="fPrio"><option value="">Toda prioridade</option>' +
+  h = h.replace('@@BTFX@@', btFx);
+  h += '<div class="filtros' + (!desktop && !fxAberto ? ' fechado' : '') + '"><select id="fPrio"><option value="">Toda prioridade</option>' +
     Object.keys(F.PRIO).map(function (k) { return '<option value="' + k + '"' + (f.priority === k ? ' selected' : '') + '>' + F.PRIO[k][0] + '</option>'; }).join('') + '</select>';
   if (atendimento()) {
     h += '<select id="fSla"><option value="">Todo SLA</option>' + ['AT_RISK', 'BREACHED', 'ON_TRACK', 'MET', 'NOT_CONFIGURED'].map(function (k) {
@@ -161,13 +170,15 @@ function cabeca() {
   var fimCh = function () { ch.classList.toggle('fim', ch.scrollLeft + ch.clientWidth >= ch.scrollWidth - 4); };
   ch.addEventListener('scroll', fimCh, { passive: true }); fimCh();
   var chipOn = ch.querySelector('.on'); if (chipOn && ch.scrollWidth > ch.clientWidth) ch.scrollLeft = Math.max(0, chipOn.offsetLeft - 16);
+  var bf = document.getElementById('btFx'); if (bf) bf.onclick = function () { fxAberto = !fxAberto; cabeca(); };
   document.getElementById('chips').onclick = function (ev) { var b = ev.target.closest('[data-s]'); if (!b) return; f.status = b.getAttribute('data-s'); cabeca(); recarregar(); };
   var seg = document.querySelector('.seg');
   if (seg) seg.onclick = function (ev) { var b = ev.target.closest('[data-m]'); if (!b) return; modo = b.getAttribute('data-m'); cabeca(); recarregar(); };
-  function sel(id, k) { var el = document.getElementById(id); if (el) el.onchange = function () { f[k] = this.value; recarregar(); }; }
+  function sel(id, k) { var el = document.getElementById(id); if (el) el.onchange = function () { f[k] = this.value; contarFx(); recarregar(); }; }
+  function contarFx() { var b = document.getElementById('btFx'); if (!b) return; var n = [f.priority, f.sla, f.queue, f.sort === 'sla' ? 1 : '', f.sem ? 1 : ''].filter(Boolean).length; var e = b.querySelector('em'); if (n) { if (!e) { e = document.createElement('em'); b.appendChild(e); } e.textContent = n; } else if (e) e.remove(); }
   sel('fPrio', 'priority'); sel('fSla', 'sla'); sel('fSetor', 'queue');
-  var so = document.getElementById('fSort'); if (so) so.onchange = function () { f.sort = this.checked ? 'sla' : ''; recarregar(); };
-  var se = document.getElementById('fSem'); if (se) se.onchange = function () { f.sem = this.checked ? '1' : ''; recarregar(); };
+  var so = document.getElementById('fSort'); if (so) so.onchange = function () { f.sort = this.checked ? 'sla' : ''; contarFx(); recarregar(); };
+  var se = document.getElementById('fSem'); if (se) se.onchange = function () { f.sem = this.checked ? '1' : ''; contarFx(); recarregar(); };
 }
 function soSem() { return modo === 'fila' && !!f.sem; }
 

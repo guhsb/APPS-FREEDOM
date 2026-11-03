@@ -30,8 +30,8 @@ html[data-tema=escuro] .marca{background:#fff}
 @media (max-width:1000px){.usu div{display:none}.usu{padding:5px}.pilulas b{padding:9px 12px}}
 /* ---- atalhos da esquerda: fechada = só ícones; aberta = os mesmos grupos esticados, com os nomes ---- */
 .rail{height:100vh;box-sizing:border-box;padding:8px 0 16px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.g{background:var(--sf);border-radius:25px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sombra);width:50px;box-sizing:border-box;overflow:hidden;flex:none;transition:width .26s cubic-bezier(.2,.8,.2,1),border-radius .26s;will-change:width}
-html.aberta .g{width:222px;border-radius:20px}
+.g{background:var(--sf);border-radius:25px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--sombra);width:clamp(50px,calc(100vw - 28px),222px);box-sizing:border-box;overflow:hidden;flex:none;transition:border-radius .2s}
+html.aberta .g{border-radius:20px}
 .g .sec{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--tx3);height:0;opacity:0;overflow:hidden;padding-left:10px;white-space:nowrap;margin:0 0 -4px;transition:opacity .2s,height .3s,margin .3s}
 .g .sec{display:none}   /* sem títulos (Aparência, Helpdesk…): abrir e fechar só alarga, nada sobe ou desce */
 .it{position:relative;display:flex;align-items:center;gap:12px;height:38px;min-height:38px;flex:none;box-sizing:border-box;border-radius:19px;padding:0 0 0 10px;color:var(--tx2);cursor:pointer;white-space:nowrap;font-size:13.5px;font-weight:600;transition:background .25s,color .25s}
@@ -50,15 +50,28 @@ html.aberta .cnt{opacity:1;transition-delay:.08s}
 .mola{flex:1}
 .subs{overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 380px);scrollbar-width:none}.subs::-webkit-scrollbar{display:none}
 /* Mac: tudo numa página (as telas ficam por cima, à direita e embaixo do topo) */
-.fixa{position:fixed;left:0;top:76px;bottom:0;width:78px;transition:width .26s}html.aberta .fixa{width:262px}.fixa .rail{height:calc(100vh - 76px)}
-.chipsP{position:fixed;left:78px;transition:left .26s}html.aberta .chipsP{left:262px}.chipsP{right:0;top:76px;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px}
+.fixa{position:fixed;left:0;top:76px;bottom:0;width:78px;transition:width .2s cubic-bezier(.33,1,.68,1);container-type:inline-size}.fixa .g{width:clamp(50px,calc(100cqw - 28px),222px)}html.aberta .fixa{width:262px}.fixa .rail{height:calc(100vh - 76px)}
+.chipsP{position:fixed;left:78px;transition:left .2s cubic-bezier(.33,1,.68,1)}html.aberta .chipsP{left:262px}.chipsP{right:0;top:76px;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px}
 .chipsP b{border:1px solid var(--ln);background:var(--sf);color:var(--tx2);border-radius:99px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600}.chipsP b.on{background:var(--tx);color:var(--sf);border-color:var(--tx)}
 .subs{overflow:auto;max-height:calc(100vh - 330px);scrollbar-width:none}.subs::-webkit-scrollbar{display:none}
+/* ---- Android: gaveta do menu ☰ ---- */
+html.gaveta,html.gaveta body{overflow-y:auto;height:100%}
+.gv{min-height:100vh;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 14px 18px;display:flex;flex-direction:column;gap:12px}
+.gvTop{display:flex;align-items:center;gap:11px;padding:2px 2px 2px 4px}
+.gvTop .av{width:42px;height:42px;border-radius:50%;background:var(--rosa);color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;flex:none}
+.gvTop div{flex:1;min-width:0}.gvTop b{display:block;font-size:15.5px;color:var(--tx)}.gvTop small{display:block;font-size:12.5px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gvX{width:40px;height:40px;border-radius:50%;background:var(--sf);box-shadow:var(--sombra);display:flex;align-items:center;justify-content:center;color:var(--tx2);flex:none}
+.gvBusca{display:flex;align-items:center;gap:10px;height:48px;border-radius:24px;background:var(--sf);box-shadow:var(--sombra);padding:0 16px;color:var(--tx3);font-size:14.5px}
+html.gaveta .g{width:auto;border-radius:22px;padding:6px}
+html.gaveta .it{height:46px;min-height:46px;border-radius:23px;font-size:15px;padding:0 0 0 14px}
+html.gaveta .it .tx{opacity:1}html.gaveta .cnt{opacity:1}html.gaveta .bol{display:none}
+html.gaveta .dois{display:flex;gap:8px}html.gaveta .dois .it{flex:1;justify-content:center;padding:0;background:var(--sf);box-shadow:var(--sombra)}html.gaveta .dois .it.on{background:var(--tx)}
+html.gaveta .it:active{background:var(--sf3)}html.gaveta .it.on:active{background:var(--tx)}
 </style></head><body>
 <div id="raiz"></div>
 <script src="base.js"></script>
 <script>
-var Q = location.search + location.hash, MODO = /mac/.test(Q) ? 'mac' : /rail/.test(Q) ? 'rail' : 'topo', ultimo = '', sairPede = 0;
+var Q = location.search + location.hash, MODO = /gaveta/.test(Q) ? 'gaveta' : /mac/.test(Q) ? 'mac' : /rail/.test(Q) ? 'rail' : 'topo', ultimo = '', sairPede = 0;
 function S(d) { return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; }
 // ícones dos atalhos (pelo id da parte de cada tela)
 var IC = {
@@ -132,18 +145,36 @@ function rail(e) {
 /** Abre/fecha os atalhos sem redesenhar (a animação corre inteira).
    Abrir: primeiro alarga o espaço e depois estica os grupos. Fechar: encolhe os grupos e só no fim devolve o espaço. */
 var railTm = 0;
+/** Android: menu ☰ (gaveta da esquerda) com o mesmo conteúdo dos atalhos do Windows. */
+var NOMES_ABA = { admin: ['Admin', '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'], site: ['Site', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'] };
+function gaveta(e) {
+  var h = '<div class="gv"><div class="gvTop"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>' + esc(e.email || '') + '</small></div>' +
+    '<span class="gvX" data-r="fecharMenu" aria-label="Fechar">' + S('<path d="M6 6l12 12M18 6L6 18"/>') + '</span></div>';
+  if (e.helpdesk) h += '<div class="gvBusca" id="btBusca">' + S('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>') + '<span>Buscar chamado ou tela…</span></div>';
+  var subs = [], atual = '', num = {};
+  if (e.aba === 'helpdesk') { subs = HELP; atual = e.helpSub || 'inicio'; num = numeros(); }
+  else if (e.sub && e.sub.lista) { subs = e.sub.lista; atual = e.sub.atual; }
+  if (subs.length) h += '<div class="g">' + subs.map(function (x) {
+    return item(x[0], 's', IC[x[0]] || IC.pontos, e.aba === 'helpdesk' && x[0] === 'inicio' ? 'Início' : e.aba === 'helpdesk' && x[0] === 'dash' ? 'Dashboard' : x[1], x[0] === atual ? 'on' : '', num[x[0]]);
+  }).join('') + '</div>';
+  var ac = e.acoes || {}, extra = '';
+  if (e.aba !== 'site' && ac.img) extra += item('imagem', 'r', ACOES.imagem, 'Gerar imagem (PNG)');
+  if (e.aba === 'comercial' && ac.xls) extra += item('excel', 'r', ACOES.excel, 'Exportar Excel');
+  if (e.helpdesk) extra += item('chamado', 'r', ACOES.chamado, 'Abrir chamado', 'ro');
+  (e.abas || []).forEach(function (a) { var n = NOMES_ABA[a[0]]; if (n) extra += item(a[0], 'aba', n[1], n[0], a[0] === e.aba ? 'on' : ''); });
+  if (extra) h += '<div class="g">' + extra + '</div>';
+  h += '<div class="dois">' + item('claro', 'r', ACOES.sol, 'Claro', e.tema !== 'escuro' ? 'on' : '') + item('escuro', 'r', ACOES.lua, 'Escuro', e.tema === 'escuro' ? 'on' : '') + '</div>';
+  h += '<div class="mola"></div><div class="g">' + item('sair', 'r', ACOES.sair, sairPede ? 'Toque de novo para sair' : 'Sair / trocar login', sairPede ? 'pede' : '') + '</div></div>';
+  return h;
+}
 function railAlternar(quer) {
   var nova = quer == null ? !aberta : !!quer; if (nova === aberta) return;
   aberta = nova; clearTimeout(railTm);
   try { localStorage.setItem('railAberta', aberta ? '1' : ''); } catch (x) { }
   var bt = document.querySelector('[data-r="railToggle"]'); if (bt) bt.title = aberta ? 'Fechar atalhos' : 'Abrir atalhos';
-  if (aberta) {
-    try { App.acaoShell('railAbrir'); } catch (x) { }
-    requestAnimationFrame(function () { requestAnimationFrame(function () { document.documentElement.classList.add('aberta'); }); });
-  } else {
-    document.documentElement.classList.remove('aberta');
-    railTm = setTimeout(function () { try { App.acaoShell('railFechar'); } catch (x) { } }, 260);
-  }
+  // um movimento só: o app alarga/estreita o espaço e os grupos acompanham a largura (a tela do meio vai junto)
+  document.documentElement.classList.toggle('aberta', aberta);
+  try { App.acaoShell(aberta ? 'railAbrir' : 'railFechar'); } catch (x) { }
 }
 window.railAlternar = railAlternar;
 document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { ev.preventDefault(); try { App.acaoShell('esc'); } catch (x) { } } });
@@ -169,7 +200,7 @@ function desenhar(forcar) {
     var ind = document.getElementById('ind');
     if (l0) { ind.style.transition = 'none'; ind.style.left = l0; ind.style.width = w0; ind.offsetWidth; ind.style.transition = ''; }   // desliza da aba antiga para a nova
     requestAnimationFrame(posInd);
-  } else document.getElementById('raiz').innerHTML = rail(e);
+  } else document.getElementById('raiz').innerHTML = MODO === 'gaveta' ? gaveta(e) : rail(e);
 }
 window.shellAtualizar = function () { desenhar(); };
 window.temaMudou = function () { desenhar(true); };
@@ -193,6 +224,13 @@ document.addEventListener('click', function (ev) {
     App.acaoShell(r);
   } catch (x) { }
 });
+if (MODO === 'gaveta') {
+  document.documentElement.classList.add('gaveta');
+  // arrastar para a esquerda fecha o menu
+  var gx = null, gy = 0;
+  document.addEventListener('touchstart', function (ev) { gx = ev.touches[0].clientX; gy = ev.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', function (ev) { if (gx == null) return; var t = ev.changedTouches[0], dx = t.clientX - gx, dy = t.clientY - gy; gx = null; if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.4) try { App.acaoShell('fecharMenu'); } catch (x) { } }, { passive: true });
+}
 desenhar(true); setInterval(desenhar, 15000);
 window.recebidoHelpdesk = function () { desenhar(); };
 // a janela do app precisa saber a largura certa dos atalhos ao abrir

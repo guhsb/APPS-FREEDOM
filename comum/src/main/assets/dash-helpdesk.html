@@ -62,12 +62,15 @@ function desenhar() {
   var qs = acesso.queues || [], o = d.o;
   document.getElementById('sub').innerHTML = (qs.length === 1 ? F.esc(qs[0].name) : 'Seus ' + qs.length + ' setores') + ' · ' + (periodo === 'hoje' ? 'hoje' : X.dm(d.ini) + '–' + X.dm(d.fim));
   var h = X.abas([['resumo', 'Resumo'], ['filas', 'Filas'], ['atend', 'Atendentes'], ['aval', 'Avaliações']], aba);
-  if (qs.length > 1) {
-    var venc = {}; (o.queues || []).forEach(function (q) { venc[q.queue_id] = F.n(q.breached); });
+  var cel = document.documentElement.classList.contains('barraFlutuante');   // celular: setores numa caixa de escolha, sem a linha de botões
+  var venc = {}; (o.queues || []).forEach(function (q) { venc[q.queue_id] = F.n(q.breached); });
+  if (qs.length > 1 && !cel) {
+    venc = {}; (o.queues || []).forEach(function (q) { venc[q.queue_id] = F.n(q.breached); });
     h += X.abas([['', 'Todos os meus setores · ' + qs.length]].concat(qs.map(function (q) { return [String(q.id), F.esc(X.cap(q.name)) + (venc[q.id] ? '<small>' + venc[q.id] + '</small>' : '')]; })), setor, 'setor').replace('class="tabs"', 'class="tabs" style="margin-top:-4px"');
   }
   h += '<div class="filtro"><span><b>Período</b><select id="selPer">' + [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['mes', 'Este mês'], ['ant', 'Mês passado']].map(function (p) { return '<option value="' + p[0] + '"' + (periodo === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select></span>' +
-    '<span class="fix"><b>Setores</b>' + (setor ? F.esc(X.cap((qs.filter(function (q) { return String(q.id) === setor; })[0] || {}).name)) : 'Todos os seus') + '</span></div>';
+    (cel && qs.length > 1 ? '<span><b>Setores</b><select id="selSetor"><option value="">Todos os seus · ' + qs.length + '</option>' + qs.map(function (q) { return '<option value="' + q.id + '"' + (String(q.id) === setor ? ' selected' : '') + '>' + F.esc(X.cap(q.name)) + (venc[q.id] ? ' · ' + venc[q.id] + ' vencido(s)' : '') + '</option>'; }).join('') + '</select></span>'
+      : '<span class="fix"><b>Setores</b>' + (setor ? F.esc(X.cap((qs.filter(function (q) { return String(q.id) === setor; })[0] || {}).name)) : 'Todos os seus') + '</span>') + '</div>';
   if (aba === 'resumo') h += resumo();
   if (aba === 'filas') h += filas();
   if (aba === 'atend') h += atendentes();
@@ -260,7 +263,7 @@ document.addEventListener('click', function (ev) {
   if (t.hasAttribute('data-setor')) { setor = t.getAttribute('data-setor'); AV.pag = 1; carregar(true); return; }
   if (t.hasAttribute('data-t')) { try { App.abrirSite('/helpdesk/tickets/' + t.getAttribute('data-t')); } catch (e) { } }
 });
-document.addEventListener('change', function (ev) { if (ev.target.id === 'selPer') { periodo = ev.target.value; X.lembrar('hd_per', periodo); setoresPessoa = null; carregar(true); } });
+document.addEventListener('change', function (ev) { if (ev.target.id === 'selSetor') { setor = ev.target.value; AV.pag = 1; carregar(true); return; } if (ev.target.id === 'selPer') { periodo = ev.target.value; X.lembrar('hd_per', periodo); setoresPessoa = null; carregar(true); } });
 document.getElementById('btVoltar').innerHTML = F.ic('seta');
 document.getElementById('btAt').innerHTML = F.ic('atualizar');
 document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };

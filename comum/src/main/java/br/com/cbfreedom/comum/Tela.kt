@@ -205,6 +205,18 @@ class Tela : Activity() {
         lpB.setMargins(dp(12), 0, dp(12), dp(12))
         raiz.addView(barraAbas, lpB)
         setContentView(raiz)
+        // teclado aberto: a barra de baixo some (senão fica entre o teclado e a caixa de resposta e aperta a conversa)
+        raiz.viewTreeObserver.addOnGlobalLayoutListener {
+            val r = android.graphics.Rect(); raiz.getWindowVisibleDisplayFrame(r)
+            val total = raiz.rootView.height
+            val teclado = total > 0 && total - r.bottom > total * 0.15
+            if (teclado != tecladoAberto) {
+                tecladoAberto = teclado
+                if (Store.logado(this)) barraAbas.visibility = if (teclado) View.GONE else View.VISIBLE
+                val c = "document.documentElement.classList.toggle('tecladoAberto'," + teclado + ")"
+                js(webApp, c); js(webDash, c); for (w in websPainel.values) js(w, c)
+            }
+        }
 
         webApp = novaWebLocal()
         conteudo.addView(webApp, cheio())
@@ -216,65 +228,74 @@ class Tela : Activity() {
     private fun dp(v: Int): Int = Math.round(v * resources.displayMetrics.density)
     private fun cheio() = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
 
-    private val BARRA_FLUT by lazy { cor("#0f1b3d", "#232a3a") }
-    private val PILULA_ATIVA by lazy { cor("#ffffff", "#f3f5f9") }
-    private val ICONE_INATIVO by lazy { cor("#aab3c8", "#8b93a7") }
-    private val ICONE_ATIVO by lazy { cor("#0f1b3d", "#0b0d12") }
+    // barra de baixo no estilo das abas do Windows: fundo claro e a aba aberta numa pílula escura
+    private val BARRA_FLUT by lazy { cor("#ffffff", "#12151d") }
+    private val PILULA_ATIVA by lazy { cor("#0f1b3d", "#f3f5f9") }
+    private val ICONE_INATIVO by lazy { cor("#4b5875", "#a3abbd") }
+    private val ICONE_ATIVO by lazy { cor("#ffffff", "#0b0d12") }
+    private val BOTAO_MENU by lazy { cor("#f6f8fc", "#1d2230") }
 
-    /** Barra de abas flutuante (pílula escura); a aba aberta fica numa pílula branca que desliza; o sino abre os avisos. */
+    /** Barra de baixo: ☰ (menu com os atalhos), as abas principais e o sino. A aba aberta vira uma pílula escura com o nome. */
     private fun criarAbas(): FrameLayout {
         val barra = FrameLayout(this)
-        val fundo = GradientDrawable(); fundo.cornerRadius = dp(31).toFloat(); fundo.setColor(BARRA_FLUT)
+        val fundo = GradientDrawable(); fundo.cornerRadius = dp(30).toFloat(); fundo.setColor(BARRA_FLUT)
+        if (claro) fundo.setStroke(1, Color.parseColor("#e1e7ef"))
         barra.background = fundo
         barra.elevation = dp(10).toFloat()
-        barra.setPadding(dp(5), dp(5), dp(5), dp(5))
-        indicadorAba = View(this)
-        val fi = GradientDrawable(); fi.cornerRadius = dp(26).toFloat(); fi.setColor(PILULA_ATIVA)
-        indicadorAba.background = fi
-        indicadorAba.visibility = View.INVISIBLE
-        barra.addView(indicadorAba, FrameLayout.LayoutParams(dp(60), ViewGroup.LayoutParams.MATCH_PARENT))
+        barra.setPadding(dp(6), dp(6), dp(6), dp(6))
+        indicadorAba = View(this)   // não usado: a própria aba aberta pinta a pílula
         val linha = LinearLayout(this)
         linha.orientation = LinearLayout.HORIZONTAL
+        linha.gravity = Gravity.CENTER_VERTICAL
+        val lt = android.animation.LayoutTransition(); lt.enableTransitionType(android.animation.LayoutTransition.CHANGING); lt.setDuration(220)
+        linha.layoutTransition = lt
         barra.addView(linha, cheio())
+        // ☰ menu
+        val menu = FrameLayout(this)
+        menu.isClickable = true
+        menu.contentDescription = "Menu"
+        val fm = GradientDrawable(); fm.shape = GradientDrawable.OVAL; fm.setColor(BOTAO_MENU)
+        menu.background = fm
+        val im = ImageView(this); im.setImageResource(R.drawable.ic_menu); im.setColorFilter(ICONE_INATIVO)
+        menu.addView(im, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
+        menu.setOnClickListener { abrirGaveta() }
+        val lpM = LinearLayout.LayoutParams(dp(48), dp(48)); lpM.marginEnd = dp(4)
+        linha.addView(menu, lpM)
+        // Admin e Site ficam no menu ☰ (a barra fica com espaço para o nome da aba aberta)
         val itens = listOf(
             Triple(ABA_HELPDESK, "Helpdesk", R.drawable.ic_aba_helpdesk),
             Triple(ABA_COMERCIAL, "Comercial", R.drawable.ic_aba_comercial),
             Triple(ABA_LOGISTICA, "Logística", R.drawable.ic_aba_logistica),
-            Triple(ABA_ADMIN, "Admin", R.drawable.ic_aba_admin),
-            Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel),
-            Triple(ABA_SITE, "Site", R.drawable.ic_aba_site)
+            Triple(ABA_PAINEL, "Painel", R.drawable.ic_aba_painel)
         )
         for ((id, rotulo, icone) in itens) {
             val item = LinearLayout(this)
-            item.orientation = LinearLayout.VERTICAL
+            item.orientation = LinearLayout.HORIZONTAL
             item.gravity = Gravity.CENTER
             item.isClickable = true
             item.contentDescription = rotulo
+            item.setPadding(dp(10), 0, dp(10), 0)
             val img = ImageView(this)
             img.setImageResource(icone)
             img.setColorFilter(ICONE_INATIVO)
-            item.addView(img, LinearLayout.LayoutParams(dp(20), dp(20)))
+            item.addView(img, LinearLayout.LayoutParams(dp(21), dp(21)))
             val txt = TextView(this)
             txt.text = rotulo
-            txt.textSize = 10f
+            txt.textSize = 13.5f
             txt.maxLines = 1
-            txt.gravity = Gravity.CENTER
-            txt.setTextColor(ICONE_INATIVO)
+            txt.typeface = android.graphics.Typeface.DEFAULT_BOLD
+            txt.setTextColor(ICONE_ATIVO)
+            txt.visibility = View.GONE
             val lpT = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            lpT.topMargin = dp(2)
+            lpT.marginStart = dp(7)
             item.addView(txt, lpT)
             item.setOnClickListener {
-                // tocar de novo no Site volta para o início do site
                 when {
-                    aba == id && id == ABA_SITE -> webSite?.let { abrirUrlSite(Helpdesk.SITE + "/") }
                     aba == id && id == ABA_HELPDESK && paginaApp == "sub" -> { voltarHelpdesk(); entrar(webApp) }
                     else -> selecionar(id)
                 }
             }
-            item.setOnLongClickListener {
-                if (id == ABA_SITE) { selecionar(ABA_SITE); webSite?.reload(); toast("Recarregando o site…"); true } else false
-            }
-            linha.addView(item, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            linha.addView(item, LinearLayout.LayoutParams(0, dp(48), 1f))
             abas[id] = Pair(img, txt)
             itensAba[id] = item
         }
@@ -297,31 +318,128 @@ class Tela : Activity() {
         selo.background = fs
         selo.visibility = View.GONE
         val lpS = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(17), Gravity.TOP or Gravity.END)
-        lpS.topMargin = dp(6); lpS.marginEnd = dp(4)
+        lpS.topMargin = dp(4); lpS.marginEnd = dp(2)
         sino.addView(selo, lpS)
         sino.setOnClickListener { abrirTela("avisos.html") }
-        linha.addView(sino, LinearLayout.LayoutParams(dp(46), ViewGroup.LayoutParams.MATCH_PARENT))
+        linha.addView(sino, LinearLayout.LayoutParams(dp(46), dp(48)))
         return barra
     }
 
-    /** A pílula branca desliza até a aba aberta; ícone e texto da aba aberta ficam escuros. */
+    /** A aba aberta vira uma pílula escura com o nome; as outras ficam só com o ícone. */
     private fun pintarAbas() {
         for ((id, par) in abas) {
             val ativa = id == aba
-            val cor = if (ativa) ICONE_ATIVO else ICONE_INATIVO
-            par.first.setColorFilter(cor)
-            par.second.setTextColor(cor)
-            par.second.typeface = if (ativa) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+            par.first.setColorFilter(if (ativa) ICONE_ATIVO else ICONE_INATIVO)
+            par.second.visibility = if (ativa) View.VISIBLE else View.GONE
+            val item = itensAba[id] ?: continue
+            if (ativa) { val f = GradientDrawable(); f.cornerRadius = dp(24).toFloat(); f.setColor(PILULA_ATIVA); item.background = f } else item.background = null
+            val lp = item.layoutParams as LinearLayout.LayoutParams
+            val peso = if (ativa) 2.3f else 1f
+            if (lp.weight != peso) { lp.weight = peso; item.layoutParams = lp }
         }
-        val alvo = itensAba[aba] ?: return
-        alvo.post {
-            if (alvo.width == 0 || alvo.visibility != View.VISIBLE) { indicadorAba.visibility = View.INVISIBLE; return@post }
-            val lp = indicadorAba.layoutParams
-            val primeira = indicadorAba.visibility != View.VISIBLE
-            if (lp.width != alvo.width) { lp.width = alvo.width; indicadorAba.layoutParams = lp }
-            val x = alvo.left.toFloat()
-            if (primeira) { indicadorAba.translationX = x; indicadorAba.visibility = View.VISIBLE }
-            else indicadorAba.animate().translationX(x).setDuration(380).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+    }
+
+    // ---- menu ☰: gaveta da esquerda com os atalhos (mesmo conteúdo da barra lateral do Windows) ----
+    private var gaveta: FrameLayout? = null
+    private var gavetaFundo: View? = null
+    private var gavetaCaixa: FrameLayout? = null
+    private var webGaveta: WebView? = null
+    private var gavetaAberta = false
+    private var tecladoAberto = false
+
+    private fun larguraGaveta() = Math.min(dp(320), (resources.displayMetrics.widthPixels * 0.84f).toInt())
+
+    private fun abrirGaveta() {
+        if (gaveta == null) {
+            val g = FrameLayout(this)
+            val f = View(this); f.setBackgroundColor(Color.parseColor("#610f1b3d")); f.alpha = 0f
+            f.isClickable = true; f.setOnClickListener { fecharGaveta() }
+            g.addView(f, cheio())
+            val cx = FrameLayout(this)
+            val fc = GradientDrawable(); fc.setColor(FUNDO)
+            val r = dp(26).toFloat(); fc.cornerRadii = floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
+            cx.background = fc; cx.clipToOutline = true; cx.elevation = dp(16).toFloat()
+            val w = novaWebLocal()
+            w.setBackgroundColor(FUNDO)
+            cx.addView(w, cheio())
+            g.addView(cx, FrameLayout.LayoutParams(larguraGaveta(), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
+            (conteudo.parent as FrameLayout).addView(g, cheio())
+            w.loadUrl(ASSET + "shell.html?modo=gaveta")
+            gaveta = g; gavetaFundo = f; gavetaCaixa = cx; webGaveta = w
+            g.visibility = View.GONE
+        }
+        val g = gaveta ?: return
+        js(webGaveta, "window.shellAtualizar&&shellAtualizar()")
+        gavetaAberta = true
+        g.visibility = View.VISIBLE; g.bringToFront()
+        val cx = gavetaCaixa!!
+        cx.translationX = -larguraGaveta().toFloat()
+        cx.animate().translationX(0f).setDuration(240).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+        gavetaFundo!!.animate().alpha(1f).setDuration(240).start()
+    }
+
+    private fun fecharGaveta() {
+        if (!gavetaAberta) return
+        gavetaAberta = false
+        val g = gaveta ?: return
+        gavetaCaixa!!.animate().translationX(-larguraGaveta().toFloat()).setDuration(200).setInterpolator(android.view.animation.AccelerateInterpolator(1.5f)).start()
+        gavetaFundo!!.animate().alpha(0f).setDuration(200).withEndAction { if (!gavetaAberta) g.visibility = View.GONE }.start()
+    }
+
+    private val subsTela = java.util.concurrent.ConcurrentHashMap<String, String>()      // atalhos que cada dashboard informou (abas da tela)
+    private val acoesTela = java.util.concurrent.ConcurrentHashMap<String, String>()     // se a tela tem imagem/excel
+
+    /** Qual atalho do Helpdesk está aberto (pela página do webApp). */
+    private fun helpSubAtual(): String {
+        val u = try { webApp.url ?: "" } catch (_: Exception) { "" }
+        return when {
+            u.contains("config=1") -> "config"
+            u.contains("/helpdesk.html") -> "inicio"
+            u.contains("dash-helpdesk.html") -> "dash"
+            u.contains("lista.html#") -> u.substringAfter("lista.html#").substringBefore('&').substringBefore('?')
+            else -> ""
+        }
+    }
+
+    private fun webAtual(): WebView? = when {
+        aba == ABA_HELPDESK -> webApp
+        DASH.containsKey(aba) -> webDash
+        aba == ABA_PAINEL -> painelAtual?.let { websPainel[it] }
+        else -> null
+    }
+
+    private fun shellJson(): String {
+        val o = JSONObject()
+        val logado = Store.logado(this)
+        val lista = org.json.JSONArray()
+        for (it in listOf(ABA_HELPDESK to "Helpdesk", ABA_COMERCIAL to "Comercial", ABA_LOGISTICA to "Logística", ABA_ADMIN to "Admin", ABA_PAINEL to "Painel", ABA_SITE to "Site"))
+            if (logado && abaDisponivel(it.first)) lista.put(org.json.JSONArray().put(it.first).put(it.second))
+        o.put("logado", logado).put("aba", aba).put("abas", lista).put("tema", if (claro) "claro" else "escuro")
+            .put("naoLidos", if (aba == ABA_HELPDESK) 0 else Helpdesk.naoVistos(this)).put("helpSub", helpSubAtual())
+            .put("helpdesk", Acesso.helpdesk(this)).put("email", Store.email(this) ?: "").put("nome", Acesso.nome(this))
+        DASH[aba]?.let { pag -> subsTela[pag]?.let { try { o.put("sub", JSONObject(it)) } catch (_: Exception) { } } }
+        try { val u = webAtual()?.url?.substringBefore('#'); if (u != null) acoesTela[u]?.let { o.put("acoes", JSONObject(it)) } } catch (_: Exception) { }
+        return o.toString()
+    }
+
+    private fun irSubMenu(id0: String) {
+        val id = id0.replace(Regex("[^A-Za-z0-9_-]"), ""); if (id.isEmpty()) return
+        fecharGaveta()
+        if (aba == ABA_HELPDESK) {
+            when (id) { "inicio" -> { voltarHelpdesk(); selecionar(ABA_HELPDESK) }; "dash" -> abrirTela("dash-helpdesk.html"); else -> abrirTela("lista.html#$id") }
+            entrar(webApp); return
+        }
+        if (DASH.containsKey(aba)) js(webDash, "(function(){var b=document.querySelector('.tabs:not(.sub) [data-aba=\"$id\"]');if(b)b.click();window.scrollTo(0,0)})()")
+    }
+
+    private fun acaoMenu(nome: String) {
+        when (nome) {
+            "fecharMenu" -> fecharGaveta()
+            "esc" -> fecharGaveta()
+            "imagem", "excel", "atualizar" -> { fecharGaveta(); js(webAtual(), "window.acaoRail&&acaoRail('$nome')") }
+            "chamado" -> { fecharGaveta(); abrirTela("novo.html") }
+            "busca" -> { fecharGaveta(); if (aba != ABA_HELPDESK) selecionar(ABA_HELPDESK); webApp.postDelayed({ js(webApp, "window.abrirBusca&&abrirBusca()") }, 260) }
+            "claro", "escuro" -> { if (nome != Tema.nome(this)) { Tema.definir(this, nome); Thread { Widget.redesenharTodos(applicationContext) }.start(); recreate() } }
         }
     }
 
@@ -617,6 +735,7 @@ class Tela : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (gavetaAberta) { fecharGaveta(); return }
         val s = webSite
         if (aba == ABA_HELPDESK && paginaApp == "sub") { webApp.evaluateJavascript("(window.fecharVisor&&fecharVisor())?1:0") { r -> if (r != "1") runOnUiThread { voltarApp() } }; return }   // foto aberta: fecha só ela
         if (aba == ABA_PAINEL) painelAtual?.let { websPainel[it] }?.let { if (it.canGoBack()) { it.goBack(); return } }
@@ -1413,7 +1532,31 @@ class Tela : Activity() {
 
         /** As telas contam suas partes (usado pelos atalhos do PC; no celular não precisa). */
         @JavascriptInterface
-        fun subAbas(json: String) { }
+        fun subAbas(json: String) {
+            try {
+                val a = JSONObject(json)
+                if (a.optInt("acoes", 0) == 1) { val u = a.optString("url", ""); if (u.isNotEmpty()) acoesTela[u] = json; return }
+                val pag = a.optString("pagina", ""); if (pag.isNotEmpty()) subsTela[pag] = json
+            } catch (_: Exception) { }
+            js(webGaveta, "window.shellAtualizar&&shellAtualizar()")
+        }
+
+        /** Menu ☰ (shell.html?modo=gaveta): estado, abas, atalhos e ações. */
+        @JavascriptInterface
+        fun shell(): String = try {
+            // lê o estado na thread da tela (WebView só pode ser consultada nela)
+            val t = java.util.concurrent.FutureTask { shellJson() }
+            runOnUiThread(t); t.get(2, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: Exception) { "{}" }
+
+        @JavascriptInterface
+        fun irAba(id: String) = runOnUiThread { fecharGaveta(); if (abaDisponivel(id)) selecionar(id) }
+
+        @JavascriptInterface
+        fun irSub(id: String) = runOnUiThread { irSubMenu(id) }
+
+        @JavascriptInterface
+        fun acaoShell(nome: String) = runOnUiThread { if (nome == "sair") { fecharGaveta(); sair() } else acaoMenu(nome) }
 
         // ---- imagem (PNG) dos painéis ----
         @JavascriptInterface

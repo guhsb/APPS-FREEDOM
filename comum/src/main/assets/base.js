@@ -611,3 +611,59 @@ F.aoColarImagem = function (fn) {
     apagar.forEach(function (k) { localStorage.removeItem(k); });
   } catch (e) { }
 })();
+
+/* ---- Android: puxar a tela para baixo atualiza (igual WhatsApp/Gmail); usa o botão Atualizar da própria tela ---- */
+(function () {
+  if (!('ontouchstart' in window)) return;
+  var LIM = 70, MAX = 120, y0 = null, dist = 0, ativo = false, el = null, girando = false;
+  var ABERTOS = '.opModal,#mfundo,.mfundo,#visor,.vmFundo,.bkF,#modal.on,[role=dialog]';
+  function android() { try { return F.plataforma() === 'android'; } catch (e) { return false; } }
+  function bola() {
+    if (el) return el;
+    var st = document.createElement('style');
+    st.textContent = '#puxa{position:fixed;left:50%;top:0;z-index:9998;width:40px;height:40px;margin-left:-20px;border-radius:50%;background:var(--sf,#fff);box-shadow:0 2px 10px rgba(15,27,61,.22);display:flex;align-items:center;justify-content:center;color:var(--tx3,#7b879e);transform:translateY(-50px);opacity:0;pointer-events:none}' +
+      '#puxa svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}#puxa.pronto{color:var(--rosa,#e0457f)}' +
+      '#puxa.solta{transition:transform .25s,opacity .25s}#puxa.gira svg{animation:puxaGira .8s linear infinite}@keyframes puxaGira{to{transform:rotate(360deg)}}' +
+      'html.puxaOn{overscroll-behavior-y:contain}';
+    document.head.appendChild(st);
+    el = document.createElement('div'); el.id = 'puxa';
+    el.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>';
+    document.body.appendChild(el); return el;
+  }
+  function pos(d, solta) {
+    var b = bola(); b.classList.toggle('solta', !!solta);
+    b.style.transform = 'translateY(' + (d - 50) + 'px)' + (girando ? '' : ' rotate(' + Math.round(d * 3) + 'deg)');
+    b.style.opacity = d <= 0 ? 0 : Math.min(1, d / 40);
+    b.classList.toggle('pronto', d >= LIM);
+  }
+  function dentroRolavel(t) {   // a pessoa está rolando uma caixa interna (lista do modal, texto…), não a página
+    for (var n = t; n && n !== document.body && n.nodeType === 1; n = n.parentElement) {
+      if (/^(TEXTAREA|SELECT|INPUT)$/.test(n.tagName)) return true;
+      if (n.scrollTop > 0) return true;
+    }
+    return false;
+  }
+  document.addEventListener('touchstart', function (ev) {
+    y0 = null; ativo = false;
+    if (girando || ev.touches.length !== 1 || !android()) return;
+    document.documentElement.classList.add('puxaOn');
+    if ((window.scrollY || document.documentElement.scrollTop) > 0 || !document.getElementById('btAt') || document.querySelector(ABERTOS) || dentroRolavel(ev.target)) return;
+    y0 = ev.touches[0].clientY; dist = 0;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (ev) {
+    if (y0 == null) return;
+    var dy = ev.touches[0].clientY - y0;
+    if (dy <= 0 || (window.scrollY || 0) > 0) { if (ativo) pos(0); ativo = false; return; }
+    ativo = true; dist = Math.min(MAX, dy * 0.5); pos(dist);
+  }, { passive: true });
+  document.addEventListener('touchend', function () {
+    if (y0 == null) return; y0 = null;
+    if (!ativo) return; ativo = false;
+    if (dist < LIM) { pos(0, true); return; }
+    var at = document.getElementById('btAt'); if (!at) { pos(0, true); return; }
+    girando = true; bola().classList.add('gira'); pos(56, true);
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { }
+    at.click();
+    setTimeout(function () { girando = false; el.classList.remove('gira'); pos(0, true); }, 900);
+  }, { passive: true });
+})();

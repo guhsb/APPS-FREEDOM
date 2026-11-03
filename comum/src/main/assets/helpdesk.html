@@ -9,6 +9,11 @@
 .status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .status.off i{background:var(--tx3);box-shadow:none}.status.erro i{background:var(--laranja);box-shadow:0 0 0 3px var(--laranja-s)}
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+/* celular: os números numa faixa só que rola de lado (Últimas atualizações sobe) */
+html.barraFlutuante .kpis{display:flex;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px;scroll-snap-type:x proximity}
+html.barraFlutuante .kpis::-webkit-scrollbar{display:none}
+html.barraFlutuante .kpi{flex:0 0 calc((100% - 16px) / 3.35);scroll-snap-align:start}
+.aviso .xAv{background:none!important;border:0;color:inherit;opacity:.6;padding:4px!important;margin:-4px -4px -4px 0;font-size:20px;line-height:1;min-width:0}
 .kpi{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:12px 12px 11px;position:relative;overflow:hidden}
 .kpi:before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--c,var(--ln2))}
 .kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.1}
@@ -50,6 +55,11 @@ select{background:var(--sf2);color:var(--tx);border:1px solid var(--ln2);border-
 <div id="conteudo"><div class="carregando"><i></i>Carregando…</div></div>
 <script src="base.js"></script>
 <script>
+// avisos de notificação/bateria: o X esconde por 7 dias (voltam se o problema continuar)
+function escondido(k) { try { return Date.now() - (+localStorage.getItem('hd_x_' + k) || 0) < 7 * 864e5; } catch (e) { return false; } }
+function xAviso(k) { return '<button class="xAv" aria-label="Esconder" onclick="esconderAviso(\'' + k + '\',this)">×</button>'; }
+window.esconderAviso = function (k, b) { try { localStorage.setItem('hd_x_' + k, String(Date.now())); } catch (e) { } var a = b.closest('.aviso'); if (a) a.remove(); };
+
 var STATUS = { OPEN: ['Aberto', 'var(--azul)', 'rgba(79,124,255,.15)'], IN_PROGRESS: ['Em andamento', 'var(--violeta)', 'rgba(139,108,240,.16)'],
   WAITING: ['Aguardando', 'var(--laranja)', 'rgba(240,165,58,.15)'], RESOLVED: ['Resolvido', 'var(--verde)', 'rgba(31,191,143,.15)'], CLOSED: ['Fechado', 'var(--tx3)', 'var(--sf3)'],
   REOPENED: ['Reaberto', 'var(--azul)', 'rgba(79,124,255,.15)'], WAITING_SUPPLIER: ['Aguard. fornecedor', 'var(--laranja)', 'rgba(240,165,58,.15)'],
@@ -129,15 +139,15 @@ function render() {
     h += '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(ap.erro) + '</span><button onclick="App.atualizarPeloNavegador()">Baixar</button></div>';
   if (!e.ativo)
     h += '<div class="aviso rosa">' + F.ic('sino') + '<span>Os avisos do Helpdesk estão desligados neste celular.</span><button onclick="cfg({ativo:true})">Ligar</button></div>';
-  if (e.ativo && !e.notifOk)
-    h += '<div class="aviso">' + F.ic('sino') + '<span>As notificações do app estão bloqueadas.</span><button onclick="App.configurarNotificacoes()">Permitir</button></div>';
+  if (e.ativo && !e.notifOk && !escondido('notif'))
+    h += '<div class="aviso">' + F.ic('sino') + '<span>As notificações do app estão bloqueadas.</span><button onclick="App.configurarNotificacoes()">Permitir</button>' + xAviso('notif') + '</div>';
   else if (e.ativo && e.canalOk === false)
     h += '<div class="aviso">' + F.ic('som') + '<span>Os avisos estão <b>sem som</b> ou sem aparecer na tela.</span><button onclick="App.configurarSom()">Ajustar</button></div>';
   if (e.fila > 0)
     h += '<div class="aviso offline">' + F.ic('nuvem') + '<span>' + (e.fila === 1 ? '1 envio guardado' : e.fila + ' envios guardados') +
       ' sem internet. ' + (e.online === false ? 'Vai ser enviado quando a conexão voltar.' : 'Enviando…') + '</span></div>';
-  if (e.ativo && !e.bateriaOk)
-    h += '<div class="aviso">' + F.ic('bateria') + '<span>Libere a bateria para os avisos chegarem com a tela bloqueada.</span><button onclick="App.liberarBateria()">Liberar</button></div>';
+  if (e.ativo && !e.bateriaOk && !escondido('bat'))
+    h += '<div class="aviso">' + F.ic('bateria') + '<span>Libere a bateria para os avisos chegarem com a tela bloqueada.</span><button onclick="App.liberarBateria()">Liberar</button>' + xAviso('bat') + '</div>';
 
   // números
   var r = e.resumo || {}, req = r.requester || {}, ws = r.workspace;

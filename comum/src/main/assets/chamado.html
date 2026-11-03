@@ -20,6 +20,9 @@ body{padding-bottom:150px}
 .btn:disabled{opacity:.55}
 .btn svg.ic{width:18px;height:18px}
 .op{padding:6px 16px 14px}
+.opCel summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;margin:-2px 0}.opCel summary::-webkit-details-marker{display:none}
+.opCel summary span{flex:1;min-width:0}.opCel summary h3{margin:0 0 1px}.opCel summary small{font-size:12.5px;color:var(--tx3)}
+.opCel summary svg.ic{width:20px;height:20px;color:var(--tx3);transition:transform .2s}.opCel[open] summary svg.ic{transform:rotate(180deg)}.opCel[open] summary{margin-bottom:6px}
 .op h3{margin:10px 0 2px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2)}
 .linhaOp{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-top:1px solid var(--ln)}
 .linhaOp:first-of-type{border-top:0}
@@ -77,7 +80,7 @@ body{padding-bottom:150px}
 .caixa button{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:var(--rosa);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .caixa button:disabled{background:var(--sf3);color:var(--tx3);cursor:default}
 .caixa .fechado{flex:1;text-align:center;color:var(--tx3);font-size:13px;padding:10px}
-html.barraFlutuante .caixa{bottom:86px}
+html.barraFlutuante .caixa{bottom:86px}html.barraFlutuante.tecladoAberto .caixa{bottom:8px}
 html[data-tema="escuro"] .caixa{background:var(--sf2);border-color:var(--ln2);box-shadow:0 12px 32px rgba(0,0,0,.55)}
 html[data-tema="escuro"] .caixa textarea{background:var(--bg)}
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--sf3);color:var(--tx);border:1px solid var(--ln2);border-radius:12px;
@@ -183,6 +186,7 @@ var ID = parseInt((location.hash || '').replace('#', ''), 10) || 0;
 var dados = null, ultimaChave = '', enviando = false, carregando = false, deNovo = false;
 var ocupado = '';                  // operação em andamento (trava os botões)
 var abertoSol = false, abertoRej = false, confirmaAceite = false, abertoOp = null;   // abertoOp: janela de status/prioridade/responsável/setor (PC)
+var opCel = false;   // celular: cartão Atendimento aberto?
 var abertoTR = false, tr = { setor: '', busca: '', resp: '', motivo: '' };   // transferir responsável (outro setor, só este chamado)
 var anexos = null, enviandoAnexo = '';
 // abriu outro chamado com esta tela aberta: recarrega para trocar de chamado
@@ -222,7 +226,14 @@ function textoEvento(it) {
   if (et === 'SOLUTION_ACCEPTED') return ['ok', 'aceitou a solução · chamado concluído'];
   if (et === 'SOLUTION_REJECTED') return ['alerta', 'rejeitou a solução' + (meta.reason ? ': ' + meta.reason : '')];
   if (n) return ['troca', 'encaminhou o chamado ' + (o ? 'de ' + o + ' ' : '') + 'para ' + n];
-  return ['relogio', (et || 'atualização').toLowerCase().replace(/_/g, ' ')];
+  // outros tipos: texto em português (o site às vezes manda o código em inglês)
+  var PT = { ASSIGNED: ['pessoa', 'assumiu o chamado'], UNASSIGNED: ['pessoa', 'deixou o chamado sem responsável'], CREATED: ['msg', 'abriu o chamado'], OPENED: ['msg', 'abriu o chamado'],
+    CLOSED: ['ok', 'encerrou o chamado'], RESOLVED: ['ok', 'resolveu o chamado'], REOPENED: ['troca', 'reabriu o chamado'], CANCELLED: ['alerta', 'cancelou o chamado'], CANCELED: ['alerta', 'cancelou o chamado'],
+    QUEUE_CHANGED: ['troca', 'mudou o setor' + (n ? ' para ' + n : '')], TRANSFERRED: ['troca', 'transferiu o chamado' + (n ? ' para ' + n : '')], TITLE_CHANGED: ['troca', 'mudou o título'],
+    CATEGORY_CHANGED: ['troca', 'mudou a categoria' + (n ? ' para ' + n : '')], DUE_DATE_CHANGED: ['relogio', 'mudou o prazo'], SLA_BREACHED: ['alerta', 'o prazo (SLA) estourou'], SLA_AT_RISK: ['alerta', 'o prazo (SLA) está perto de vencer'],
+    RATED: ['estrela', 'avaliou o atendimento'], RATING_ADDED: ['estrela', 'avaliou o atendimento'], ATTACHMENT_REMOVED: ['clipe', 'removeu um anexo'], WATCHER_ADDED: ['pessoa', 'passou a acompanhar'] };
+  if (PT[et]) return PT[et];
+  return ['relogio', 'atualizou o chamado'];
 }
 function mostrarToast(t) {
   if (!t) return;
@@ -329,8 +340,8 @@ function render(d) {
     if (abertoOp === chave) modais += janela(F.ic(icone) + rotulo, corpo + '<div class="duas" style="margin-top:4px"><span></span>' + bt('opFechar', 'Cancelar', 'linha') + '</div>', 'opFechar');
     return '';
   }
-  var linhas = '';
-  if (cap.can_take) linhas += '<div class="linhaOp">' + bt('btAssumir', 'Assumir chamado', 'rosa', 'pessoa') + '</div>';
+  var linhas = '', assumir = cap.can_take ? '<div class="linhaOp">' + bt('btAssumir', 'Assumir chamado', 'rosa', 'pessoa') + '</div>' : '';
+  if (PC) linhas += assumir;
   if (cap.can_change_status && (cap.valid_statuses || []).length) {
     linhas += opItem('status', 'troca', 'Status', stLabel(t.status), '<div class="linhaOp"><label for="selStatus">Status · atual: ' + F.esc(stLabel(t.status)) + '</label><div class="lado"><select id="selStatus">' +
       opcoes(cap.valid_statuses.map(function (v) { return [v, stLabel(v)]; }), '', 'Alterar para…') +
@@ -389,7 +400,12 @@ function render(d) {
     }
   }
   linhas += modais;
-  if (linhas) h += '<div class="card op"><h3>Atendimento</h3>' + linhas + '</div>';
+  if (linhas && PC) h += '<div class="card op"><h3>Atendimento</h3>' + linhas + '</div>';
+  else if (linhas || assumir) {
+    // celular: "Assumir" fica à mostra; o resto (status, prioridade, responsável, conclusão) recolhido para a conversa aparecer logo
+    if (assumir) h += '<div class="card op">' + assumir + '</div>';
+    if (linhas) h += '<details class="card op opCel" id="opCel"' + (opCel || abertoSol || abertoTR || ocupado ? ' open' : '') + '><summary><span><h3>Atendimento</h3><small>Status, prioridade, responsável e conclusão</small></span>' + F.ic('baixo') + '</summary>' + linhas + '</details>';
+  }
 
   // conversa
   var sp2 = solucaoProposta(d), idSol = sp2.msg ? sp2.msg.id : null;
@@ -483,6 +499,7 @@ document.addEventListener('click', function (ev) {
   }
 });
 document.addEventListener('input', function (ev) { if (ev.target.id === 'txAval') avalTxt = ev.target.value; });
+document.addEventListener('toggle', function (ev) { if (ev.target.id === 'opCel') opCel = ev.target.open; }, true);
 
 function desenharAnexos() {
   var sb = document.querySelector('[data-op="anexos"] small');   // PC: o botão "Anexos" mostra quantos tem
@@ -493,7 +510,7 @@ function desenharAnexos() {
   if (n) n.textContent = anexos.length || '';
   if (!anexos.length) { box.innerHTML = '<div class="vazio">Nenhum anexo neste chamado.</div>'; return; }
   box.innerHTML = '<div class="lista anx">' + anexos.map(function (a, i) {
-    var nome = a.original_filename || a.filename || ('Anexo ' + (i + 1));
+    var nome = a.original_filename || a.filename || a.file_name || ('Anexo ' + (i + 1));
     var ft = ehFoto(a), u = ft && !!(fotos[a.id] && fotos[a.id].url) ? fotos[a.id].url : '';
     if (ft && fotos[a.id] == null) filaFoto(a);
     return '<div class="item" data-anexo="' + i + '"><div class="ico' + (ft ? ' mini' : '') + '"' + (ft ? ' data-fid="' + a.id + '" data-mini="1"' : '') + '>' + (u ? '<img src="' + u + '" alt="">' : ft ? F.ic('imagem') : icoTipo(a)) + '</div><div class="tx"><div class="t1"><b>' + F.esc(nome) + '</b></div>' +
@@ -633,7 +650,7 @@ function comAnexos(itens) {
   var usados = {}, extra = anexos.map(function (a, i) {
     var ev = (porNome[nomeAnx(a)] || []).filter(function (e) { return !usados[e.id]; })[0];
     if (ev) usados[ev.id] = 1;
-    var ator = ev && ev.actor ? ev.actor : { name: a.uploaded_by_name || 'Alguém', is_current_user: !!eus[a.uploaded_by_name] };
+    var ator = ev && ev.actor ? ev.actor : { name: a.uploaded_by_name || a.uploaded_by || 'Anexo', is_current_user: !!eus[a.uploaded_by_name] };
     return { type: 'ANEXO', anexo: a, ix: i, created_at: a.created_at || (ev && ev.created_at), actor: ator };
   });
   var base = itens.filter(function (it) { return !(it.type === 'EVENT' && usados[it.id]); });

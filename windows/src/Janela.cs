@@ -536,7 +536,7 @@ namespace Freedom
                 case "sair": ponte.sair(); break;
                 case "railAbrir": case "railFechar":
                     railAberta = nome == "railAbrir";
-                    webRail.Width = Px(railAberta ? 262 : 78);   // aberta: empurra a tela do meio para a direita
+                    AnimarRail(Px(railAberta ? 246 : 78));   // empurra a tela do meio junto, num movimento só
                     break;
                 case "esc":   // Esc sem nada aberto na tela: fecha o sino, depois os atalhos, depois volta da tela aberta
                     if (sinoAberto) { Sino(false); break; }
@@ -581,6 +581,24 @@ namespace Freedom
                 if (sinoAberto) { webSino.BringToFront(); webSino.Focus(); Js(webSino, "window.recebidoHelpdesk&&recebidoHelpdesk()"); }
             }
             AtualizarShell();
+        }
+        // atalhos: a largura anda aos poucos (200 ms, desacelerando) e a tela do meio acompanha no mesmo passo
+        System.Windows.Forms.Timer railTimer; int railDe, railPara; DateTime railIni;
+        void AnimarRail(int alvo)
+        {
+            railDe = webRail.Width; railPara = alvo; railIni = DateTime.Now;
+            if (railDe == railPara) return;
+            if (railTimer == null)
+            {
+                railTimer = new System.Windows.Forms.Timer { Interval = 15 };
+                railTimer.Tick += (s, e) =>
+                {
+                    double t = Math.Min(1, (DateTime.Now - railIni).TotalMilliseconds / 200.0), k = 1 - Math.Pow(1 - t, 3);
+                    webRail.Width = (int)Math.Round(railDe + (railPara - railDe) * k);
+                    if (t >= 1) railTimer.Stop();
+                };
+            }
+            railTimer.Start();
         }
         void PosicionarSino()
         {

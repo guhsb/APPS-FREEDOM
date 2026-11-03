@@ -265,6 +265,15 @@ function abrirTela(arquivo) {
 }
 
 function voltarHelpdesk() { vApp.webContents.loadURL(url('helpdesk.html')); paginaApp = 'helpdesk'; helpSub = 'inicio'; atualizarBarra(); }
+let navTm = null;
+function animarNav(alvo) {
+  clearInterval(navTm); const de = NAV, ini = Date.now(); if (de === alvo) return;
+  navTm = setInterval(() => {
+    const t = Math.min(1, (Date.now() - ini) / 200), k = 1 - Math.pow(1 - t, 3);
+    NAV = Math.round(de + (alvo - de) * k); posicionar();
+    if (t >= 1) clearInterval(navTm);
+  }, 15);
+}
 function voltarApp() {
   const h = vApp.webContents.navigationHistory;
   if (paginaApp === 'sub' && h && h.canGoBack()) h.goBack(); else voltarHelpdesk();
@@ -511,7 +520,7 @@ const ponte = {
   acaoShell: (wc, nome) => {
     if (nome === 'imagem' || nome === 'excel' || nome === 'atualizar') { const v = vistaAtual(); if (v) js(v.webContents, "window.acaoRail && acaoRail('" + nome + "')"); }
     else if (nome === 'chamado') { sino(false); abrirTela('novo.html'); }
-    else if (nome === 'railAbrir' || nome === 'railFechar') { NAV = nome === 'railAbrir' ? 262 : 78; posicionar(); }   // atalhos abertos empurram as telas
+    else if (nome === 'railAbrir' || nome === 'railFechar') animarNav(nome === 'railAbrir' ? 262 : 78);   // atalhos abertos empurram as telas, no mesmo movimento
     else if (nome === 'esc') {   // Esc sem nada aberto na tela: fecha o sino, depois os atalhos, depois volta da tela aberta
       if (sinoAberto) sino(false);
       else if (NAV > 78) js(janela.webContents, 'window.railAlternar && railAlternar(false)');
