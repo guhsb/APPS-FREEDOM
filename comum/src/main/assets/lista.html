@@ -137,6 +137,9 @@ function cabeca() {
     return '<button data-s="' + c[0] + '" class="' + (f.status === c[0] ? 'on' : '') + '">' + c[1] + '</button>';
   }).join('') + '</div>';
   h = h.replace('@@BTFX@@', btFx);
+  if (modo === 'meus' && f.status === 'PENDING_APPROVAL')   // veio do lembrete da tela inicial
+    h += '<div class="aviso" style="background:var(--verde-s);border-color:rgba(31,191,143,.35);color:var(--tx-verde,var(--verde));margin-bottom:10px">' + F.ic('ok') +
+      '<span>Estes chamados foram resolvidos pelo atendente. Abra cada um e toque em <b>Aceitar solução</b> (ou Rejeitar, se ainda faltar algo).</span></div>';
   h += '<div class="filtros' + (!desktop && !fxAberto ? ' fechado' : '') + '"><select id="fPrio"><option value="">Toda prioridade</option>' +
     Object.keys(F.PRIO).map(function (k) { return '<option value="' + k + '"' + (f.priority === k ? ' selected' : '') + '>' + F.PRIO[k][0] + '</option>'; }).join('') + '</select>';
   if (atendimento()) {
