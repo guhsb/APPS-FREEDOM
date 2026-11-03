@@ -247,8 +247,6 @@ class Tela : Activity() {
         val linha = LinearLayout(this)
         linha.orientation = LinearLayout.HORIZONTAL
         linha.gravity = Gravity.CENTER_VERTICAL
-        val lt = android.animation.LayoutTransition(); lt.enableTransitionType(android.animation.LayoutTransition.CHANGING); lt.setDuration(220)
-        linha.layoutTransition = lt
         barra.addView(linha, cheio())
         // ☰ menu
         val menu = FrameLayout(this)
@@ -281,7 +279,7 @@ class Tela : Activity() {
             item.addView(img, LinearLayout.LayoutParams(dp(21), dp(21)))
             val txt = TextView(this)
             txt.text = rotulo
-            txt.textSize = 13.5f
+            txt.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 13.5f)   // letra grande do celular não estoura a barra
             txt.maxLines = 1
             txt.isSingleLine = true
             txt.ellipsize = null
@@ -335,6 +333,7 @@ class Tela : Activity() {
             par.second.visibility = if (ativa) View.VISIBLE else View.GONE
             val item = itensAba[id] ?: continue
             if (ativa) { val f = GradientDrawable(); f.cornerRadius = dp(24).toFloat(); f.setColor(PILULA_ATIVA); item.background = f } else item.background = null
+            if (ativa) item.setPadding(dp(12), 0, dp(14), 0) else item.setPadding(0, 0, 0, 0)   // ícones das outras abas centralizados no espaço que sobra
             // a aba aberta ocupa o tamanho do nome inteiro (nunca corta); as outras dividem o que sobra
             val lp = item.layoutParams as LinearLayout.LayoutParams
             val w = if (ativa) ViewGroup.LayoutParams.WRAP_CONTENT else 0
@@ -858,7 +857,7 @@ class Tela : Activity() {
                 if (::webApp.isInitialized && v === webApp && url != null && url.startsWith(ASSET)) {
                     paginaApp = when {
                         url.contains("login.html") -> "login"
-                        url.contains("helpdesk.html") -> "helpdesk"
+                        url.contains("helpdesk.html") && !url.contains("config=1") -> "helpdesk"   // configurações contam como tela aberta (o Helpdesk volta ao início)
                         else -> "sub"
                     }
                 }
