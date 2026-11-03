@@ -41,7 +41,12 @@ namespace Freedom
         WebView2 webApp, webSite, webPainel, webDash;
         // layout novo: barra de cima (abas em pílula, sino), atalhos da esquerda e a janelinha de avisos do sino
         readonly WebView2 webTopo = new WebView2 { Dock = DockStyle.Top, Height = 76, Visible = false };
-        readonly WebView2 webRail = new WebView2 { Dock = DockStyle.Left, Width = 78, Visible = false };
+        readonly WebView2 webRail = new WebView2 { Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom, Width = 78, Visible = false };
+        // espaço dos atalhos (a tela do meio fica à direita dele). Os atalhos flutuam por cima: abrem empurrando
+        // quando cabe; se empurrar fosse desmontar a tela (2 colunas virando 1), abrem por cima sem mexer nela
+        readonly Panel railEspaco = new Panel { Dock = DockStyle.Left, Width = 78, Visible = false };
+        const double zoom = 1;
+        bool railPorCima;           // aberta por cima da tela (não coube empurrar)
         WebView2 webSino;
         bool sinoAberto;
         bool railAberta;
@@ -70,7 +75,7 @@ namespace Freedom
             inicioOculto = oculto;
             // Windows com zoom de tela (125%, 150%…): as barras do WebView2 crescem junto, então a altura/largura também
             try { using (var g = Graphics.FromHwnd(IntPtr.Zero)) escala = Math.Max(1f, g.DpiX / 96f); } catch (Exception) { escala = 1f; }   // não usa CreateGraphics(): criaria a janela antes da hora
-            webTopo.Height = Px(76); webRail.Width = Px(78);
+            webTopo.Height = Pz(76); webRail.Width = Pz(78); railEspaco.Width = Pz(78);
             ponte = new Ponte(this);
             Text = "Freedom";
             BackColor = FUNDO;
@@ -86,9 +91,11 @@ namespace Freedom
             Controls.Add(conteudo);
             MontarNav();   // barra lateral antiga: continua montada (estado das abas), mas não aparece mais
             webTopo.DefaultBackgroundColor = FUNDO; webRail.DefaultBackgroundColor = FUNDO;
-            Controls.Add(webRail);
+            railEspaco.BackColor = FUNDO;
+            Controls.Add(railEspaco);
             Controls.Add(webTopo);
-            Resize += (s, e) => PosicionarSino();
+            Controls.Add(webRail); webRail.BringToFront();
+            Resize += (s, e) => { PosicionarSino(); PosicionarRail(); };
 
             bandeja.Icon = Icon ?? SystemIcons.Application;
             bandeja.Text = "Freedom";
@@ -383,7 +390,7 @@ namespace Freedom
             bool logado = Store.Logado();
             nav.Visible = logado;
             webTopo.Visible = logado && webTopo.CoreWebView2 != null;
-            webRail.Visible = logado && webRail.CoreWebView2 != null;
+            webRail.Visible = logado && webRail.CoreWebView2 != null; railEspaco.Visible = webRail.Visible; PosicionarRail();
             if (!logado) Sino(false);
             int y = 12;
             foreach (var kv in abas)
@@ -467,7 +474,7 @@ namespace Freedom
             try
             {
                 await Preparar(webTopo); webTopo.CoreWebView2.Navigate(ASSET + "shell.html?modo=topo");
-                await Preparar(webRail); webRail.CoreWebView2.Navigate(ASSET + "shell.html?modo=rail");
+                await Preparar(webRail); webRail.CoreWebView2.Navigate(ASSET + "shell.html?modo=rail"); PosicionarRail();
                 AjustarAbas();
             }
             catch (Exception) { }
@@ -536,7 +543,12 @@ namespace Freedom
                 case "sair": ponte.sair(); break;
                 case "railAbrir": case "railFechar":
                     railAberta = nome == "railAbrir";
-                    AnimarRail(Px(railAberta ? 246 : 78));   // empurra a tela do meio junto, num movimento só
+                    if (railAberta)
+                    {
+                        // empurra se a tela do meio continuar no mesmo formato; senão abre por cima (sem desmontar a tela)
+                        railPorCima = true;   // sempre por cima da tela (não empurra nem desmonta nada)
+                    }
+                    if (!railAberta) railPorCima = false;   // a largura não muda: os grupos crescem dentro do recorte (RegiaoRail)
                     break;
                 case "esc":   // Esc sem nada aberto na tela: fecha o sino, depois os atalhos, depois volta da tela aberta
                     if (sinoAberto) { Sino(false); break; }
@@ -582,19 +594,53 @@ namespace Freedom
             }
             AtualizarShell();
         }
-        // atalhos: a largura anda aos poucos (200 ms, desacelerando) e a tela do meio acompanha no mesmo passo
-        System.Windows.Forms.Timer railTimer; int railDe, railPara; DateTime railIni;
-        void AnimarRail(int alvo)
+        int Pz(double v) { return Px((float)(v * zoom)); }
+        /// <summary>Recorte dos atalhos: cada grupo com o próprio tamanho e cantos redondos (o que está entre eles é a tela de baixo).</summary>
+        public void RegiaoRail(string json)
         {
-            railDe = webRail.Width; railPara = alvo; railIni = DateTime.Now;
-            if (railDe == railPara) return;
+            try
+            {
+                var a = new JSONArray(json ?? "[]");
+                var p = new System.Drawing.Drawing2D.GraphicsPath();
+                for (int i = 0; i < a.Length; i++)
+                {
+                    var r = a.OptJSONArray(i); if (r == null || r.Length < 4) continue;
+                    float x = Px(r.OptLong(0)), y = Px(r.OptLong(1)), w = Px(r.OptLong(2)), h = Px(r.OptLong(3)), rr = Math.Min(Px(r.OptLong(4, 0)) * 2f, Math.Min(w, h));
+                    if (w <= 0 || h <= 0) continue;
+                    var g = new System.Drawing.Drawing2D.GraphicsPath();
+                    if (rr < 2) g.AddRectangle(new RectangleF(x, y, w, h));
+                    else { g.AddArc(x, y, rr, rr, 180, 90); g.AddArc(x + w - rr, y, rr, rr, 270, 90); g.AddArc(x + w - rr, y + h - rr, rr, rr, 0, 90); g.AddArc(x, y + h - rr, rr, rr, 90, 90); g.CloseFigure(); }
+                    p.AddPath(g, false); g.Dispose();
+                }
+                p.FillMode = System.Drawing.Drawing2D.FillMode.Winding;
+                var velho = webRail.Region; webRail.Region = new Region(p); if (velho != null) velho.Dispose(); p.Dispose();
+            }
+            catch (Exception) { }
+        }
+        /// <summary>Atalhos flutuam sobre o espaço da esquerda, do topo até embaixo.</summary>
+        void PosicionarRail()
+        {
+            int top = webTopo.Visible ? webTopo.Height : 0;
+            webRail.Bounds = new Rectangle(0, top, Pz(300), Math.Max(0, ClientSize.Height - top));   // largura fixa; o recorte mostra só os grupos
+            if (webRail.Region == null) webRail.Region = new Region(new Rectangle(0, 0, Pz(78), Math.Max(1, webRail.Height)));
+            webRail.BringToFront(); if (sinoAberto && webSino != null) webSino.BringToFront();
+        }
+        // atalhos: a largura anda aos poucos (200 ms, desacelerando); o espaço (tela do meio) acompanha no mesmo passo
+        System.Windows.Forms.Timer railTimer; int railDe, railPara, espDe, espPara; DateTime railIni;
+        void AnimarRail(int alvo, int espaco)
+        {
+            railDe = webRail.Width; railPara = alvo; espDe = railEspaco.Width; espPara = espaco; railIni = DateTime.Now;
+            if (railDe == railPara && espDe == espPara) return;
             if (railTimer == null)
             {
                 railTimer = new System.Windows.Forms.Timer { Interval = 15 };
                 railTimer.Tick += (s, e) =>
                 {
                     double t = Math.Min(1, (DateTime.Now - railIni).TotalMilliseconds / 200.0), k = 1 - Math.Pow(1 - t, 3);
+                    SuspendLayout();
                     webRail.Width = (int)Math.Round(railDe + (railPara - railDe) * k);
+                    railEspaco.Width = (int)Math.Round(espDe + (espPara - espDe) * k);
+                    ResumeLayout(); PosicionarRail();
                     if (t >= 1) railTimer.Stop();
                 };
             }
@@ -607,7 +653,7 @@ namespace Freedom
             int w = Px(450), h = Math.Min(Px(600), Math.Max(Px(320), ClientSize.Height - Px(80)));
             int cx = sinoX > 0 ? Px(sinoX) : ClientSize.Width - Px(330);
             int x = Math.Max(Px(8), Math.Min(ClientSize.Width - w - Px(8), cx - w + Px(70)));   // a janelinha fica embaixo do sino, alinhada pela direita
-            webSino.Bounds = new Rectangle(x, Px(60), w, h);   // encosta na barra de cima: a setinha sai de dentro dela
+            webSino.Bounds = new Rectangle(x, Pz(60), w, h);   // encosta na barra de cima: a setinha sai de dentro dela
             int seta = Math.Max(Px(24), Math.Min(w - Px(34), cx - x));
             Js(webSino, "window.seta&&seta(" + (int)Math.Round(seta / escala) + ")");
             // a janela do WebView2 não fica transparente: recorta o formato do cartão (cantos curvos + setinha)
@@ -675,6 +721,7 @@ namespace Freedom
             bool barra = w == webTopo || w == webRail || w == webSino;
             c.Settings.IsZoomControlEnabled = !barra;
             if (barra) try { w.ZoomFactor = 1; } catch (Exception) { }
+            if (!barra || w == webTopo) w.GotFocus += (s2, e2) => { if (railAberta) Js(webRail, "window.railAlternar&&railAlternar(false)"); };   // clicou fora dos atalhos (na tela ou no topo): fecha
             c.NavigationStarting += (s, e) =>
             {
                 if (e.Uri.StartsWith(ASSET))

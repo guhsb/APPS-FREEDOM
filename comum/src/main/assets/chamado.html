@@ -47,6 +47,11 @@ body{padding-bottom:150px}
 .msg{max-width:86%;align-self:flex-start;background:var(--sf);border:1px solid var(--ln);border-radius:16px 16px 16px 6px;padding:10px 12px}
 .msg.eu{align-self:flex-end;background:rgba(232,75,138,.13);border-color:rgba(232,75,138,.3);border-radius:16px 16px 6px 16px}
 .msg.solucao{border-color:rgba(31,191,143,.45)}
+.avalPop{position:fixed;inset:0;z-index:70;background:rgba(15,27,61,.45);display:flex;align-items:flex-end;justify-content:center;padding:12px;animation:avIn .2s ease}
+@media (min-width:600px){.avalPop{align-items:center}}
+.avalCx{position:relative;width:100%;max-width:460px}.avalCx .card{margin:0;box-shadow:0 18px 50px rgba(15,27,61,.3)}
+.avalX{position:absolute;top:8px;right:8px;z-index:2;width:34px;height:34px;border-radius:50%;border:0;background:var(--sf2);color:var(--tx2);font-size:20px;line-height:1;cursor:pointer}
+@keyframes avIn{from{opacity:0}to{opacity:1}}
 .aval h3{margin:0 0 4px;font-size:16px}.aval .nota{margin:0 0 8px}
 .estrelas{display:flex;gap:6px;margin:6px 0 2px}.estrelas button{border:0;background:var(--sf2);border-radius:12px;width:46px;height:46px;font-size:24px;line-height:1;color:var(--tx3);cursor:pointer}
 .estrelas button.on{color:#f5a524;background:rgba(245,165,36,.14)}
@@ -458,6 +463,7 @@ function render(d) {
 }
 
 // ---------- avaliação do atendimento (igual ao site: quem abriu avalia depois de resolvido) ----------
+var pedirNota = false;   // acabou de aceitar a solução: a avaliação abre na hora, numa janelinha
 var aval = undefined, avalStatus = null, avalNota = 0, avalTxt = '', avalEnviando = false, avalErro = '';
 var NOTAS = ['', 'Péssimo', 'Ruim', 'Regular', 'Bom', 'Excelente'];
 function carregarAval() {
@@ -467,7 +473,14 @@ function carregarAval() {
 }
 function desenharAval() {
   var box = document.getElementById('avalBox'); if (!box) return;
+  var pop = pedirNota && aval && aval.eligible && !aval.rating, jan = document.getElementById('avalPop');
+  if (!pop && jan) jan.remove();
   if (!aval || (!aval.eligible && !aval.rating)) { box.innerHTML = ''; return; }
+  if (pop) {
+    if (!jan) { jan = document.createElement('div'); jan.id = 'avalPop'; jan.className = 'avalPop'; jan.setAttribute('role', 'dialog'); document.body.appendChild(jan);
+      jan.addEventListener('click', function (ev) { if (ev.target === jan || ev.target.closest('.avalX')) { pedirNota = false; desenharAval(); } }); }
+    box.innerHTML = ''; box = jan;
+  }
   var h = '<div class="card aval"><h3>Avalie este atendimento</h3>';
   if (aval.rating) {
     var n = Number(aval.rating.rating) || 0;
@@ -481,9 +494,10 @@ function desenharAval() {
       (avalErro ? '<div class="nota" style="color:var(--tx-rosa)">' + F.esc(avalErro) + '</div>' : '') +
       '<div style="margin-top:8px">' + bt('btAval', avalEnviando ? 'Enviando…' : 'Enviar avaliação', 'rosa', 'ok', avalEnviando || !avalNota) + '</div>';
   }
-  box.innerHTML = h + '</div>';
+  box.innerHTML = pop ? '<div class="avalCx"><button class="avalX" type="button" aria-label="Depois">×</button>' + h.replace('<h3>Avalie este atendimento</h3>', '<h3>Chamado concluído! Como foi o atendimento?</h3>') + '</div></div>' : h + '</div>';
   var b = document.getElementById('btAval'); if (b && (!avalNota || avalEnviando)) b.disabled = true;
 }
+document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && document.getElementById('avalPop')) { pedirNota = false; desenharAval(); } });
 document.addEventListener('click', function (ev) {
   var e = ev.target.closest ? ev.target.closest('[data-nota],#btAval') : null; if (!e) return;
   if (e.hasAttribute('data-nota')) { avalNota = Number(e.getAttribute('data-nota')); var tx = document.getElementById('txAval'); if (tx) avalTxt = tx.value; desenharAval(); return; }
@@ -492,7 +506,7 @@ document.addEventListener('click', function (ev) {
     avalEnviando = true; avalErro = ''; desenharAval();
     F.api('POST', '/helpdesk/tickets/' + ID + '/rating', { rating: avalNota, comment: avalTxt.trim() || null }).then(function (r) {
       avalEnviando = false;
-      if (r.status >= 200 && r.status < 300) { aval = { eligible: false, rating: r.json || { rating: avalNota, comment: avalTxt.trim() || null } }; mostrarToast('Avaliação enviada. Obrigado!'); }
+      if (r.status >= 200 && r.status < 300) { pedirNota = false; aval = { eligible: false, rating: r.json || { rating: avalNota, comment: avalTxt.trim() || null } }; mostrarToast('Avaliação enviada. Obrigado!'); }
       else avalErro = 'Não foi possível enviar a avaliação. Atualize e tente novamente.';
       desenharAval();
     });
@@ -889,6 +903,7 @@ window.chamadoAcao = function (id, tipo, ok, msg) {
   } else {
     ocupado = '';
     if (ok) { abertoSol = false; abertoRej = false; confirmaAceite = false; abertoOp = null; if (tipo === 'transferirResp') abertoTR = false; }
+    if (ok && tipo === 'aceitar') { pedirNota = true; setTimeout(carregarAval, 900); }   // aceitou: já pede a nota
     mostrarToast(msg || (ok ? 'Feito' : 'Não deu certo'));
     if (dados) render(dados);              // destrava os botões
   }

@@ -8,6 +8,11 @@
 .status i{width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 3px var(--verde-s);flex:none}
 .status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .status.off i{background:var(--tx3);box-shadow:none}.status.erro i{background:var(--laranja);box-shadow:0 0 0 3px var(--laranja-s)}
+.lembra{display:flex;align-items:center;gap:12px;margin:10px 0 2px;padding:12px 14px;border-radius:16px;cursor:pointer;background:linear-gradient(180deg,rgba(31,191,143,.12),rgba(31,191,143,.05)),var(--sf);border:1px solid rgba(31,191,143,.4);box-shadow:var(--sombra)}
+.lembra .lq{width:38px;height:38px;border-radius:12px;background:var(--verde);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}.lembra .lq svg.ic{width:20px;height:20px}
+.lembra .lt{flex:1;min-width:0}.lembra .lt b{display:block;font-size:14.5px}.lembra .lt span{display:block;font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.lembra .lt em{display:block;font-style:normal;font-size:12px;font-weight:700;color:var(--tx-verde,var(--verde));margin-top:3px}
+.lembra .seta{color:var(--verde)}
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 /* celular: os números numa faixa só que rola de lado (Últimas atualizações sobe) */
 html.barraFlutuante .kpis{display:flex;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px;scroll-snap-type:x proximity}
@@ -149,6 +154,15 @@ function render() {
   if (e.ativo && !e.bateriaOk && !escondido('bat'))
     h += '<div class="aviso">' + F.ic('bateria') + '<span>Libere a bateria para os avisos chegarem com a tela bloqueada.</span><button onclick="App.liberarBateria()">Liberar</button>' + xAviso('bat') + '</div>';
 
+  // lembrete: chamados que o atendente resolveu e esperam a pessoa confirmar (senão ficam abertos esquecidos)
+  var pc = confirmar || [];
+  if (pc.length) {
+    h += '<div class="lembra" data-' + (pc.length === 1 ? 'c="/helpdesk/tickets/' + attr(pc[0].id) : 't="lista.html#meus&status=PENDING_APPROVAL') + '">' +
+      '<span class="lq">' + F.ic('ok') + '</span><span class="lt"><b>' + (pc.length === 1 ? 'Seu chamado foi resolvido' : pc.length + ' chamados seus foram resolvidos') + '</b>' +
+      '<span>' + (pc.length === 1 ? F.esc(pc[0].protocol || '') + ' · ' + F.esc(pc[0].title || '') : pc.slice(0, 3).map(function (t) { return F.esc(t.protocol || ''); }).join(' · ') + (pc.length > 3 ? '…' : '')) +
+      '</span><em>Confira e conclua o chamado</em></span><span class="seta">' + F.ic('seta') + '</span></div>';
+  }
+
   // números
   var r = e.resumo || {}, req = r.requester || {}, ws = r.workspace;
   h += '<div class="kpis">';
@@ -254,7 +268,19 @@ document.getElementById('conteudo').addEventListener('click', function (ev) {
   var el = ev.target.closest ? ev.target.closest('[data-c]') : null;
   if (el) abrir(el.getAttribute('data-c'));
 });
-window.recebidoHelpdesk = function () { ultimo = ''; render(); };
+window.recebidoHelpdesk = function () { ultimo = ''; render(); buscarConfirmar(); };
+/** Chamados meus esperando confirmação (status "Aguardando aprovação"): no máximo a cada 1 min. */
+var confirmar = null, confirmarEm = 0;
+function buscarConfirmar(forcar) {
+  if (!forcar && Date.now() - confirmarEm < 60000) return; confirmarEm = Date.now();
+  try { F.api('GET', '/helpdesk/tickets?view=requester&status=PENDING_APPROVAL&page=1&page_size=20').then(function (r) {
+    if (r.status !== 200 || !r.json) return;
+    var l = (r.json.items || []).filter(function (t) { return !t.status || t.status === 'PENDING_APPROVAL'; });
+    var k = JSON.stringify(l.map(function (t) { return t.id; })), antes = JSON.stringify((confirmar || []).map(function (t) { return t.id; }));
+    confirmar = l; if (k !== antes) { ultimo = ''; render(); }
+  }); } catch (e) { }
+}
+setTimeout(function () { buscarConfirmar(true); }, 400);
 F.topoSombra();
 render();
 setInterval(render, 15000);

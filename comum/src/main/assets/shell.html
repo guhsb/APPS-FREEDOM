@@ -68,6 +68,14 @@ html.gaveta .it{height:46px;min-height:46px;border-radius:23px;font-size:15px;pa
 html.gaveta .it .tx{opacity:1}html.gaveta .cnt{opacity:1}html.gaveta .bol{display:none}
 html.gaveta .dois{display:flex;gap:8px}html.gaveta .dois .it{flex:1;justify-content:center;padding:0;background:var(--sf);box-shadow:var(--sombra)}html.gaveta .dois .it.on{background:var(--tx)}
 html.gaveta .it:active{background:var(--sf3)}html.gaveta .it.on:active{background:var(--tx)}
+/* ---- Windows: atalhos flutuando por cima da tela — cada grupo do tamanho dele, o resto é a tela de baixo ---- */
+html.flut .rail{gap:8px}
+html.flut .g{width:50px;transition:width .22s cubic-bezier(.2,.8,.2,1),border-radius .22s;box-shadow:0 1px 2px rgba(15,27,61,.06),0 6px 18px rgba(15,27,61,.14)}
+html.flut .it{padding-right:12px}html.flut.aberta .it{padding-right:14px}
+html.flut .cnt{margin-left:14px;margin-right:0}
+html.flut .mola{flex:1}
+.dicaR{position:fixed;z-index:5;left:70px;height:32px;display:none;align-items:center;padding:0 12px;border-radius:16px;background:var(--tx);color:var(--sf);font-size:12.5px;font-weight:700;white-space:nowrap;pointer-events:none;box-shadow:0 6px 18px rgba(15,27,61,.2)}
+html[data-tema=escuro] .dicaR{color:#0b0d12}
 </style></head><body>
 <div id="raiz"></div>
 <script src="base.js"></script>
@@ -112,7 +120,8 @@ function topo(e) {
     '<div class="usu' + (e.helpSub === 'config' ? ' on' : '') + '" id="btUsu" title="Configurações · ' + esc(e.email) + '"><span class="av">' + esc((e.nome || e.email || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(e.nome || 'Freedom') + '</b><small>' + esc(e.email || '') + '</small></div></div></div>';
   return h;
 }
-var aberta = false; try { aberta = localStorage.getItem('railAberta') === '1'; } catch (x) { }
+// Windows: os atalhos abrem por cima da tela, então começam sempre fechados; no Mac (empurram) lembra como ficou
+var aberta = false; try { aberta = MODO === 'mac' && localStorage.getItem('railAberta') === '1'; } catch (x) { }
 if (aberta) document.documentElement.classList.add('aberta');
 var SECS = { helpdesk: 'HELPDESK', comercial: 'COMERCIAL', logistica: 'LOGÍSTICA', admin: 'ADMIN', painel: 'PAINEL' };
 /** Quantos chamados em cada atalho do Helpdesk (os mesmos números do Início). */
@@ -146,6 +155,48 @@ function rail(e) {
 /** Abre/fecha os atalhos sem redesenhar (a animação corre inteira).
    Abrir: primeiro alarga o espaço e depois estica os grupos. Fechar: encolhe os grupos e só no fim devolve o espaço. */
 var railTm = 0;
+// Windows: atalhos flutuam — cada grupo cresce até o tamanho do próprio conteúdo e o app recorta a janela no formato deles
+var FLUT = MODO === 'rail', regTm = 0, regAte = 0, ultReg = '';
+function larguras(anima) {
+  [].forEach.call(document.querySelectorAll('.rail .g'), function (g) {
+    var alvo = 50;
+    if (aberta) { var ant = g.style.width; g.style.transition = 'none'; g.style.width = 'max-content'; alvo = Math.min(260, Math.ceil(g.getBoundingClientRect().width)); g.style.width = ant || '50px'; void g.offsetWidth; g.style.transition = ''; }
+    if (!anima) { g.style.transition = 'none'; g.style.width = alvo + 'px'; void g.offsetWidth; g.style.transition = ''; } else g.style.width = alvo + 'px';
+  });
+  regiaoPor(anima ? 320 : 0);
+}
+/** Manda o recorte (retângulos visíveis) ao app; durante a animação, a cada quadro. */
+function regiao() {
+  var l = [];
+  [].forEach.call(document.querySelectorAll('.rail .abre, .rail .g, .dicaR'), function (el) {
+    if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') return;
+    var r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1 || getComputedStyle(el).display === 'none') return;
+    l.push([Math.floor(r.left) - 1, Math.floor(r.top) - 1, Math.ceil(r.width) + 2, Math.ceil(r.height) + 2, Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0) + 1]);
+  });
+  var k = JSON.stringify(l); if (k === ultReg) return; ultReg = k;
+  try { App.railRegiao(k); } catch (x) { }
+}
+function regiaoPor(ms) {
+  regAte = Date.now() + ms; if (regTm) return;
+  var passo = function () { regiao(); if (Date.now() < regAte) regTm = requestAnimationFrame(passo); else { regTm = 0; regiao(); } };
+  regTm = requestAnimationFrame(passo);
+}
+/** Mouse em cima de um ícone (atalhos fechados): aparece o nome ao lado. */
+function dica(it) {
+  var d = document.getElementById('dicaR');
+  if (!it) { if (d && d.style.display !== 'none') { d.style.display = 'none'; regiao(); } return; }
+  if (!d) { d = document.createElement('div'); d.id = 'dicaR'; d.className = 'dicaR'; document.body.appendChild(d); }
+  var r = it.getBoundingClientRect(), t = it.querySelector('.tx'), n = it.querySelector('.cnt');
+  d.textContent = (t ? t.textContent : it.getAttribute('title') || '') + (n ? ' · ' + n.textContent : '');
+  d.style.top = Math.round(r.top + r.height / 2 - 16) + 'px'; d.style.display = 'flex'; regiao();
+}
+if (FLUT) {
+  document.documentElement.classList.add('flut');
+  document.addEventListener('mouseover', function (ev) { if (aberta) return; var it = ev.target.closest && ev.target.closest('.it,.abre'); if (it && it.classList.contains('abre')) it = null; dica(it); });
+  document.addEventListener('mouseleave', function () { dica(null); });
+  document.addEventListener('mouseout', function (ev) { if (!ev.relatedTarget) dica(null); });
+  window.addEventListener('resize', function () { ultReg = ''; regiao(); });
+}
 /** Android: menu ☰ (gaveta da esquerda) com o mesmo conteúdo dos atalhos do Windows. */
 var NOMES_ABA = { admin: ['Admin', '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'], site: ['Site', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'] };
 function gaveta(e) {
@@ -175,6 +226,7 @@ function railAlternar(quer) {
   var bt = document.querySelector('[data-r="railToggle"]'); if (bt) bt.title = aberta ? 'Fechar atalhos' : 'Abrir atalhos';
   // um movimento só: o app alarga/estreita o espaço e os grupos acompanham a largura (a tela do meio vai junto)
   document.documentElement.classList.toggle('aberta', aberta);
+  if (FLUT) { dica(null); larguras(true); }
   try { App.acaoShell(aberta ? 'railAbrir' : 'railFechar'); } catch (x) { }
 }
 window.railAlternar = railAlternar;
@@ -201,7 +253,7 @@ function desenhar(forcar) {
     var ind = document.getElementById('ind');
     if (l0) { ind.style.transition = 'none'; ind.style.left = l0; ind.style.width = w0; ind.offsetWidth; ind.style.transition = ''; }   // desliza da aba antiga para a nova
     requestAnimationFrame(posInd);
-  } else document.getElementById('raiz').innerHTML = MODO === 'gaveta' ? gaveta(e) : rail(e);
+  } else { document.getElementById('raiz').innerHTML = MODO === 'gaveta' ? gaveta(e) : rail(e); if (FLUT) { ultReg = ''; larguras(false); } }
 }
 window.shellAtualizar = function () { desenhar(); };
 window.temaMudou = function () { desenhar(true); };
@@ -214,8 +266,10 @@ document.addEventListener('click', function (ev) {
     if (t.id === 'btUsu') { App.acaoShell('config'); return; }
     if (t.id === 'btBusca') { App.acaoShell('busca'); return; }
     if (t.id === 'btAtual') { t.classList.add('gira'); setTimeout(function () { t.classList.remove('gira'); }, 900); App.acaoShell('atualizar'); return; }
-    if (t.hasAttribute('data-aba')) { App.irAba(t.getAttribute('data-aba')); return; }
-    if (t.hasAttribute('data-s')) { [].forEach.call(document.querySelectorAll('[data-s]'), function (x) { x.classList.toggle('on', x === t); }); App.irSub(t.getAttribute('data-s')); return; }
+    // atalhos abertos (PC): escolher algo fecha a barra sozinha
+    var fecha = function () { if (MODO === 'rail' && aberta) setTimeout(function () { railAlternar(false); }, 60); };
+    if (t.hasAttribute('data-aba')) { App.irAba(t.getAttribute('data-aba')); fecha(); return; }
+    if (t.hasAttribute('data-s')) { [].forEach.call(document.querySelectorAll('[data-s]'), function (x) { x.classList.toggle('on', x === t); }); App.irSub(t.getAttribute('data-s')); fecha(); return; }
     var r = t.getAttribute('data-r');
     if (r === 'railToggle') { railAlternar(); return; }
     if (r === 'sair') {
@@ -223,6 +277,7 @@ document.addEventListener('click', function (ev) {
       sairPede = Date.now(); desenhar(true); setTimeout(function () { sairPede = 0; desenhar(true); }, 4000); return;
     }
     App.acaoShell(r);
+    if (r !== 'claro' && r !== 'escuro') fecha();
   } catch (x) { }
 });
 if (MODO === 'gaveta') {
