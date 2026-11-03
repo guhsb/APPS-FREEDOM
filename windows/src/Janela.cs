@@ -594,6 +594,25 @@ namespace Freedom
             }
             AtualizarShell();
         }
+        double ZoomSalvo()
+        {
+            try { return Math.Max(0.25, Math.Min(5, double.Parse(Prefs.De("janela").GetString("zoom", "1"), System.Globalization.CultureInfo.InvariantCulture))); } catch (Exception) { return 1; }
+        }
+        bool guardandoZoom;
+        void GuardarZoom(WebView2 origem)
+        {
+            if (guardandoZoom) return;
+            double z = Math.Round(origem.ZoomFactor, 2);
+            if (Math.Abs(z - ZoomSalvo()) < 0.005) return;
+            guardandoZoom = true;
+            try
+            {
+                Prefs.De("janela").Edit().Put("zoom", z.ToString(System.Globalization.CultureInfo.InvariantCulture)).Commit();
+                var pilha = new Stack<Control>(); pilha.Push(conteudo);   // as outras abas ficam com o mesmo zoom
+                while (pilha.Count > 0) { var c = pilha.Pop(); foreach (Control f in c.Controls) { var w = f as WebView2; if (w != null) { if (w != origem && w.CoreWebView2 != null) try { w.ZoomFactor = z; } catch (Exception) { } } else pilha.Push(f); } }
+            }
+            finally { guardandoZoom = false; }
+        }
         int Pz(double v) { return Px((float)(v * zoom)); }
         /// <summary>Recorte dos atalhos: cada grupo com o próprio tamanho e cantos redondos (o que está entre eles é a tela de baixo).</summary>
         public void RegiaoRail(string json)
@@ -721,6 +740,12 @@ namespace Freedom
             bool barra = w == webTopo || w == webRail || w == webSino;
             c.Settings.IsZoomControlEnabled = !barra;
             if (barra) try { w.ZoomFactor = 1; } catch (Exception) { }
+            else
+            {
+                // zoom das telas (Ctrl + roda / Ctrl + / −): fica salvo e vale para todas as abas
+                try { w.ZoomFactor = ZoomSalvo(); } catch (Exception) { }
+                w.ZoomFactorChanged += (s2, e2) => { try { GuardarZoom(w); } catch (Exception) { } };
+            }
             if (!barra || w == webTopo) w.GotFocus += (s2, e2) => { if (railAberta) Js(webRail, "window.railAlternar&&railAlternar(false)"); };   // clicou fora dos atalhos (na tela ou no topo): fecha
             c.NavigationStarting += (s, e) =>
             {
