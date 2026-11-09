@@ -70,16 +70,21 @@ function minResolver(t) {
   if (!fim || !ini) return null; var m = (new Date(fim) - new Date(ini)) / 6e4; return m > 0 ? m : null;
 }
 function carregarPessoas() {
-  var dt = datas(), chave = periodo + '|' + setor + '|' + dt[0];
+  var dt = datas(), chave = 'v2|' + periodo + '|' + setor + '|' + dt[0];
   if (PS.chave === chave && (PS.itens || PS.lendo)) return;
   PS.chave = chave; PS.itens = null; PS.lendo = true; PS.erro = ''; PS.prog = 'Juntando os chamados do período…';
-  var meu = chave, todos = [], pag = 1;
+  // a lista do site sem status traz só os abertos: junta também os resolvidos e os fechados (sem repetir)
+  var meu = chave, todos = [], vistos = {}, STS = ['', 'RESOLVED', 'CLOSED'], si = 0, pag = 1;
   var pagina = function () {
-    return X.get('/helpdesk/workspace/tickets?view=queues&page=' + pag + '&page_size=50' + (setor ? '&queue_id=' + setor : '')).then(function (j) {
-      var l = j.items || j.tickets || []; todos = todos.concat(l);
+    var st = STS[si];
+    return X.get('/helpdesk/workspace/tickets?view=queues&page=' + pag + '&page_size=50' + (st ? '&status=' + st : '') + (setor ? '&queue_id=' + setor : '')).catch(function () { return { items: [] }; }).then(function (j) {
+      var l = j.items || j.tickets || [];
+      l.forEach(function (t) { if (!vistos[t.id]) { vistos[t.id] = 1; todos.push(t); } });
       var velho = l.length && l.every(function (t) { var d0 = String(t.updated_at || t.created_at || '').slice(0, 10); return d0 && d0 < dt[0]; });
       var mais = typeof j.total === 'number' ? pag * 50 < j.total : l.length >= 50;
-      if (mais && !velho && pag < 12) { pag++; PS.prog = 'Juntando os chamados… ' + todos.length; if (aba === 'pessoas') desenhar(); return pagina(); }
+      PS.prog = 'Juntando os chamados… ' + todos.length; if (aba === 'pessoas') desenhar();
+      if (mais && !velho && pag < 12) { pag++; return pagina(); }
+      if (si < STS.length - 1) { si++; pag = 1; return pagina(); }
     });
   };
   pagina().then(function () {
