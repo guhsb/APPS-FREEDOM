@@ -29,6 +29,7 @@ body{padding-bottom:90px}
 .fxN label.on{border-color:var(--tx);box-shadow:0 0 0 1px var(--tx)}
 .ativos{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}.ativos button{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--tx);color:var(--sf);border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}.ativos button i{font-style:normal;opacity:.7}
 .resumoP{font-size:12.5px;color:var(--tx2);margin:0 2px 10px}.resumoP b{color:var(--tx)}
+.kc .m span svg.ic{width:12px;height:12px;vertical-align:-2px;margin-right:3px}
 .meta span svg.ic{width:12px;height:12px;vertical-align:-2px;margin-right:3px}
 .btFx{flex:none;display:inline-flex;align-items:center;gap:5px;margin-left:auto;background:var(--sf2);color:var(--tx);border:1px solid var(--ln);border-radius:999px;padding:6px 10px;font:inherit;font-size:12.5px;font-weight:700}.btFx svg.ic{width:14px;height:14px}
 .btFx.ab{background:var(--tx);border-color:var(--tx);color:var(--sf)}
@@ -400,7 +401,7 @@ var kbDados = null, kbPedido = 0, arrastando = null, movendo = false, regras = {
 
 function caminhoCol(st) {
   var salva = f.status; f.status = st; var sp = pagina; pagina = 1;
-  var q = caminho().replace('page_size=20', 'page_size=' + (st === 'RESOLVED' ? 15 : 50));
+  var q = caminho().replace('page_size=20', 'page_size=' + (filtroLocal() ? 100 : st === 'RESOLVED' ? 15 : 50));   // com filtro de pessoa/título: traz mais de cada coluna para filtrar aqui
   f.status = salva; pagina = sp; return q;
 }
 
@@ -414,13 +415,22 @@ function buscarKanban(silencioso) {
     var av = document.getElementById('aviso'), falhou = rs.filter(function (r) { return r.status !== 200 || !r.json; })[0];
     if (falhou) { av.innerHTML = '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(F.erroApi(falhou, 'Não consegui carregar os chamados')) + '</span><button onclick="recarregar()">Tentar</button></div>'; }
     else av.innerHTML = '';
-    kbDados = {};
-    COLS.forEach(function (c, i) {
-      var j = rs[i] && rs[i].json || {}, its = j.items || [];
-      if (soSem()) its = its.filter(function (t) { return !t.assignee_user_id; });
-      kbDados[c[0]] = { itens: its, total: typeof j.total === 'number' && !soSem() ? j.total : its.length };
-    });
-    desenharKanban();
+    var todos = [];
+    COLS.forEach(function (c, i) { todos = todos.concat((rs[i] && rs[i].json || {}).items || []); });
+    // pessoa e título também no Kanban: os nomes que faltam vêm do chamado (e ficam guardados)
+    var montar = function () {
+      if (meu !== kbPedido) return;
+      todos.forEach(function (t) { var n = pessoaDe(t); if (n) vistosNomes[n] = 1; if (t.title) vistosTit[t.title] = 1; });
+      kbDados = {};
+      COLS.forEach(function (c, i) {
+        var j = rs[i] && rs[i].json || {}, its = j.items || [];
+        if (filtroLocal()) its = its.filter(passa);
+        kbDados[c[0]] = { itens: its, total: typeof j.total === 'number' && !filtroLocal() ? j.total : its.length };
+      });
+      desenharKanban(); cabecaSeParado();
+    };
+    if (f.pessoa) garantirNomes(todos).then(montar);
+    else { montar(); garantirNomes(todos).then(function () { if (meu === kbPedido) montar(); }); }
   });
 }
 
@@ -429,6 +439,7 @@ function cartao(t) {
   var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
   var m = [];
   if (setores[t.queue_id]) m.push('<span>' + F.esc(setores[t.queue_id]) + '</span>');
+  var pz = pessoaDe(t); if (pz) m.push('<span title="' + (atendimento() ? 'Aberto por' : 'Atendido por') + '">' + F.ic(atendimento() ? 'pessoa' : 'fone') + F.esc(pz) + '</span>');
   if (atendimento()) m.push(t.assignee_user_id ? '<span>' + F.esc(pessoas[t.assignee_user_id] || 'Com responsável') + '</span>' : '<span style="color:var(--laranja);font-weight:700">Sem responsável</span>');
   if (sla === 'BREACHED' || sla === 'AT_RISK') m.push('<span style="font-weight:700;color:' + (sla === 'BREACHED' ? 'var(--vermelho)' : 'var(--laranja)') + '">' + F.SLA[sla] + '</span>');
   m.push('<span>' + F.quando(t.updated_at) + '</span>');
