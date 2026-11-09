@@ -22,6 +22,14 @@ body{padding-bottom:90px}
 .chips button{flex:none;background:var(--sf);border:1px solid var(--ln);color:var(--tx2);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:600}
 .chips button.on{background:var(--rosa);border-color:var(--rosa);color:#fff}
 .filtros.fechado{display:none}
+.fxN{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.fxN label{display:flex;align-items:center;gap:8px;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:0 10px;min-width:0}
+.fxN label svg.ic{width:16px;height:16px;color:var(--tx3);flex:none}
+.fxN select{flex:1;min-width:0;width:100%;border:0;background:transparent;color:var(--tx);font:inherit;font-size:13.5px;padding:10px 0;outline:none;text-overflow:ellipsis}
+.fxN label.on{border-color:var(--tx);box-shadow:0 0 0 1px var(--tx)}
+.ativos{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}.ativos button{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--tx);color:var(--sf);border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}.ativos button i{font-style:normal;opacity:.7}
+.resumoP{font-size:12.5px;color:var(--tx2);margin:0 2px 10px}.resumoP b{color:var(--tx)}
+.meta span svg.ic{width:12px;height:12px;vertical-align:-2px;margin-right:3px}
 .btFx{flex:none;display:inline-flex;align-items:center;gap:5px;margin-left:auto;background:var(--sf2);color:var(--tx);border:1px solid var(--ln);border-radius:999px;padding:6px 10px;font:inherit;font-size:12.5px;font-weight:700}.btFx svg.ic{width:14px;height:14px}
 .btFx.ab{background:var(--tx);border-color:var(--tx);color:var(--sf)}
 .btFx em{font-style:normal;font-size:11px;font-weight:800;background:var(--rosa);color:#fff;border-radius:99px;padding:0 6px;min-width:16px;text-align:center}
@@ -101,7 +109,7 @@ var partes = (location.hash || '#meus').slice(1).split('&');
 // os atalhos da esquerda só trocam o "#..." do endereço: recarrega para mostrar a outra lista
 window.addEventListener('hashchange', function () { location.reload(); });
 var modo = partes[0] || 'meus';
-var f = { status: '', priority: '', queue: '', sla: '', sort: '', busca: '', sem: '' };
+var f = { status: '', priority: '', queue: '', sla: '', sort: '', busca: '', sem: '', pessoa: '', titulo: '' };
 partes.slice(1).forEach(function (p) { var kv = p.split('='); if (kv[0] in f) f[kv[0]] = decodeURIComponent(kv[1] || ''); });
 // sem filtro no endereço (atalho comum): volta com os filtros que a pessoa deixou nesta lista
 if (partes.length === 1) { try { var fsv = JSON.parse(localStorage.getItem('lista_f_' + modo) || 'null'); if (fsv) Object.keys(f).forEach(function (k) { if (k !== 'busca' && fsv[k] != null) f[k] = fsv[k]; }); } catch (e) { } }
@@ -133,6 +141,16 @@ function cabeca() {
   // celular: os filtros ficam recolhidos num botão no começo da linha de status (a lista aparece logo)
   var nFx = [f.priority, f.sla, f.queue, f.sort === 'sla' ? 1 : '', f.sem ? 1 : ''].filter(Boolean).length;
   var btFx = desktop ? '' : '<button class="btFx' + (fxAberto ? ' ab' : '') + (nFx ? ' tem' : '') + '" id="btFx" type="button">' + F.ic('ajustes') + 'Filtros' + (nFx ? ' <em>' + nFx + '</em>' : '') + '</button>';
+  // procurar por pessoa (Meus chamados: quem atendeu · Atendimento: quem abriu) e pelos títulos fixos
+  var nomes = nomesConhecidos(), tits = titulosConhecidos();
+  if (f.pessoa && nomes.indexOf(f.pessoa) < 0) nomes.unshift(f.pessoa);
+  if (f.titulo && tits.indexOf(f.titulo) < 0) tits.unshift(f.titulo);
+  h += '<div class="fxN"><label class="' + (f.pessoa ? 'on' : '') + '" title="' + (atendimento() ? 'Quem abriu o chamado' : 'Quem atendeu você') + '">' + F.ic('pessoa') + '<select id="fPessoa"><option value="">' + (atendimento() ? 'Aberto por: todos' : 'Atendido por: todos') + '</option>' +
+    nomes.map(function (n) { return '<option' + (n === f.pessoa ? ' selected' : '') + '>' + F.esc(n) + '</option>'; }).join('') + '</select></label>' +
+    '<label class="' + (f.titulo ? 'on' : '') + '">' + F.ic('lista') + '<select id="fTitulo"><option value="">Todos os títulos</option>' +
+    tits.map(function (n) { return '<option' + (n === f.titulo ? ' selected' : '') + '>' + F.esc(n) + '</option>'; }).join('') + '</select></label></div>';
+  if (f.pessoa || f.titulo) h += '<div class="ativos">' + (f.pessoa ? '<button type="button" data-tira="pessoa">' + (atendimento() ? 'Aberto por: ' : 'Com: ') + F.esc(f.pessoa) + ' <i>×</i></button>' : '') +
+    (f.titulo ? '<button type="button" data-tira="titulo">Título: ' + F.esc(f.titulo) + ' <i>×</i></button>' : '') + '</div>';
   h += '<div class="chips" id="chips"' + (kanban ? ' style="display:none"' : '') + '>' + STATUS_CHIPS.map(function (c) {
     return '<button data-s="' + c[0] + '" class="' + (f.status === c[0] ? 'on' : '') + '">' + c[1] + '</button>';
   }).join('') + '</div>';
@@ -180,10 +198,72 @@ function cabeca() {
   function sel(id, k) { var el = document.getElementById(id); if (el) el.onchange = function () { f[k] = this.value; contarFx(); recarregar(); }; }
   function contarFx() { var b = document.getElementById('btFx'); if (!b) return; var n = [f.priority, f.sla, f.queue, f.sort === 'sla' ? 1 : '', f.sem ? 1 : ''].filter(Boolean).length; var e = b.querySelector('em'); if (n) { if (!e) { e = document.createElement('em'); b.appendChild(e); } e.textContent = n; } else if (e) e.remove(); }
   sel('fPrio', 'priority'); sel('fSla', 'sla'); sel('fSetor', 'queue');
+  var fp = document.getElementById('fPessoa'); if (fp) fp.onchange = function () { f.pessoa = this.value; cabeca(); recarregar(); };
+  var ft = document.getElementById('fTitulo'); if (ft) ft.onchange = function () { f.titulo = this.value; cabeca(); recarregar(); };
+  [].forEach.call(document.querySelectorAll('[data-tira]'), function (b) { b.onclick = function () { f[b.getAttribute('data-tira')] = ''; cabeca(); recarregar(); }; });
   var so = document.getElementById('fSort'); if (so) so.onchange = function () { f.sort = this.checked ? 'sla' : ''; contarFx(); recarregar(); };
   var se = document.getElementById('fSem'); if (se) se.onchange = function () { f.sem = this.checked ? '1' : ''; contarFx(); recarregar(); };
 }
 function soSem() { return modo === 'fila' && !!f.sem; }
+/** Filtros feitos aqui no app (o site não tem): sem responsável, pessoa e título. Busca mais páginas até ter uma lista boa. */
+function filtroLocal() { return soSem() || !!f.pessoa || !!f.titulo; }
+function normal(x) { return String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
+// nomes de quem abriu/atendeu: vêm da lista quando o site manda; senão, do próprio chamado (guardado para não buscar de novo)
+var nomesCh = {}; try { nomesCh = JSON.parse(localStorage.getItem('hd_nomes') || '{}'); } catch (e) { }
+function guardarNomes() { try { var k = Object.keys(nomesCh); if (k.length > 600) k.slice(0, k.length - 600).forEach(function (x) { delete nomesCh[x]; }); localStorage.setItem('hd_nomes', JSON.stringify(nomesCh)); } catch (e) { } }
+function quemAbriu(t) { return t.requester_name || (t.requester && (t.requester.name || t.requester.display_name)) || t.created_by_name || (nomesCh[t.id] || {}).r || ''; }
+function quemAtendeu(t) { return t.assignee_name || (t.assignee && (t.assignee.name || t.assignee.display_name)) || (t.assignee_user_id ? pessoas[t.assignee_user_id] : '') || (nomesCh[t.id] || {}).a || ''; }
+function pessoaDe(t) { return atendimento() ? quemAbriu(t) : quemAtendeu(t); }
+function falta(t) { return !pessoaDe(t) && !(nomesCh[t.id] && nomesCh[t.id].ok) && !(!atendimento() && !t.assignee_user_id && t.assignee_user_id !== undefined); }
+/** Busca os nomes que faltam (4 de cada vez), lendo o chamado. */
+function garantirNomes(lista) {
+  var fila = lista.filter(falta).slice(0, 60);
+  if (!fila.length) return Promise.resolve();
+  return new Promise(function (fim) {
+    var rodando = 0, i = 0;
+    var prox = function () {
+      if (i >= fila.length && !rodando) { guardarNomes(); fim(); return; }
+      while (rodando < 4 && i < fila.length) {
+        var t = fila[i++]; rodando++;
+        F.api('GET', '/helpdesk/tickets/' + t.id + '/timeline').then((function (t) { return function (r) {
+          var j = r.status === 200 && r.json ? r.json : null;
+          if (j) nomesCh[t.id] = { r: j.requester_name || '', a: j.assignee_name || '', ok: 1 };
+          rodando--; prox();
+        }; })(t), function () { rodando--; prox(); });
+      }
+    };
+    prox();
+  });
+}
+function passa(t) {
+  if (soSem() && t.assignee_user_id) return false;
+  if (f.pessoa && normal(pessoaDe(t)) !== normal(f.pessoa)) return false;
+  if (f.titulo && normal(t.title) !== normal(f.titulo)) return false;
+  return true;
+}
+var vistosNomes = {}, vistosTit = {};
+function nomesConhecidos() {
+  var l = Object.keys(vistosNomes);
+  if (atendimento()) Object.keys(nomesCh).forEach(function (k) { if (nomesCh[k].r) l.push(nomesCh[k].r); });
+  else { Object.keys(pessoas).forEach(function (k) { l.push(pessoas[k]); }); Object.keys(nomesCh).forEach(function (k) { if (nomesCh[k].a) l.push(nomesCh[k].a); }); }
+  return l.filter(function (n, i) { return n && l.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); });
+}
+var titulosFixos = []; try { titulosFixos = JSON.parse(localStorage.getItem('hd_titulos') || '[]'); } catch (e) { }
+function titulosConhecidos() { var l = titulosFixos.concat(Object.keys(vistosTit)); return l.filter(function (n, i) { return n && l.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); }); }
+/** Títulos fixos de cada setor (os mesmos da tela Abrir chamado). */
+function carregarTitulos(ids) {
+  var l = [], fila = ids.slice(0, 30), i = 0;
+  var um = function () {
+    if (i >= fila.length) { titulosFixos = l.filter(function (n, k) { return l.indexOf(n) === k; }); try { localStorage.setItem('hd_titulos', JSON.stringify(titulosFixos)); } catch (e) { } cabecaSeParado(); return; }
+    F.api('GET', '/helpdesk/queues/' + encodeURIComponent(fila[i++]) + '/request-types').then(function (r) {
+      var a = r.status === 200 ? (Array.isArray(r.json) ? r.json : (r.json && r.json.items) || []) : [];
+      a.forEach(function (t) { if (t.is_active !== false && t.name) l.push(t.name); }); um();
+    }, um);
+  };
+  um();
+}
+/** Redesenha a cabeça (para as listas de nomes/títulos) sem atrapalhar quem está digitando ou escolhendo. */
+function cabecaSeParado() { var a = document.activeElement; if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return; cabeca(); }
 
 function caminho() {
   var q = atendimento() ? '/helpdesk/workspace/tickets?view=' + (modo === 'comigo' ? 'assigned' : 'queues') : '/helpdesk/tickets?view=requester';
@@ -208,7 +288,7 @@ function buscar() {
   if (pagina === 1) {
     // abre na hora com a última lista igual a esta; a nova entra quando o site responder
     var salvo = null; try { salvo = JSON.parse(localStorage.getItem('lc_' + cam) || 'null'); } catch (e) { }
-    if (salvo && salvo.items && !soSem()) { itens = salvo.items.slice(); total = salvo.total; maisBrutos = false; daCache = true; desenhar(itens.length); }
+    if (salvo && salvo.items && !filtroLocal()) { itens = salvo.items.slice(); total = salvo.total; maisBrutos = false; daCache = true; desenhar(itens.length); }
     else document.getElementById('lista').innerHTML = '<div class="carregando"><i></i>Carregando…</div>';
   }
   F.api('GET', cam).then(function (r) {
@@ -233,34 +313,47 @@ function buscar() {
     var brutos = r.json.items || [];
     var tot = typeof r.json.total === 'number' ? r.json.total : null;
     maisBrutos = tot != null ? pagina * 20 < tot : brutos.length >= 20;
-    // "Só sem responsável": o filtro é feito aqui, então busca mais páginas até ter uma lista boa
-    var novos = soSem() ? brutos.filter(function (t) { return !t.assignee_user_id; }) : brutos;
-    itens = itens.concat(novos);
-    total = soSem() ? null : tot;
-    if (soSem() && maisBrutos && novos.length < 10 && autoPag < 8) { autoPag++; pagina++; buscar(); return; }
-    autoPag = 0;
-    desenhar(novos.length);
+    // filtros feitos aqui (sem responsável, pessoa, título): busca mais páginas até ter uma lista boa
+    var seguir = function () {
+      if (meu !== pedido) return;
+      brutos.forEach(function (t) { var n = pessoaDe(t); if (n) vistosNomes[n] = 1; if (t.title) vistosTit[t.title] = 1; });
+      var novos = filtroLocal() ? brutos.filter(passa) : brutos;
+      itens = itens.concat(novos);
+      total = filtroLocal() ? null : tot;
+      if (filtroLocal() && maisBrutos && itens.length < 15 && autoPag < 12) { autoPag++; pagina++; carregando = true; buscar(); return; }
+      autoPag = 0;
+      desenhar(novos.length);
+      cabecaSeParado();
+      // nomes que ainda não apareceram: busca em segundo plano (para mostrar e para o filtro de pessoa)
+      if (!f.pessoa) garantirNomes(itens).then(function () { if (meu === pedido) { itens.forEach(function (t) { var n = pessoaDe(t); if (n) vistosNomes[n] = 1; }); desenhar(0); cabecaSeParado(); } });
+    };
+    if (f.pessoa) garantirNomes(brutos).then(seguir); else seguir();
   });
 }
 
 function desenhar(ultimos) {
   var el = document.getElementById('lista');
-  document.getElementById('sub').textContent = soSem() ? itens.length + (maisBrutos ? '+' : '') + ' sem responsável' :
+  document.getElementById('sub').textContent = filtroLocal() ? itens.length + (maisBrutos ? '+' : '') + (soSem() && !f.pessoa && !f.titulo ? ' sem responsável' : itens.length === 1 ? ' chamado' : ' chamados') :
     total != null ? total + (total === 1 ? ' chamado' : ' chamados') : itens.length + ' chamado(s)';
   if (!itens.length) {
-    if (soSem() && maisBrutos) { el.innerHTML = '<div class="vazio">Nenhum sem responsável nas primeiras páginas.</div><button class="mais" id="btMais">Procurar mais</button>';
+    if (filtroLocal() && maisBrutos) { el.innerHTML = '<div class="vazio">' + (soSem() && !f.pessoa && !f.titulo ? 'Nenhum sem responsável nas primeiras páginas.' : 'Nenhum chamado com esses filtros nas primeiras páginas.') + '</div><button class="mais" id="btMais">Procurar mais</button>';
       document.getElementById('btMais').onclick = function () { if (carregando) return; pagina++; buscar(); }; return; }
-    el.innerHTML = '<div class="vazio">' + (f.busca || f.status || f.priority || f.queue || f.sla || f.sem ? 'Nenhum chamado com esses filtros.' :
+    el.innerHTML = '<div class="vazio">' + (f.busca || f.status || f.priority || f.queue || f.sla || f.sem || f.pessoa || f.titulo ? 'Nenhum chamado com esses filtros.' :
       modo === 'comigo' ? 'Nenhum chamado atribuído a você agora.' : modo === 'fila' ? 'Nenhum chamado na fila.' : 'Você ainda não abriu chamados.') + '</div>';
     return;
   }
-  var h = '<div class="lista">' + itens.map(function (t) {
+  var h = '';
+  if (f.pessoa || f.titulo) h += '<div class="resumoP"><b>' + itens.length + (maisBrutos ? '+' : '') + (itens.length === 1 ? ' chamado' : ' chamados') + '</b>' +
+    (f.titulo ? ' sobre “' + F.esc(f.titulo) + '”' : '') + (f.pessoa ? (atendimento() ? ' abertos por <b>' + F.esc(f.pessoa) + '</b>' : ' atendidos por <b>' + F.esc(f.pessoa) + '</b>') : '') + '</div>';
+  h += '<div class="lista">' + itens.map(function (t) {
     var s = F.STATUS[t.status] || [t.status, '#8b93a7', 'var(--sf3)'], p = F.PRIO[t.priority];
     var sla = t.sla && typeof t.sla === 'object' ? (t.sla.status || t.sla.state) : t.sla;
     var corSla = sla === 'BREACHED' ? 'var(--vermelho)' : sla === 'AT_RISK' ? 'var(--laranja)' : 'var(--tx3)';
     var meta = [];
     if (p) meta.push('<span><i style="background:' + p[1] + '"></i>' + p[0] + '</span>');
     if (setores[t.queue_id]) meta.push('<span>' + F.esc(setores[t.queue_id]) + '</span>');
+    if (atendimento()) { var ab = quemAbriu(t); if (ab) meta.push('<span title="Aberto por">' + F.ic('pessoa') + F.esc(ab) + '</span>'); }
+    else { var at = quemAtendeu(t); if (at) meta.push('<span title="Atendido por">' + F.ic('fone') + F.esc(at) + '</span>'); }
     if (atendimento()) meta.push('<span>' + (t.assignee_user_id ? F.esc(pessoas[t.assignee_user_id] || 'Com responsável') : '<b style="color:var(--laranja)">Sem responsável</b>') + '</span>');
     if (sla && sla !== 'NOT_CONFIGURED' && F.SLA[sla]) meta.push('<span class="sla" style="color:' + corSla + '">' + F.SLA[sla] + '</span>');
     meta.push('<span>' + F.quando(t.updated_at) + '</span>');
@@ -268,7 +361,7 @@ function desenhar(ultimos) {
       '<span class="badge" style="color:' + s[1] + ';background:' + s[2] + '">' + F.esc(s[0]) + '</span></div>' +
       '<p>' + F.esc(t.title || '') + '</p><div class="meta">' + meta.join('') + '</div></div><span class="seta">' + F.ic('seta') + '</span></div>';
   }).join('') + '</div>';
-  var temMais = soSem() ? maisBrutos : total != null ? itens.length < total : ultimos >= 20;
+  var temMais = filtroLocal() ? maisBrutos : total != null ? itens.length < total : ultimos >= 20;
   if (temMais) h += '<button class="mais" id="btMais">Carregar mais</button>';
   el.innerHTML = h;
   var bm = document.getElementById('btMais');
@@ -291,6 +384,7 @@ window.recebidoHelpdesk = function () { if (kanban) { if (!arrastando && !movend
 // nomes de setores e pessoas para mostrar na lista
 Promise.all([F.api('GET', '/helpdesk/queues'), atendimento() ? F.api('GET', '/helpdesk/workspace/access') : Promise.resolve(null)]).then(function (rs) {
   var q = rs[0] && rs[0].json; if (Array.isArray(q)) q.forEach(function (x) { setores[x.id] = x.name; });
+  carregarTitulos(Object.keys(setores).concat(rs[1] && rs[1].json && rs[1].json.queues ? rs[1].json.queues.map(function (x) { return String(x.id); }) : []).filter(function (x, i, a) { return a.indexOf(x) === i; }));
   if (rs[1] && rs[1].json) { acesso = rs[1].json; (acesso.assignees || []).forEach(function (p) { pessoas[p.id] = p.name; }); }
   cabeca();
   if (kanban) { if (kbDados) desenharKanban(); } else if (itens.length) desenhar(0);
