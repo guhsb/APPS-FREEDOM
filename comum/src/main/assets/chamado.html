@@ -52,6 +52,8 @@ body{padding-bottom:150px}
 .avalCx{position:relative;width:100%;max-width:460px}.avalCx .card{margin:0;box-shadow:0 18px 50px rgba(15,27,61,.3)}
 .avalX{position:absolute;top:8px;right:8px;z-index:2;width:34px;height:34px;border-radius:50%;border:0;background:var(--sf2);color:var(--tx2);font-size:20px;line-height:1;cursor:pointer}
 @keyframes avIn{from{opacity:0}to{opacity:1}}
+.nmLink{display:inline-flex;align-items:center;gap:3px;margin-top:2px;font-size:13.5px;font-weight:700;color:var(--tx);text-decoration:none;border-bottom:1.5px dashed var(--azul);cursor:pointer;max-width:100%}
+.nmLink svg.ic{width:13px;height:13px;color:var(--azul);flex:none}.nmLink:hover{color:var(--azul)}
 .aval h3{margin:0 0 4px;font-size:16px}.aval .nota{margin:0 0 8px}
 .estrelas{display:flex;gap:6px;margin:6px 0 2px}.estrelas button{border:0;background:var(--sf2);border-radius:12px;width:46px;height:46px;font-size:24px;line-height:1;color:var(--tx3);cursor:pointer}
 .estrelas button.on{color:#f5a524;background:rgba(245,165,36,.14)}
@@ -211,6 +213,19 @@ function data(s) {
   if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s += 'Z';
   var d = new Date(s); return isNaN(d) ? null : d;
 }
+/** Nome clicável: abre a lista só com os chamados daquela pessoa (Atendimento: quem abriu · Meus chamados: quem atendeu). */
+function souSolicitante(d) { return (d.items || []).some(function (it) { return it.type === 'OPENING' && it.actor && it.actor.is_current_user; }); }
+function nomeLink(nome, lista, dica) {
+  if (!nome) return '<b>—</b>';
+  if (!lista) return '<b>' + F.esc(nome) + '</b>';
+  return '<a class="nmLink" href="#" data-pessoa="' + F.esc(nome) + '" data-lista="' + lista + '" title="' + F.esc(dica + nome) + '">' + F.esc(nome) + F.ic('seta') + '</a>';
+}
+document.addEventListener('click', function (ev) {
+  var a = ev.target.closest ? ev.target.closest('[data-pessoa]') : null; if (!a) return;
+  ev.preventDefault();
+  var tela = 'lista.html#' + a.getAttribute('data-lista') + '&pessoa=' + encodeURIComponent(a.getAttribute('data-pessoa')).replace(/[!'()*~]/g, function (c) { return '%' + c.charCodeAt(0).toString(16).toUpperCase(); });
+  try { App.abrirTela(tela); } catch (e) { location.href = tela; }
+});
 function hora(s) { var d = data(s); return d ? F.hhmm(d.getTime()) : ''; }
 function diaTxt(d) {
   var h = new Date(), on = new Date(h.getTime() - 86400000);
@@ -307,8 +322,8 @@ function render(d) {
     (pr ? '<span class="prio"><i style="background:' + pr[1] + '"></i>' + pr[0] + '</span>' : '') +
     (sla && SLA[sla] ? '<span class="pill">SLA: ' + SLA[sla] + '</span>' : '') + '</div>' +
     '<h2>' + F.esc(t.title || '') + '</h2><div class="campos">' +
-    '<div><span>Solicitante</span><b>' + F.esc(d.requester_name || '—') + '</b></div>' +
-    '<div><span>Responsável</span><b>' + F.esc(d.assignee_name || 'Sem responsável') + '</b></div>' +
+    '<div><span>Solicitante</span>' + nomeLink(d.requester_name, souSolicitante(d) ? '' : 'fila', 'Ver os chamados abertos por ') + '</div>' +
+    '<div><span>Responsável</span>' + (d.assignee_name ? nomeLink(d.assignee_name, souSolicitante(d) ? 'meus' : '', 'Ver os seus chamados atendidos por ') : '<b>Sem responsável</b>') + '</div>' +
     '<div><span>Setor</span><b>' + F.esc(d.queue_name || '—') + '</b></div>' +
     '<div><span>Aberto</span><b>' + dataHora(t.created_at) + '</b></div></div></div>';
   h += '<div id="avalBox"></div>';

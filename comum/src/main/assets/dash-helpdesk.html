@@ -2,7 +2,17 @@
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="stylesheet" href="base.css"><link rel="stylesheet" href="dash.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
-<style>.perfil{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;background:var(--violeta-s);color:var(--tx-violeta);margin-left:6px;vertical-align:2px}</style>
+<style>.perfil{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;background:var(--violeta-s);color:var(--tx-violeta);margin-left:6px;vertical-align:2px}.psAtivos{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}.psAtivos button{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--tx);color:var(--sf);border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}.psAtivos button i{font-style:normal;opacity:.7}.psAtivos svg.ic{width:14px;height:14px}
+.psBar{display:grid;grid-template-columns:minmax(0,190px) 1fr 34px;align-items:center;gap:10px;padding:7px 6px;margin:0 -6px;border-radius:10px;cursor:pointer;font-size:13px}
+.psBar:hover{background:var(--sf2)}.psBar .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.psBar .t{height:10px;border-radius:99px;background:var(--sf3);overflow:hidden}.psBar .t i{display:block;height:100%;border-radius:99px}
+.psBar b{text-align:right;font-variant-numeric:tabular-nums}.psBar.on{background:var(--sf2);box-shadow:inset 0 0 0 1.5px var(--tx)}.psBar.apag{opacity:.45}
+.psTab{font-size:13px}.psL{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 70px 110px;gap:8px;align-items:center;padding:9px 6px;margin:0 -6px;border-bottom:1px solid var(--ln);cursor:pointer;border-radius:8px}
+.psL span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.psL .r{text-align:right;font-variant-numeric:tabular-nums}.psL:hover{background:var(--sf2)}
+.psL.psH{cursor:default;font-size:11.5px;font-weight:700;color:var(--tx3);border-radius:0}.psL.psH:hover{background:none}
+.psL.on{background:var(--sf2);box-shadow:inset 0 0 0 1.5px var(--tx)}.psL.apag{opacity:.45}
+.chipT{font-style:normal;background:var(--sf3);border-radius:999px;padding:2px 8px;font-size:11.5px;color:var(--tx2)}
+@media (max-width:600px){.psBar{grid-template-columns:minmax(0,1fr) 70px 28px}.psL{grid-template-columns:minmax(0,1fr) 80px}.psL span:nth-child(2),.psL span:nth-child(4){display:none}}
+</style>
 </head><body class="dash">
 <div class="topo">
   <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
@@ -47,6 +57,85 @@ function carregar(forcar) {
     if (!d) document.getElementById('c').innerHTML = '';
   }).then(function () { if (meu === pedido) { carregandoAgora = false; document.getElementById('btAt').classList.remove('gira'); } });
 }
+// =====================================================================
+// Aba Pessoas: quem abre chamados e as dúvidas que mais se repetem (títulos), filtrando um pelo outro
+// =====================================================================
+var PS = { chave: '', itens: null, lendo: false, prog: '', pessoa: '', titulo: '', erro: '' };
+var nomesCh = {}; try { nomesCh = JSON.parse(localStorage.getItem('hd_nomes') || '{}'); } catch (e) { }
+function guardarNomes() { try { localStorage.setItem('hd_nomes', JSON.stringify(nomesCh)); } catch (e) { } }
+function quemAbriu(t) { return t.requester_name || (t.requester && (t.requester.name || t.requester.display_name)) || t.created_by_name || (nomesCh[t.id] || {}).r || ''; }
+function diaDe(t) { return String(t.created_at || t.opened_at || t.updated_at || '').slice(0, 10); }
+function minResolver(t) {
+  var fim = t.resolved_at || t.closed_at, ini = t.created_at;
+  if (!fim || !ini) return null; var m = (new Date(fim) - new Date(ini)) / 6e4; return m > 0 ? m : null;
+}
+function carregarPessoas() {
+  var dt = datas(), chave = periodo + '|' + setor + '|' + dt[0];
+  if (PS.chave === chave && (PS.itens || PS.lendo)) return;
+  PS.chave = chave; PS.itens = null; PS.lendo = true; PS.erro = ''; PS.prog = 'Juntando os chamados do período…';
+  var meu = chave, todos = [], pag = 1;
+  var pagina = function () {
+    return X.get('/helpdesk/workspace/tickets?view=queues&page=' + pag + '&page_size=50' + (setor ? '&queue_id=' + setor : '')).then(function (j) {
+      var l = j.items || j.tickets || []; todos = todos.concat(l);
+      var velho = l.length && l.every(function (t) { var d0 = String(t.updated_at || t.created_at || '').slice(0, 10); return d0 && d0 < dt[0]; });
+      var mais = typeof j.total === 'number' ? pag * 50 < j.total : l.length >= 50;
+      if (mais && !velho && pag < 12) { pag++; PS.prog = 'Juntando os chamados… ' + todos.length; if (aba === 'pessoas') desenhar(); return pagina(); }
+    });
+  };
+  pagina().then(function () {
+    if (PS.chave !== meu) return;
+    var it = todos.filter(function (t) { var d0 = diaDe(t); return !d0 || (d0 >= dt[0] && d0 <= dt[1]); });
+    var falta = it.filter(function (t) { return !quemAbriu(t); }).slice(0, 250), feitos = 0, i = 0;
+    return new Promise(function (fim) {
+      var rod = 0;
+      var prox = function () {
+        if (PS.chave !== meu) { fim(); return; }
+        if (i >= falta.length && !rod) { fim(); return; }
+        while (rod < 4 && i < falta.length) {
+          var t = falta[i++]; rod++;
+          F.api('GET', '/helpdesk/tickets/' + t.id + '/timeline').then((function (t) { return function (r) {
+            if (r.status === 200 && r.json) nomesCh[t.id] = { r: r.json.requester_name || '', a: r.json.assignee_name || '', ok: 1 };
+            rod--; feitos++; if (feitos % 8 === 0) { PS.prog = 'Lendo quem abriu cada chamado… ' + feitos + ' de ' + falta.length; if (aba === 'pessoas') desenhar(); }
+            prox(); }; })(t), function () { rod--; feitos++; prox(); });
+        }
+      };
+      prox();
+    }).then(function () { guardarNomes(); if (PS.chave === meu) { PS.itens = it; PS.lendo = false; if (aba === 'pessoas') desenhar(); } });
+  }).catch(function (e) { if (PS.chave === meu) { PS.lendo = false; PS.erro = e.message || 'Não consegui juntar os chamados'; if (aba === 'pessoas') desenhar(); } });
+}
+function pessoas() {
+  carregarPessoas();
+  if (PS.erro) return X.erro(PS.erro);
+  if (!PS.itens) return '<div class="card"><div class="carregando"><i></i>' + F.esc(PS.prog) + '</div><div class="vazio" style="padding-top:0">Na primeira vez demora um pouco: o app lê quem abriu cada chamado e guarda para as próximas.</div></div>';
+  var it = PS.itens, h = '';
+  var porPes = PS.pessoa ? it.filter(function (t) { return quemAbriu(t) === PS.pessoa; }) : it;
+  var porTit = PS.titulo ? it.filter(function (t) { return (t.title || '') === PS.titulo; }) : it;
+  if (PS.pessoa || PS.titulo) h += '<div class="psAtivos">' + (PS.pessoa ? '<button data-pstira="pessoa">' + F.ic('pessoa') + F.esc(PS.pessoa) + ' <i>×</i></button>' : '') +
+    (PS.titulo ? '<button data-pstira="titulo">' + F.ic('lista') + F.esc(PS.titulo) + ' <i>×</i></button>' : '') + '</div>';
+  // títulos (das pessoas escolhidas)
+  var tc = {}; porPes.forEach(function (t) { var k = t.title || '(sem título)'; tc[k] = (tc[k] || 0) + 1; });
+  var tl = Object.keys(tc).sort(function (a, b) { return tc[b] - tc[a]; }), mx = tl.length ? tc[tl[0]] : 1, CORES = ['var(--azul)', 'var(--rosa)', 'var(--violeta)', 'var(--verde)', 'var(--laranja)'];
+  h += X.card(PS.pessoa ? 'Assuntos de ' + F.esc(PS.pessoa) : 'Dúvidas que mais se repetem', (porPes.length + (porPes.length === 1 ? ' chamado' : ' chamados')) + ' no período · toque num título para ver quem abriu',
+    tl.slice(0, 15).map(function (k, i) { var on = PS.titulo === k;
+      return '<div class="psBar' + (on ? ' on' : '') + (PS.titulo && !on ? ' apag' : '') + '" data-pst="' + F.esc(k) + '"><span class="n">' + F.esc(k) + '</span><span class="t"><i style="width:' + Math.max(4, tc[k] / mx * 100) + '%;background:' + CORES[i % CORES.length] + '"></i></span><b>' + tc[k] + '</b></div>'; }).join('') || '<div class="vazio">Nenhum chamado no período.</div>');
+  // pessoas (do título escolhido)
+  var pc = {}; porTit.forEach(function (t) { var n = quemAbriu(t) || 'Sem nome'; var x = pc[n] = pc[n] || { n: 0, tit: {}, min: [], }; x.n++; var k = t.title || ''; x.tit[k] = (x.tit[k] || 0) + 1; var m = minResolver(t); if (m != null) x.min.push(m); });
+  var pl = Object.keys(pc).sort(function (a, b) { return pc[b].n - pc[a].n; }), temTempo = pl.some(function (n) { return pc[n].min.length; });
+  h += X.card(PS.titulo ? 'Quem abriu “' + F.esc(PS.titulo) + '”' : 'Quem mais abriu chamados', 'Toque no nome para ver só os assuntos da pessoa',
+    '<div class="psTab"><div class="psL psH"><span>Pessoa</span><span>' + (PS.titulo ? '' : 'Título mais comum') + '</span><span class="r">Chamados</span>' + (temTempo ? '<span class="r">Tempo p/ resolver</span>' : '') + '</div>' +
+    pl.slice(0, 30).map(function (n) { var x = pc[n], tt = Object.keys(x.tit).sort(function (a, b) { return x.tit[b] - x.tit[a]; })[0] || '', on = PS.pessoa === n;
+      var med = x.min.length ? x.min.reduce(function (a, b) { return a + b; }, 0) / x.min.length : null;
+      return '<div class="psL' + (on ? ' on' : '') + (PS.pessoa && !on ? ' apag' : '') + '" data-psp="' + F.esc(n) + '"><span><b>' + F.esc(n) + '</b></span><span>' + (PS.titulo || !tt ? '' : '<em class="chipT">' + F.esc(tt) + ' · ' + x.tit[tt] + '</em>') + '</span>' +
+        '<span class="r"><b>' + x.n + '</b></span>' + (temTempo ? '<span class="r">' + (med != null ? dur(med) : '—') + '</span>' : '') + '</div>'; }).join('') + '</div>' + (pl.length ? '' : '<div class="vazio">Ninguém no período.</div>'));
+  // chamados do filtro
+  if (PS.pessoa || PS.titulo) {
+    var ls = it.filter(function (t) { return (!PS.pessoa || quemAbriu(t) === PS.pessoa) && (!PS.titulo || (t.title || '') === PS.titulo); });
+    h += X.card('Chamados', ls.length + (ls.length === 1 ? ' chamado' : ' chamados') + ' · toque para abrir', ls.slice(0, 40).map(function (t) {
+      return '<div class="tk" data-t="' + t.id + '"><div class="c"><b>' + F.esc((t.protocol || '#' + t.id) + ' · ' + (t.title || '')) + '</b><span>' + F.esc(quemAbriu(t) || '') + ' · ' + X.dm(diaDe(t)) + ' · ' + F.esc((F.STATUS[t.status] || [t.status])[0]) + '</span></div></div>'; }).join(''));
+  }
+  return h;
+}
+
 function semSetor() {
   document.getElementById('sub').textContent = 'Só para quem atende algum setor';
   document.getElementById('c').innerHTML = '<div class="vazio">Este dashboard mostra as filas de atendimento.<br>Você não atende nenhum setor no Helpdesk, então ele fica escondido.</div>';
@@ -61,7 +150,7 @@ function quando(iso) { if (!iso) return ''; var dt = new Date(iso), agora = new 
 function desenhar() {
   var qs = acesso.queues || [], o = d.o;
   document.getElementById('sub').innerHTML = (qs.length === 1 ? F.esc(qs[0].name) : 'Seus ' + qs.length + ' setores') + ' · ' + (periodo === 'hoje' ? 'hoje' : X.dm(d.ini) + '–' + X.dm(d.fim));
-  var h = X.abas([['resumo', 'Resumo'], ['filas', 'Filas'], ['atend', 'Atendentes'], ['aval', 'Avaliações']], aba);
+  var h = X.abas([['resumo', 'Resumo'], ['filas', 'Filas'], ['atend', 'Atendentes'], ['pessoas', 'Pessoas'], ['aval', 'Avaliações']], aba);
   var cel = document.documentElement.classList.contains('barraFlutuante');   // celular: setores numa caixa de escolha, sem a linha de botões
   var venc = {}; (o.queues || []).forEach(function (q) { venc[q.queue_id] = F.n(q.breached); });
   if (qs.length > 1 && !cel) {
@@ -75,6 +164,7 @@ function desenhar() {
   if (aba === 'filas') h += filas();
   if (aba === 'atend') h += atendentes();
   if (aba === 'aval') h += avaliacoes();
+  if (aba === 'pessoas') h += pessoas();
   var c = document.getElementById('c'); c.innerHTML = h; X.ligarGraficos(c);
 }
 
@@ -258,6 +348,13 @@ function carregarSetoresPessoa() {
 }
 
 document.addEventListener('click', function (ev) {
+  var q = ev.target.closest ? ev.target.closest('[data-psp],[data-pst],[data-pstira]') : null;
+  if (q) {   // aba Pessoas: tocar num nome mostra só os assuntos dele; tocar num título mostra só quem abriu esse título
+    if (q.hasAttribute('data-psp')) PS.pessoa = PS.pessoa === q.getAttribute('data-psp') ? '' : q.getAttribute('data-psp');
+    if (q.hasAttribute('data-pst')) PS.titulo = PS.titulo === q.getAttribute('data-pst') ? '' : q.getAttribute('data-pst');
+    if (q.hasAttribute('data-pstira')) PS[q.getAttribute('data-pstira')] = '';
+    desenhar(); return;
+  }
   var t = ev.target.closest ? ev.target.closest('[data-aba],[data-setor],[data-t]') : null; if (!t) return;
   if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('hd_aba', aba); desenhar(); window.scrollTo(0, 0); return; }
   if (t.hasAttribute('data-setor')) { setor = t.getAttribute('data-setor'); AV.pag = 1; carregar(true); return; }
