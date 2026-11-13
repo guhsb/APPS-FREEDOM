@@ -146,9 +146,9 @@ function cabeca() {
   var nomes = nomesConhecidos(), tits = titulosConhecidos();
   if (f.pessoa && nomes.indexOf(f.pessoa) < 0) nomes.unshift(f.pessoa);
   if (f.titulo && tits.indexOf(f.titulo) < 0) tits.unshift(f.titulo);
-  h += '<div class="fxN"><label class="' + (f.pessoa ? 'on' : '') + '" title="' + (atendimento() ? 'Quem abriu o chamado' : 'Quem atendeu você') + '">' + F.ic('pessoa') + '<select id="fPessoa"><option value="">' + (atendimento() ? 'Aberto por: todos' : 'Atendido por: todos') + '</option>' +
+  h += '<div class="fxN"><label class="' + (f.pessoa ? 'on' : '') + '" title="' + (atendimento() ? 'Quem abriu o chamado' : 'Quem atendeu você') + '">' + F.ic('pessoa') + '<select id="fPessoa"><option value="">' + (atendimento() ? 'Aberto por: todos' : 'Atendido por: todos') + (f.titulo ? ' (' + nomes.length + ')' : '') + '</option>' +
     nomes.map(function (n) { return '<option' + (n === f.pessoa ? ' selected' : '') + '>' + F.esc(n) + '</option>'; }).join('') + '</select></label>' +
-    '<label class="' + (f.titulo ? 'on' : '') + '">' + F.ic('lista') + '<select id="fTitulo"><option value="">Todos os títulos</option>' +
+    '<label class="' + (f.titulo ? 'on' : '') + '">' + F.ic('lista') + '<select id="fTitulo"><option value="">' + (f.pessoa ? 'Todos os títulos de ' + F.esc(String(f.pessoa).split(' ')[0]) + ' (' + tits.length + ')' : 'Todos os títulos') + '</option>' +
     tits.map(function (n) { return '<option' + (n === f.titulo ? ' selected' : '') + '>' + F.esc(n) + '</option>'; }).join('') + '</select></label></div>';
   if (f.pessoa || f.titulo) h += '<div class="ativos">' + (f.pessoa ? '<button type="button" data-tira="pessoa">' + (atendimento() ? 'Aberto por: ' : 'Com: ') + F.esc(f.pessoa) + ' <i>×</i></button>' : '') +
     (f.titulo ? '<button type="button" data-tira="titulo">Título: ' + F.esc(f.titulo) + ' <i>×</i></button>' : '') + '</div>';
@@ -242,15 +242,24 @@ function passa(t) {
   if (f.titulo && normal(t.title) !== normal(f.titulo)) return false;
   return true;
 }
-var vistosNomes = {}, vistosTit = {};
+var vistosNomes = {}, vistosTit = {}, vistosItens = {};   // chamados já vistos: um filtro limita as opções do outro
 function nomesConhecidos() {
+  if (f.titulo) {   // título escolhido: só as pessoas que abriram/atenderam esse título
+    var lt = []; Object.keys(vistosItens).forEach(function (k) { var t = vistosItens[k]; if (normal(t.title) === normal(f.titulo)) { var n = pessoaDe(t); if (n) lt.push(n); } });
+    return lt.filter(function (n, i) { return lt.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); });
+  }
   var l = Object.keys(vistosNomes);
   if (atendimento()) Object.keys(nomesCh).forEach(function (k) { if (nomesCh[k].r) l.push(nomesCh[k].r); });
   else { Object.keys(pessoas).forEach(function (k) { l.push(pessoas[k]); }); Object.keys(nomesCh).forEach(function (k) { if (nomesCh[k].a) l.push(nomesCh[k].a); }); }
   return l.filter(function (n, i) { return n && l.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); });
 }
 var titulosFixos = []; try { titulosFixos = JSON.parse(localStorage.getItem('hd_titulos') || '[]'); } catch (e) { }
-function titulosConhecidos() { var l = titulosFixos.concat(Object.keys(vistosTit)); return l.filter(function (n, i) { return n && l.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); }); }
+function titulosConhecidos() {
+  if (f.pessoa) {   // pessoa escolhida: só os títulos dos chamados dela
+    var lp = []; Object.keys(vistosItens).forEach(function (k) { var t = vistosItens[k]; if (t.title && normal(pessoaDe(t)) === normal(f.pessoa)) lp.push(t.title); });
+    return lp.filter(function (n, i) { return lp.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); });
+  }
+  var l = titulosFixos.concat(Object.keys(vistosTit)); return l.filter(function (n, i) { return n && l.indexOf(n) === i; }).sort(function (a, b) { return a.localeCompare(b, 'pt'); }); }
 /** Títulos fixos de cada setor (os mesmos da tela Abrir chamado). */
 function carregarTitulos(ids) {
   var l = [], fila = ids.slice(0, 30), i = 0;
@@ -317,7 +326,7 @@ function buscar() {
     // filtros feitos aqui (sem responsável, pessoa, título): busca mais páginas até ter uma lista boa
     var seguir = function () {
       if (meu !== pedido) return;
-      brutos.forEach(function (t) { var n = pessoaDe(t); if (n) vistosNomes[n] = 1; if (t.title) vistosTit[t.title] = 1; });
+      brutos.forEach(function (t) { vistosItens[t.id] = t; var n = pessoaDe(t); if (n) vistosNomes[n] = 1; if (t.title) vistosTit[t.title] = 1; });
       var novos = filtroLocal() ? brutos.filter(passa) : brutos;
       itens = itens.concat(novos);
       total = filtroLocal() ? null : tot;
@@ -420,7 +429,7 @@ function buscarKanban(silencioso) {
     // pessoa e título também no Kanban: os nomes que faltam vêm do chamado (e ficam guardados)
     var montar = function () {
       if (meu !== kbPedido) return;
-      todos.forEach(function (t) { var n = pessoaDe(t); if (n) vistosNomes[n] = 1; if (t.title) vistosTit[t.title] = 1; });
+      todos.forEach(function (t) { vistosItens[t.id] = t; var n = pessoaDe(t); if (n) vistosNomes[n] = 1; if (t.title) vistosTit[t.title] = 1; });
       kbDados = {};
       COLS.forEach(function (c, i) {
         var j = rs[i] && rs[i].json || {}, its = j.items || [];

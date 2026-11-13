@@ -167,3 +167,9 @@ input.ckRem{width:20px;height:20px;flex:0 0 auto;margin:0 4px 0 0;accent-color:v
 .motL{display:none;flex-basis:100%;font-size:14px;color:var(--tx2);line-height:1.35;background:var(--sf2);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;margin-top:2px}
 .motL b{color:var(--tx);font-weight:700}
 @media (max-width:600px){.lin .v small.motV{display:none}.motL{display:block}.lin.temMot .v{max-width:none}}
+/* Consulta: motivo em lote */
+.loteInfo{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;background:var(--laranja-s);border:1px solid rgba(217,119,6,.3);color:#9a5a06;border-radius:12px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+.loteInfo.bloq{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.28);color:#b91c1c}
+.loteInfo b{color:inherit}.loteInfo span{font-size:12px;opacity:.85}
+.loteAc{justify-content:flex-start;flex-wrap:wrap;margin:0 0 6px}
+.loteAc .btn{flex:1 1 220px}

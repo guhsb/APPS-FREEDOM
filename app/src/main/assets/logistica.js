@@ -374,9 +374,10 @@ var LG = (function () {
   // =====================================================================
   // Consulta Produto / Rede
   // =====================================================================
-  function rankTab(items) {
+  function rankTab(items, act) {
     items = lista(items); if (!items.length) return '<div class="vazio2">Nenhum resultado encontrado.</div>';
-    return items.map(function (r, i) { return '<div class="lin"><div class="c"><b><span style="color:var(--tx3)">' + (i + 1) + '.</span> ' + F.esc(r.product) + '</b><span>' + qtd(r.quantity) + ' un · ' + X.int(r.distinct_orders) + ' pedidos</span></div><div class="v">' + brl(r.value) + '</div></div>'; }).join('');
+    var ps = st('cons').prod;
+    return items.map(function (r, i) { return '<div class="lin"' + (act ? ' data-act="' + act + '" data-v="' + F.esc(r.product) + '" style="cursor:pointer' + (r.product === ps ? ';background:var(--rosa-s);border-radius:10px' : '') + '"' : '') + '><div class="c"><b><span style="color:var(--tx3)">' + (i + 1) + '.</span> ' + F.esc(r.product) + '</b><span>' + qtd(r.quantity) + ' un · ' + X.int(r.distinct_orders) + ' pedidos</span></div><div class="v">' + brl(r.value) + '</div></div>'; }).join('');
   }
   function telaCons() {
     var s = st('cons'), h = '';
@@ -391,25 +392,169 @@ var LG = (function () {
       h += bloco(s, 'sug', function (sg) { var it = lista(sg.items); return it.length ? sel('consProd', it.slice(0, 200), s.prod, 'Selecione um produto') : '<div class="vazio2">Nenhuma sugestão encontrada.</div>'; });
       if (s.prod) {
         h += bloco(s, 'res', function (r) { return '<div class="k4" style="grid-template-columns:1fr 1fr 1fr;margin-top:10px">' + [['Quantidade total', qtd(r.quantity) + ' un'], ['Valor total', X.k(r.value)], ['Nº de pedidos', X.int(r.distinct_orders)]].map(function (k) { return '<div class="k"><span>' + k[0] + '</span><b style="font-size:16px">' + k[1] + '</b></div>'; }).join('') + '</div>'; });
+        h += cardLote();
         h += bloco(s, 'peds', function (p) {
-          return X.card('Pedidos com este produto', '', (lista(p.items).map(function (o) { return '<div class="lin"><div class="c"><b>' + F.esc(o.customer || '—') + '</b><span>Pedido ' + F.esc(o.order_number) + ' · ' + F.dataBR(o.order_date) + ' · ' + F.esc(o.network || '') + '</span></div><div class="v">' + brl(o.value) + '<small>' + qtd(o.quantity) + ' un</small></div></div>'; }).join('') || '<div class="vazio2">Nenhum pedido.</div>') +
+          return X.card('Todos os pedidos com este produto', 'Histórico (pendentes e já faturados)', (lista(p.items).map(function (o) { return '<div class="lin"><div class="c"><b>' + F.esc(o.customer || '—') + '</b><span>Pedido ' + F.esc(o.order_number) + ' · ' + F.dataBR(o.order_date) + ' · ' + F.esc(o.network || '') + '</span></div><div class="v">' + brl(o.value) + '<small>' + qtd(o.quantity) + ' un</small></div></div>'; }).join('') || '<div class="vazio2">Nenhum pedido.</div>') +
             X.pag('consPed', p.page, p.total_pages));
         });
       }
       s.rk = s.rk || { ord: 'value', lim: 15 };
       if (s.rank == null && !s._crank) buscar(s, 'rank', '/logistics/analysis/products/ranking' + X.q({ sort_by: s.rk.ord, limit: s.rk.lim }));
-      h += X.card('Top produtos', '', '<div class="sub2">' + sel('rkOrd', [['value', 'Valor'], ['quantity', 'Quantidade'], ['orders', 'Pedidos']], s.rk.ord) + sel('rkLim', [5, 15, 20, 50], s.rk.lim) + '</div>' + bloco(s, 'rank', function (r) { return rankTab(r.items); }));
+      h += X.card('Top produtos', '', '<div class="sub2">' + sel('rkOrd', [['value', 'Valor'], ['quantity', 'Quantidade'], ['orders', 'Pedidos']], s.rk.ord) + sel('rkLim', [5, 15, 20, 50], s.rk.lim) + '</div>' + bloco(s, 'rank', function (r) { return rankTab(r.items, 'consIrProd'); }));
     } else {
       if (s.redes == null && !s._credes) buscar(s, 'redes', '/logistics/analysis/networks');
       h += bloco(s, 'redes', function (r) { return sel('consRede', lista(r.items), s.rede, 'Selecione uma rede'); });
       if (s.rede) {
         h += bloco(s, 'rres', function (r) { return '<div class="k4" style="grid-template-columns:1fr 1fr 1fr;margin-top:10px">' + [['Nº de pedidos', X.int(r.distinct_orders)], ['Valor total', X.k(r.value)], ['Clientes distintos', X.int(r.distinct_customers)]].map(function (k) { return '<div class="k"><span>' + k[0] + '</span><b style="font-size:16px">' + k[1] + '</b></div>'; }).join('') + '</div>'; });
+        h += cardLote();
         h += X.card('Produtos mais vendidos na rede', '', bloco(s, 'rprods', function (r) { return rankTab(r.items); }));
       }
+      h += cardTopRedes();
     }
     return h;
   }
   function consPedidos() { var s = st('cons'); buscar(s, 'peds', '/logistics/analysis/product/orders' + X.q({ product: s.prod, page: s.pagPed || 1, page_size: 50 })); }
+
+  // ---- Consulta: motivo em lote nos pedidos pendentes (por produto ou por rede) ----
+  // Guarda no aparelho o que foi colocado (e o motivo que cada pedido tinha antes) para poder tirar depois.
+  function lotes() { try { return JSON.parse(localStorage.getItem('log_lotes') || '{}'); } catch (e) { return {}; } }
+  function guardarLotes(l) { try { localStorage.setItem('log_lotes', JSON.stringify(l)); } catch (e) { } }
+  function loteAtual() { var s = st('cons'); return s.modo === 'rede' ? (s.rede ? ['rede', s.rede] : null) : (s.prod ? ['prod', s.prod] : null); }
+  function clsDe(p) { return p.operational_classification || p.classification || 'PENDENCIA'; }
+  /** Pedidos pendentes (sem finalizados) que têm o produto / são da rede. Produto: varre os itens pendentes. */
+  function carregarLote() {
+    var s = st('cons'), a = loteAtual(); if (!a) return;
+    var k = a.join('|'), L = s.lote = { k: k, c: true, marc: {}, itens: null };
+    var nums = a[0] === 'prod' ? itensDoProduto(a[1]) : Promise.resolve(null);
+    Promise.all([X.get('/logistics/pending/orders'), nums]).then(function (r) {
+      if (s.lote !== L) return;
+      var set = r[1], alvo = a[1].trim().toLowerCase();
+      L.itens = lista(r[0] && r[0].items).filter(function (p) {
+        if (p.effective_classification === 'FINALIZADO') return false;
+        return set ? !!set[p.order_number] : (p.network || '').trim().toLowerCase() === alvo;
+      }).sort(function (x, y) { return F.n(y.value) - F.n(x.value); });
+      L.itens.forEach(function (p) { L.marc[p.order_number] = 1; });   // começa com todos marcados
+    }).catch(function (e) { if (s.lote === L) L.e = e.message || 'Não consegui carregar'; })
+      .then(function () { if (s.lote === L) { L.c = false; redesenhar(); } });
+  }
+  function itensDoProduto(prod) {
+    var achou = {}, alvo = prod.trim().toLowerCase();
+    function pag(n) {
+      return X.get('/logistics/pending/items' + X.q({ search: prod, page: n, page_size: 100 })).then(function (d) {
+        lista(d && d.items).forEach(function (i) { if ((i.product || '').trim().toLowerCase() === alvo) achou[i.order_number] = 1; });
+        if (d && d.total_pages > n && n < 30) return pag(n + 1);
+      });
+    }
+    return pag(1).then(function () { return achou; });
+  }
+  function cardLote() {
+    var s = st('cons'), a = loteAtual(); if (!a) return '';
+    var k = a.join('|'), L = s.lote, rede = a[0] === 'rede';
+    if (!L || L.k !== k) { carregarLote(); L = s.lote; }
+    var tit = rede ? 'Pedidos pendentes desta rede' : 'Pedidos pendentes com este produto';
+    if (L.e) return X.card(tit, '', '<div class="aviso">' + F.ic('alerta') + '<span>' + F.esc(L.e) + '</span></div>');
+    if (L.c || !L.itens) return X.card(tit, '', X.carregando());
+    var it = L.itens; if (!it.length) return X.card(tit, '', '<div class="vazio2">Nenhum pedido pendente ' + (rede ? 'nesta rede' : 'com este produto') + '.</div>');
+    var lt = lotes()[k], marc = it.filter(function (p) { return L.marc[p.order_number]; }), n = marc.length;
+    var comTexto = lt ? marc.filter(function (p) { return (p.reason || '').trim() === lt.texto; }) : [], nPor = n - comTexto.length;
+    var tot = it.reduce(function (x, p) { return x + F.n(p.value); }, 0), nv = L.n || 30;
+    var h = (lt && lt.qtd ? '<div class="loteInfo' + (rede ? ' bloq' : '') + '">' + (rede ? '⛔ ' : '🏷️ ') + 'Motivo colocado: <b>' + F.esc(lt.texto) + '</b><span>em ' + lt.qtd + ' pedido' + (lt.qtd > 1 ? 's' : '') + ' · ' + F.esc(lt.data || '') + '</span></div>' : '') +
+      '<div class="acoes loteAc">' + (nPor ? '<button class="btn ro" data-act="lotePor">' + (rede ? '⛔ Bloquear: motivo nos ' : 'Colocar motivo nos ') + nPor + ' selecionado' + (nPor > 1 ? 's' : '') + '</button>' : '') +
+      (comTexto.length ? '<button class="btn cl" data-act="loteTirar">' + (rede ? 'Desbloquear: tirar dos ' : 'Tirar este motivo dos ') + comTexto.length + '</button>' : '') + '</div>' +
+      '<div class="barraRem"><button class="lnk" data-act="loteTodos">' + (n === it.length ? 'Desmarcar todos' : 'Marcar todos') + '</button><span class="cs" style="margin:0">' + n + ' de ' + it.length + ' selecionado' + (n === 1 ? '' : 's') + '</span></div>' +
+      it.slice(0, nv).map(function (p) {
+        var m = (p.reason || '').trim(), mot = m ? 'Motivo: <b>' + F.esc(m) + '</b>' : '';
+        return '<div class="lin' + (mot ? ' temMot' : '') + '"><input type="checkbox" class="ckRem" data-act="loteMarca" data-v="' + F.esc(p.order_number) + '"' + (L.marc[p.order_number] ? ' checked' : '') + '>' +
+          '<div class="c"><b>' + F.esc(p.customer || '—') + '</b><span>Pedido ' + F.esc(p.order_number) + ' · ' + F.dataBR(p.order_date) + (rede ? '' : ' · ' + F.esc(p.network || 'SEM REDE')) + '</span></div>' +
+          '<div class="v">' + brl(p.value) + (mot ? '<small class="motV">' + mot + '</small>' : '') + '</div>' + (mot ? '<div class="motL">' + mot + '</div>' : '') + '</div>';
+      }).join('') + (it.length > nv ? '<button class="mais" data-act="loteMais">Ver mais (' + (it.length - nv) + ')</button>' : '');
+    return X.card(tit, it.length + ' pedido' + (it.length > 1 ? 's' : '') + ' · ' + X.k(tot) + ' · marque quais vão receber o motivo', h);
+  }
+  function lotePor() {
+    var s = st('cons'), a = loteAtual(), L = s.lote; if (!a || !L) return;
+    var lt = lotes()[a.join('|')], marc = L.itens.filter(function (p) { return L.marc[p.order_number] && !(lt && (p.reason || '').trim() === lt.texto); }); if (!marc.length) return;
+    var pad = lt ? lt.texto : (a[0] === 'rede' ? 'Rede bloqueada: ' : 'Falta: ') + a[1];
+    var outros = marc.filter(function (p) { var m = (p.reason || '').trim(); return m && m !== pad; }).length;
+    var sug = motivosUsados().filter(function (m) { return m !== pad; }).slice(0, 6);
+    X.modal(a[0] === 'rede' ? 'Bloquear a rede ' + F.esc(a[1]) : 'Motivo em ' + marc.length + ' pedido' + (marc.length > 1 ? 's' : ''),
+      marc.length + ' pedido' + (marc.length > 1 ? 's' : '') + ' · ' + X.k(marc.reduce(function (x, p) { return x + F.n(p.value); }, 0)) + ' · a classificação de cada um não muda',
+      '<div class="campo"><span>Motivo</span>' + (sug.length ? '<div class="sugs">' + sug.map(function (m) { return '<button type="button" data-sug="' + F.esc(m) + '">' + F.esc(m) + '</button>'; }).join('') + '</div>' : '') +
+      '<textarea id="mLote" maxlength="1000" rows="2">' + F.esc(pad) + '</textarea></div>' +
+      (outros ? '<div class="aviso" style="margin-top:8px">' + F.ic('alerta') + '<span>' + outros + ' já ' + (outros > 1 ? 'têm' : 'tem') + ' outro motivo. Ele é trocado agora e volta quando você tirar este.</span></div>' : ''),
+      [['cancelar', 'Cancelar', 'cl'], ['loteOk', 'Colocar em ' + marc.length, 'ro']]);
+    var m = document.getElementById('mfundo');
+    m.addEventListener('click', function (ev) { var b = ev.target.closest('[data-sug]'); if (b) { var t = document.getElementById('mLote'); t.value = b.getAttribute('data-sug'); t.focus(); } });
+  }
+  function agora() { var d = new Date(), z = function (x) { return (x < 10 ? '0' : '') + x; }; return z(d.getDate()) + '/' + z(d.getMonth() + 1) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  /** Grava um pedido da Consulta (mantém a classificação) e atualiza a lista daqui. */
+  function gravarLote(p, motivo) { return gravarPed(p.order_number, clsDe(p), motivo).then(function () { p.reason = motivo || null; }); }
+  function loteOk() {
+    var s = st('cons'), a = loteAtual(), L = s.lote, txt = X.val('mLote').trim(); if (!a || !L) return;
+    if (!txt) { X.erroModal('Escreva o motivo.'); return; }
+    var k = a.join('|'), all = lotes(), lt = all[k] && all[k].texto === txt ? all[k] : { texto: txt, pedidos: {} };
+    if (all[k] && all[k].texto !== txt) lt.pedidos = all[k].pedidos;   // trocou o texto: guarda o "antes" que já tinha
+    var marc = L.itens.filter(function (p) { return L.marc[p.order_number] && (p.reason || '').trim() !== txt; }), i = 0, ok = 0, falhas = [];
+    function prox() {
+      if (i >= marc.length) {
+        lt.data = agora(); lt.qtd = Object.keys(lt.pedidos).length; all[k] = lt; guardarLotes(all); lembrarMotivo(txt); X.fechar();
+        F.toast(ok + ' pedido(s) com o motivo' + (falhas.length ? ' · ' + falhas.length + ' não deu (' + falhas.slice(0, 3).join(', ') + ')' : ''));
+        st('motVp').mapa = null; redesenhar(); return;
+      }
+      var p = marc[i++], antes = (p.reason || '').trim(); X.ocupado('loteOk', false); X.ocupado('loteOk', true, 'Colocando ' + i + ' de ' + marc.length + '…');
+      gravarLote(p, txt).then(function () { ok++; if (!(p.order_number in lt.pedidos)) lt.pedidos[p.order_number] = antes; }).catch(function () { falhas.push(p.order_number); }).then(prox);
+    }
+    X.erroModal(''); prox();
+  }
+  function loteTirar() {
+    var s = st('cons'), a = loteAtual(), L = s.lote; if (!a || !L) return;
+    var lt = lotes()[a.join('|')]; if (!lt) return;
+    var alvo = L.itens.filter(function (p) { return L.marc[p.order_number] && (p.reason || '').trim() === lt.texto; }); if (!alvo.length) return;
+    var volta = alvo.filter(function (p) { return lt.pedidos[p.order_number]; }).length;
+    X.modal(a[0] === 'rede' ? 'Desbloquear a rede ' + F.esc(a[1]) + '?' : 'Tirar o motivo de ' + alvo.length + ' pedido' + (alvo.length > 1 ? 's' : '') + '?', 'Motivo: ' + F.esc(lt.texto),
+      '<div class="det">' + (volta ? volta + ' pedido' + (volta > 1 ? 's voltam' : ' volta') + ' para o motivo que tinha antes; ' + (alvo.length - volta) + ' fica' + (alvo.length - volta === 1 ? '' : 'm') + ' sem motivo.' : 'Os ' + alvo.length + ' ficam sem motivo (não tinham outro antes).') + '</div>',
+      [['cancelar', 'Cancelar', 'cl'], ['loteTirarOk', a[0] === 'rede' ? 'Desbloquear' : 'Tirar motivo', 'ro']]);
+  }
+  function loteTirarOk() {
+    var s = st('cons'), a = loteAtual(), L = s.lote; if (!a || !L) return;
+    var k = a.join('|'), all = lotes(), lt = all[k]; if (!lt) return;
+    var alvo = L.itens.filter(function (p) { return L.marc[p.order_number] && (p.reason || '').trim() === lt.texto; }), i = 0, ok = 0, falhas = [];
+    function prox() {
+      if (i >= alvo.length) {
+        lt.qtd = Object.keys(lt.pedidos).length; if (!lt.qtd) delete all[k]; guardarLotes(all); X.fechar();
+        F.toast('Motivo tirado de ' + ok + ' pedido(s)' + (falhas.length ? ' · ' + falhas.length + ' não deu' : '')); st('motVp').mapa = null; redesenhar(); return;
+      }
+      var p = alvo[i++]; X.ocupado('loteTirarOk', false); X.ocupado('loteTirarOk', true, 'Tirando ' + i + ' de ' + alvo.length + '…');
+      gravarLote(p, lt.pedidos[p.order_number] || '').then(function () { ok++; delete lt.pedidos[p.order_number]; }).catch(function () { falhas.push(p.order_number); }).then(prox);
+    }
+    prox();
+  }
+
+  // ---- Top redes: usa o ranking do site se existir; senão monta somando rede por rede (guarda no aparelho) ----
+  function topRedes() {
+    var s = st('cons'); s.tr = s.tr || { ord: 'value', lim: 15 };
+    if (s.trd == null) { var c = X.cache('l|topredes'); if (c && c.d) s.trd = c.d; }
+    if (s._ctr || (s._trOk && s.trd)) return;
+    s._ctr = true;
+    var nomes = lista(s.redes && s.redes.items).map(function (r) { return Array.isArray(r) ? r[0] : (r && r.network) || r; }).filter(Boolean);
+    var fila = nomes.slice(), out = [];
+    function um() {
+      var n = fila.shift(); if (n == null) return Promise.resolve();
+      return X.get('/logistics/analysis/network' + X.q({ network: n })).then(function (r) { out.push({ network: n, value: F.n(r && r.value), orders: F.n(r && r.distinct_orders), customers: F.n(r && r.distinct_customers) }); }, function () { }).then(um);
+    }
+    Promise.all([um(), um(), um(), um()]).then(function () {
+      s._ctr = false; if (!out.length) return; s.trd = out; s._trOk = true; X.cache('l|topredes', out); redesenhar();
+    });
+  }
+  function cardTopRedes() {
+    var s = st('cons'); if (s.redes == null) return '';
+    topRedes();
+    var o = s.tr.ord, l = (s.trd || []).slice().sort(function (a, b) { return b[o] - a[o]; }).slice(0, F.n(s.tr.lim));
+    var corpo = !s.trd ? X.carregando() + '<div class="cs" style="text-align:center">Somando as redes…</div>' : !l.length ? '<div class="vazio2">Nenhum resultado encontrado.</div>' :
+      l.map(function (r, i) {
+        return '<div class="lin" data-act="consIrRede" data-v="' + F.esc(r.network) + '" style="cursor:pointer' + (r.network === s.rede ? ';background:var(--rosa-s);border-radius:10px' : '') + '"><div class="c"><b><span style="color:var(--tx3)">' + (i + 1) + '.</span> ' + F.esc(r.network) + '</b><span>' + X.int(r.orders) + ' pedidos · ' + X.int(r.customers) + ' clientes</span></div><div class="v">' + brl(r.value) + '</div></div>';
+      }).join('');
+    return X.card('Top redes', s.trd && s._ctr ? 'Atualizando…' : 'Toque numa rede para abrir', '<div class="sub2">' + sel('trOrd', [['value', 'Valor'], ['orders', 'Pedidos'], ['customers', 'Clientes']], o) + sel('trLim', [5, 15, 20, 50], s.tr.lim) + '</div>' + corpo);
+  }
 
   // =====================================================================
   // Standby (seleções que compõem o valor em standby)
@@ -825,6 +970,12 @@ var LG = (function () {
     pedTodos: function () { var s = st('ped'); filtraPed(s.d && s.d.items).slice(0, s.n || 40).forEach(function (p) { if (p.effective_classification !== 'FINALIZADO') s.marc[p.order_number] = 1; }); redesenhar(); },
     pedLote: lotePed,
     consModo: function (v) { st('cons').modo = v; redesenhar(); },
+    loteMarca: function (v, t) { var L = st('cons').lote; if (!L) return; if (t.checked) L.marc[v] = 1; else delete L.marc[v]; redesenhar(); },
+    loteTodos: function () { var L = st('cons').lote; if (!L || !L.itens) return; var todos = L.itens.every(function (p) { return L.marc[p.order_number]; }); L.marc = {}; if (!todos) L.itens.forEach(function (p) { L.marc[p.order_number] = 1; }); redesenhar(); },
+    loteMais: function () { var L = st('cons').lote; if (L) { L.n = (L.n || 30) + 60; redesenhar(); } },
+    lotePor: lotePor, loteTirar: loteTirar,
+    consIrProd: function (v) { var s = st('cons'); s.busca = v; buscar(s, 'sug', '/logistics/analysis/products' + X.q({ search: v.trim() })); mudou.consProd(v); window.scrollTo(0, 0); },
+    consIrRede: function (v) { mudou.consRede(v); window.scrollTo(0, 0); },
     sbCat: function (v) { var s = st('sb'); s.cat = v; s.op = null; opcoesSb(); redesenhar(); },
     sbRem: sbRem, sbEnviar: sbEnviar, sbPng: pngStandby, relPng: pngRelatorio,
     relAdd: relAdd, relMover: relMover, relRem: relRem,
@@ -854,7 +1005,7 @@ var LG = (function () {
     nfExPed: function () { nfEx('orders'); }, nfExCli: function () { nfEx('customers'); }, nfExTipo: function () { nfEx('order-types'); },
     cfLimpar: function () { var s = st('conf'); s.f = {}; s.pag = 1; carregarConf(); }
   };
-  var MBOT = { cancelar: X.fechar, salvarPed: salvarPed, sbRemOk: sbRemOk, sbEnviarOk: sbEnviarOk, relRemOk: relRemOk };
+  var MBOT = { cancelar: X.fechar, loteOk: loteOk, loteTirarOk: loteTirarOk, salvarPed: salvarPed, sbRemOk: sbRemOk, sbEnviarOk: sbEnviarOk, relRemOk: relRemOk };
   var PAG = { vpF: [function () { var s = st('vp'); return { set pag(v) { s.pagF = v; } }; }, redesenhar], pend: [st.bind(null, 'pend'), carregarPend], vp: [st.bind(null, 'vp'), carregarVp], nf: [st.bind(null, 'nf'), carregarNf], conf: [st.bind(null, 'conf'), carregarConf],
     consPed: [function () { var s = st('cons'); return { set pag(v) { s.pagPed = v; } }; }, consPedidos] };
 
@@ -887,6 +1038,7 @@ var LG = (function () {
     vpOrd: function (v) { var s = st('vp'); s.ord = v; s.pag = 1; carregarVp(); }, vpDir: function (v) { var s = st('vp'); s.dir = v; s.pag = 1; carregarVp(); },
     consProd: function (v) { var s = st('cons'); s.prod = v; s.pagPed = 1; s.res = null; s.peds = null; if (v) { buscar(s, 'res', '/logistics/analysis/product' + X.q({ product: v })); consPedidos(); } redesenhar(); },
     rkOrd: function (v) { var s = st('cons'); s.rk.ord = v; buscar(s, 'rank', '/logistics/analysis/products/ranking' + X.q({ sort_by: s.rk.ord, limit: s.rk.lim })); },
+    trOrd: function (v) { st('cons').tr.ord = v; redesenhar(); }, trLim: function (v) { st('cons').tr.lim = v; redesenhar(); },
     rkLim: function (v) { var s = st('cons'); s.rk.lim = v; buscar(s, 'rank', '/logistics/analysis/products/ranking' + X.q({ sort_by: s.rk.ord, limit: s.rk.lim })); },
     consRede: function (v) { var s = st('cons'); s.rede = v; s.rres = null; s.rprods = null; if (v) { buscar(s, 'rres', '/logistics/analysis/network' + X.q({ network: v })); buscar(s, 'rprods', '/logistics/analysis/network/products' + X.q({ network: v })); } redesenhar(); },
     sbAdd: sbAdd,
@@ -913,7 +1065,7 @@ var LG = (function () {
   /** Atualizar (botão do topo): recarrega a aba aberta. */
   function recarregar(aba) {
     if (aba === 'ped') carregarPed(); if (aba === 'pend') carregarPend(); if (aba === 'vp') { st('motVp')._ja = 0; carregarVp(); }
-    if (aba === 'cons') { var c = st('cons'); c.sug = null; c.rank = null; c.redes = null; if (c.prod) mudou.consProd(c.prod); if (c.rede) mudou.consRede(c.rede); }
+    if (aba === 'cons') { var c = st('cons'); c.sug = null; c.rank = null; c.redes = null; c.lote = null; c._trOk = false; if (c.prod) mudou.consProd(c.prod); if (c.rede) mudou.consRede(c.rede); }
     if (aba === 'sb') { carregarSb(); st('sb').op = null; opcoesSb(); }
     if (aba === 'rel') { carregarRel(); st('rel').op = null; opcoesRel(); }
     if (aba === 'fat') { var f = st('fat').sub || 'dia'; if (f === 'dia') { carregarDia(); buscar(st('dia'), 'ex', '/logistics/billing/daily/exclusions'); } else { carregarNf(); buscar(st('nf'), 'ex', '/logistics/billing/report/exclusions'); } }

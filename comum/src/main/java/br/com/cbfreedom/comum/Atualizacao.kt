@@ -151,6 +151,9 @@ object Atualizacao {
         try {
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
             params.setAppPackageName(c.packageName)
+            // Android 12+: o app se atualiza sem perguntar (vale quando a versão instalada foi posta pelo próprio app;
+            // a primeira vez depois de instalar pelo navegador/WhatsApp ainda pede confirmação)
+            if (Build.VERSION.SDK_INT >= 31) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             val total = n.optLong("tamanho", -1L)
             if (total > 0) params.setSize(total)
             sessao = pi.createSession(params)
