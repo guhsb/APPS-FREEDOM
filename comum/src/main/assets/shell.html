@@ -173,7 +173,7 @@ function regiao() {
     var r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1 || getComputedStyle(el).display === 'none') return;
     l.push([Math.floor(r.left) - 1, Math.floor(r.top) - 1, Math.ceil(r.width) + 2, Math.ceil(r.height) + 2, Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0) + 1]);
   });
-  var k = JSON.stringify(l); if (k === ultReg) return; ultReg = k;
+  var k = JSON.stringify({ d: window.devicePixelRatio || 1, r: l }); if (k === ultReg) return; ultReg = k;
   try { App.railRegiao(k); } catch (x) { }
 }
 function regiaoPor(ms) {

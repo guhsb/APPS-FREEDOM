@@ -191,7 +191,7 @@ namespace Freedom
             t = t == "escuro" ? "escuro" : "claro";
             Prefs.De("aparencia").Edit().Put("tema", t).Commit();
             Claro = t == "claro";
-            BackColor = FUNDO; ForeColor = TEXTO; conteudo.BackColor = FUNDO; nav.BackColor = BARRA;
+            BackColor = FUNDO; ForeColor = TEXTO; conteudo.BackColor = FUNDO; railEspaco.BackColor = FUNDO; nav.BackColor = BARRA;
             if (caixaPainel != null) caixaPainel.BackColor = FUNDO;
             if (chips != null) chips.BackColor = FUNDO;
             webTopo.DefaultBackgroundColor = FUNDO; webRail.DefaultBackgroundColor = FUNDO;
@@ -619,12 +619,21 @@ namespace Freedom
         {
             try
             {
-                var a = new JSONArray(json ?? "[]");
+                // vem {d: escala real da tela onde os atalhos estão, r: [[x,y,w,h,raio]...]} (ou só a lista, versão antiga)
+                json = (json ?? "[]").Trim(); JSONArray a; double f = escala;
+                if (json.StartsWith("{")) { var o = new JSONObject(json); a = o.OptJSONArray("r") ?? new JSONArray("[]"); double d = o.OptDouble("d", escala); if (d >= 0.5 && d <= 6) f = d; }
+                else a = new JSONArray(json);
+                if (Math.Abs(f - escala) > 0.01)
+                {
+                    // a janela foi para outra tela (ou o Windows mudou o zoom): o espaço da esquerda e o topo acompanham
+                    escala = (float)f; webTopo.Height = Pz(76); railEspaco.Width = Pz(78); PosicionarRail();
+                }
+                Func<long, float> P = v => (float)(v * f);
                 var p = new System.Drawing.Drawing2D.GraphicsPath();
                 for (int i = 0; i < a.Length; i++)
                 {
                     var r = a.OptJSONArray(i); if (r == null || r.Length < 4) continue;
-                    float x = Px(r.OptLong(0)), y = Px(r.OptLong(1)), w = Px(r.OptLong(2)), h = Px(r.OptLong(3)), rr = Math.Min(Px(r.OptLong(4, 0)) * 2f, Math.Min(w, h));
+                    float x = P(r.OptLong(0)), y = P(r.OptLong(1)), w = P(r.OptLong(2)), h = P(r.OptLong(3)), rr = Math.Min(P(r.OptLong(4, 0)) * 2f, Math.Min(w, h));
                     if (w <= 0 || h <= 0) continue;
                     var g = new System.Drawing.Drawing2D.GraphicsPath();
                     if (rr < 2) g.AddRectangle(new RectangleF(x, y, w, h));
@@ -641,6 +650,8 @@ namespace Freedom
         {
             int top = webTopo.Visible ? webTopo.Height : 0;
             webRail.Bounds = new Rectangle(0, top, Pz(300), Math.Max(0, ClientSize.Height - top));   // largura fixa; o recorte mostra só os grupos
+            if (railEspaco.Visible != webRail.Visible) railEspaco.Visible = webRail.Visible;   // o espaço da esquerda sempre junto com os atalhos (senão a tela fica embaixo deles)
+            if (railEspaco.Width != Pz(78)) railEspaco.Width = Pz(78);
             if (webRail.Region == null) webRail.Region = new Region(new Rectangle(0, 0, Pz(78), Math.Max(1, webRail.Height)));
             webRail.BringToFront(); if (sinoAberto && webSino != null) webSino.BringToFront();
         }
