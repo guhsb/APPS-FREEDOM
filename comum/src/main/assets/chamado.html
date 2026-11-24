@@ -254,14 +254,18 @@ function rot(it, p) { var l = it[p + '_label']; if (l == null || l === '') l = i
 function motivoEvento(it) {
   var m = it.metadata || {}, l = [m.reason, m.transfer_reason, m.motivo, m.note, m.comment, m.justification, it.reason, it.note, it.comment];
   if (it.type === 'EVENT' && it.body) l.push(it.body);
-  for (var i = 0; i < l.length; i++) if (typeof l[i] === 'string' && l[i].trim()) return l[i].trim();
+  for (var i = 0; i < l.length; i++) if (typeof l[i] === 'string' && l[i].trim() && !codigoSistema(l[i])) return l[i].trim();
   return '';
 }
+/** Transferência (de responsável ou de setor): só nela aparece o motivo. Definir o responsável pela 1ª vez não. */
+function ehTransferencia(it) { var et = String(it.event_type || ''); return /TRANSFER|QUEUE/.test(et) || (et === 'ASSIGNEE_CHANGED' && !!rot(it, 'old') && !!rot(it, 'new')); }
+/** "requested_at_intake", "AUTO_ASSIGN"… são códigos do site, não um motivo escrito por alguém. */
+function codigoSistema(t) { return /^[A-Za-z0-9]+(_[A-Za-z0-9]+)+$/.test(String(t).trim()) || /^[A-Z0-9_]+$/.test(String(t).trim()); }
 function textoEvento(it) {
   var et = it.event_type || '', o = rot(it, 'old'), n = rot(it, 'new'), meta = it.metadata || {};
   if (et === 'STATUS_CHANGED') return ['troca', 'alterou o status: ' + stLabel(o) + ' → ' + stLabel(n)];
   if (et === 'PRIORITY_CHANGED') return ['alerta', 'alterou a prioridade: ' + prLabel(o) + ' → ' + prLabel(n)];
-  if (et === 'ASSIGNEE_CHANGED') return ['pessoa', n ? 'definiu o responsável: ' + n : 'deixou o chamado sem responsável'];
+  if (et === 'ASSIGNEE_CHANGED') return ['pessoa', n ? (o ? 'transferiu o responsável: ' + o + ' → ' + n : 'definiu o responsável: ' + n) : 'deixou o chamado sem responsável'];
   if (et === 'ATTACHMENT_ADDED') return ['clipe', 'anexou ' + (meta.filename ? meta.filename : 'um arquivo')];
   if (et === 'SOLUTION_PROPOSED') return ['ok', 'enviou a solução e pediu a conclusão'];
   if (et === 'SOLUTION_ACCEPTED') return ['ok', 'aceitou a solução · chamado concluído'];
@@ -461,7 +465,7 @@ function render(d) {
     if (it.type === 'EVENT') {
       var ev = textoEvento(it);
       h += '<div class="ev">' + F.ic(ev[0]) + '<span><b>' + F.esc(eu ? 'Você' : quem) + '</b> ' + F.esc(ev[1]) + ' · ' + hora(it.created_at) + '</span></div>';
-      var mot = it.event_type === 'SOLUTION_REJECTED' ? '' : motivoEvento(it);   // transferência: o motivo que a pessoa escreveu
+      var mot = ehTransferencia(it) ? motivoEvento(it) : '';   // só na transferência: o motivo que a pessoa escreveu
       if (mot) h += '<div class="evMot"><small>Motivo</small>' + F.esc(mot) + '</div>';
       return;
     }

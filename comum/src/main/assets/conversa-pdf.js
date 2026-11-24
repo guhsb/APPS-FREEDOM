@@ -86,7 +86,7 @@
             var a = it.actor || {}, quem = a.name || 'Sistema', quando = dataHora(it.created_at);
             if (it.type === 'EVENT') {
               var ev = window.textoEvento ? textoEvento(it) : ['', 'evento'];
-              var mt = it.event_type !== 'SOLUTION_REJECTED' && window.motivoEvento ? motivoEvento(it) : '';
+              var mt = window.ehTransferencia && ehTransferencia(it) ? motivoEvento(it) : '';
               var lin = quebrar(quem + ' ' + ev[1] + (quando ? ' · ' + quando : '') + (mt ? ' — Motivo: ' + mt : ''), FI, 8.5, UTIL - 20);
               espaco(lin.length * 11 + 6);
               lin.forEach(function (l) { txt(l, MARGEM + 10, y - 9, FI, 8.5, TX3); y -= 11; }); y -= 5;
