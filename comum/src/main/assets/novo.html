@@ -134,7 +134,7 @@ function montar() {
     document.addEventListener('dragover', function (ev) { if (enviando) return; ev.preventDefault(); document.getElementById('btAnexo').classList.add('sobre'); });
     document.addEventListener('dragleave', function (ev) { if (!ev.relatedTarget) document.getElementById('btAnexo').classList.remove('sobre'); });
     // print copiado (Win+Shift+S, PrintScreen…): Ctrl+V anexa a imagem
-    F.aoColarImagem(function (arqs) { if (enviando) return; adicionar(arqs); F.toast(arqs.length > 1 ? arqs.length + ' prints anexados' : 'Print anexado'); });
+    F.aoColarImagem(function (arqs) { if (enviando) return; var n0 = anexos.length; adicionar(arqs); var n = anexos.length - n0; if (n) F.toast(n > 1 ? n + ' arquivos anexados' : 'Arquivo anexado'); }, true);
     document.addEventListener('drop', function (ev) { ev.preventDefault(); document.getElementById('btAnexo').classList.remove('sobre'); if (!enviando && ev.dataTransfer) adicionar(ev.dataTransfer.files); });
   }
 }

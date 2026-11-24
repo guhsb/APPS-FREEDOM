@@ -70,6 +70,8 @@ body{padding-bottom:150px}
 .ev{align-self:center;display:flex;align-items:center;gap:6px;max-width:94%;font-size:12px;color:var(--tx3);text-align:center;padding:2px 4px}
 .ev svg.ic{width:14px;height:14px;flex:none}
 .ev b{color:var(--tx2);font-weight:600}
+.evMot{align-self:center;max-width:min(94%,460px);margin:-2px 0 4px;background:var(--sf);border:1px solid var(--ln);border-left:3px solid var(--violeta,#6d4fe0);border-radius:10px;padding:7px 11px;font-size:13px;color:var(--tx);white-space:pre-wrap;overflow-wrap:anywhere}
+.evMot small{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--tx3);margin-bottom:2px}
 .dia{align-self:center;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--tx3);text-transform:uppercase;margin:6px 0 0}
 .anx .item{align-items:center}
 .anx .ico{background:var(--sf3);color:var(--tx2)}
@@ -115,6 +117,18 @@ html.largo .gC .ladoD{max-height:calc(100vh - 84px - 140px);overflow-y:auto;over
 .colarPrint img{display:block;max-width:100%;max-height:55vh;margin:12px auto;border-radius:10px;border:1px solid var(--ln)}
 .colarPrint .cpb{display:flex;gap:8px;justify-content:flex-end}.colarPrint button{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}
 .colarPrint .n{background:var(--sf3);color:var(--tx)}.colarPrint .s{background:var(--rosa);color:#fff}
+.colarPrint .cpT b{display:block;font-size:16px}.colarPrint .cpT span{font-size:12.5px;color:var(--tx3)}
+.pvL{display:flex;flex-direction:column;gap:6px;margin:12px 0;max-height:38vh;overflow:auto}
+.pvI{display:flex;align-items:center;gap:10px;background:var(--sf2);border:1px solid var(--ln);border-radius:12px;padding:8px 10px}
+.pvI img{width:42px;height:42px;object-fit:cover;border-radius:8px;margin:0;border:0}
+.pvE{width:42px;height:42px;border-radius:8px;background:var(--rosa-s,rgba(224,69,127,.1));color:#b4235c;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.pvI>div{flex:1;min-width:0}.pvI b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pvI small{font-size:12px;color:var(--tx3)}
+.colarPrint .pvX{background:transparent;color:var(--tx3);font-size:20px;padding:4px 8px;line-height:1}
+#pvMsg{width:100%;box-sizing:border-box;border:1px solid var(--ln2);border-radius:12px;padding:10px 12px;font:inherit;font-size:14px;background:var(--sf2);color:var(--tx);resize:vertical;margin-bottom:12px}
+.colarPrint .cpb{align-items:center}.pvDica{flex:1;font-size:12px;color:var(--tx3)}
+.soltar{position:fixed;inset:8px;z-index:90;border:3px dashed var(--rosa);border-radius:18px;background:rgba(224,69,127,.08);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;pointer-events:none}
+.soltar>div{background:var(--sf);border-radius:16px;padding:22px 28px;text-align:center;box-shadow:0 18px 50px rgba(15,27,61,.2)}
+.soltar svg{width:34px;height:34px;color:var(--rosa)}.soltar b{display:block;font-size:17px;margin-top:6px}.soltar span{font-size:13px;color:var(--tx3)}
 /* anexos dentro da conversa e visor de foto (igual WhatsApp) */
 .msg.anxM{padding:8px}
 .msg.anxM .q{padding:0 4px}
@@ -236,6 +250,13 @@ function diaTxt(d) {
 function dataHora(s) { var d = data(s); return d ? diaTxt(d) + ' ' + F.hhmm(d.getTime()) : '—'; }
 function tamanho(b) { b = Number(b) || 0; return b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
 function rot(it, p) { var l = it[p + '_label']; if (l == null || l === '') l = it[p + '_value']; return l == null ? '' : String(l); }
+/** Motivo escrito junto do evento (ex.: transferência de responsável/setor). O site guarda em lugares diferentes. */
+function motivoEvento(it) {
+  var m = it.metadata || {}, l = [m.reason, m.transfer_reason, m.motivo, m.note, m.comment, m.justification, it.reason, it.note, it.comment];
+  if (it.type === 'EVENT' && it.body) l.push(it.body);
+  for (var i = 0; i < l.length; i++) if (typeof l[i] === 'string' && l[i].trim()) return l[i].trim();
+  return '';
+}
 function textoEvento(it) {
   var et = it.event_type || '', o = rot(it, 'old'), n = rot(it, 'new'), meta = it.metadata || {};
   if (et === 'STATUS_CHANGED') return ['troca', 'alterou o status: ' + stLabel(o) + ' → ' + stLabel(n)];
@@ -440,6 +461,8 @@ function render(d) {
     if (it.type === 'EVENT') {
       var ev = textoEvento(it);
       h += '<div class="ev">' + F.ic(ev[0]) + '<span><b>' + F.esc(eu ? 'Você' : quem) + '</b> ' + F.esc(ev[1]) + ' · ' + hora(it.created_at) + '</span></div>';
+      var mot = it.event_type === 'SOLUTION_REJECTED' ? '' : motivoEvento(it);   // transferência: o motivo que a pessoa escreveu
+      if (mot) h += '<div class="evMot"><small>Motivo</small>' + F.esc(mot) + '</div>';
       return;
     }
     var corpo = String(it.body || '').trim(), ehSol = idSol != null && it.id === idSol;
@@ -836,30 +859,86 @@ function carregarAnexos() { try { App.anexosChamado(ID); } catch (e) {} }
 /** Ctrl+V com print copiado: manda a imagem como anexo do chamado (mostra a prévia antes). */
 var printSeq = 0, printEspera = {};
 window.novoAnexo = function (seq, ok, msg) { var f = printEspera[seq]; delete printEspera[seq]; if (f) f(ok, msg); };
-function enviarPrint(f) {
-  var r = new FileReader();
-  r.onload = function () {
-    var s = String(r.result), b64 = s.slice(s.indexOf(',') + 1), seq = ++printSeq;
-    enviandoAnexo = f.name; if (dados) render(dados);
-    printEspera[seq] = function (ok, msg) { enviandoAnexo = ''; mostrarToast(ok ? 'Print anexado ao chamado' : (msg || 'Não consegui anexar o print')); if (ok) carregarAnexos(); if (dados) render(dados); };
-    try { App.enviarAnexoNovo(seq, ID, f.name, f.type || 'image/png', b64); } catch (e) { delete printEspera[seq]; enviandoAnexo = ''; mostrarToast('Esta versão do app não envia o print colado'); if (dados) render(dados); }
-  };
-  r.readAsDataURL(f);
+function enviarUm(f) {   // um arquivo → anexo do chamado (promessa)
+  return new Promise(function (ok) {
+    var r = new FileReader();
+    r.onerror = function () { ok({ ok: false, msg: 'Não consegui ler ' + f.name }); };
+    r.onload = function () {
+      var s = String(r.result), b64 = s.slice(s.indexOf(',') + 1), seq = ++printSeq;
+      printEspera[seq] = function (k, msg) { ok({ ok: k, msg: msg }); };
+      try { App.enviarAnexoNovo(seq, ID, f.name, f.type || 'application/octet-stream', b64); } catch (e) { delete printEspera[seq]; ok({ ok: false, msg: 'Esta versão do app não envia arquivos arrastados' }); }
+    };
+    r.readAsDataURL(f);
+  });
 }
-F.aoColarImagem(function (arqs) {
+/** Prévia (igual WhatsApp): arquivos arrastados ou print colado → confere, escreve uma mensagem junto e envia. */
+var MAX_ANX = 10 * 1024 * 1024, previaAberta = null;
+function tamanho(b) { return b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+function previaAnexos(novos) {
   if (!ID || enviandoAnexo) return;
-  var f = arqs[0];
-  if (f.size > 10 * 1024 * 1024) { mostrarToast('O print passa de 10 MB'); return; }
-  var url = URL.createObjectURL(f), fundo = document.createElement('div');
-  fundo.className = 'colarPrint';
-  fundo.innerHTML = '<div class="cp"><b>Anexar este print ao chamado?</b><img src="' + url + '" alt="Print"><div class="cpb"><button class="n">Cancelar</button><button class="s">Anexar</button></div></div>';
-  document.body.appendChild(fundo);
-  var fechar = function () { URL.revokeObjectURL(url); fundo.remove(); };
-  fundo.querySelector('.n').onclick = fechar;
-  fundo.querySelector('.s').onclick = function () { fechar(); enviarPrint(f); };
+  if (fechadoAtual()) { mostrarToast('Chamado encerrado: não dá para anexar'); return; }
+  var lista = previaAberta ? previaAberta.lista : [], grandes = 0;
+  [].forEach.call(novos, function (f) { if (f.size > MAX_ANX) grandes++; else if (lista.length < 10) lista.push({ f: f, url: /^image\//.test(f.type) ? URL.createObjectURL(f) : '' }); });
+  if (grandes) mostrarToast(grandes + (grandes > 1 ? ' arquivos passam' : ' arquivo passa') + ' de 10 MB e ' + (grandes > 1 ? 'ficaram' : 'ficou') + ' de fora');
+  if (!lista.length) return;
+  var fundo = previaAberta ? previaAberta.fundo : document.createElement('div');
+  if (!previaAberta) { fundo.className = 'colarPrint'; document.body.appendChild(fundo); previaAberta = { lista: lista, fundo: fundo, msg: tx.value }; }
+  var p = previaAberta;
+  function fechar() { p.lista.forEach(function (x) { if (x.url) URL.revokeObjectURL(x.url); }); fundo.remove(); previaAberta = null; }
+  function desenhar() {
+    var n = p.lista.length, umaFoto = n === 1 && p.lista[0].url;
+    fundo.innerHTML = '<div class="cp"><div class="cpT"><b>' + (n === 1 ? 'Enviar 1 arquivo' : 'Enviar ' + n + ' arquivos') + '</b><span>para o chamado ' + F.esc((dados && dados.ticket && dados.ticket.protocol) || '') + '</span></div>' +
+      (umaFoto ? '<img src="' + p.lista[0].url + '" alt="">' : '') +
+      '<div class="pvL">' + p.lista.map(function (x, i) {
+        var ext = (x.f.name.split('.').pop() || '').slice(0, 4).toUpperCase();
+        return '<div class="pvI">' + (x.url ? '<img src="' + x.url + '" alt="">' : '<span class="pvE">' + F.esc(ext || 'ARQ') + '</span>') +
+          '<div><b>' + F.esc(x.f.name) + '</b><small>' + tamanho(x.f.size) + '</small></div><button class="pvX" data-i="' + i + '" aria-label="Tirar">×</button></div>';
+      }).join('') + '</div>' +
+      '<textarea id="pvMsg" rows="2" maxlength="10000" placeholder="Mensagem junto (opcional)">' + F.esc(p.msg || '') + '</textarea>' +
+      '<div class="cpb"><span class="pvDica">Arraste ou cole (Ctrl+V) mais arquivos</span><button class="n">Cancelar</button><button class="s">Enviar' + (n > 1 ? ' ' + n : '') + '</button></div></div>';
+    fundo.querySelector('.n').onclick = fechar;
+    fundo.querySelector('#pvMsg').oninput = function () { p.msg = this.value; };
+    [].forEach.call(fundo.querySelectorAll('.pvX'), function (b) { b.onclick = function () { var x = p.lista.splice(+b.getAttribute('data-i'), 1)[0]; if (x && x.url) URL.revokeObjectURL(x.url); if (!p.lista.length) fechar(); else desenhar(); }; });
+    fundo.querySelector('.s').onclick = function () {
+      var arqs = p.lista.map(function (x) { return x.f; }), msg = (p.msg || '').trim(); fechar();
+      enviarVarios(arqs, msg);
+    };
+    fundo.querySelector('.s').focus();
+  }
   fundo.onclick = function (ev) { if (ev.target === fundo) fechar(); };
-  fundo.querySelector('.s').focus();
-});
+  p.desenhar = desenhar; desenhar();
+}
+function enviarVarios(arqs, msg) {
+  var i = 0, ok = 0, erros = [];
+  function prox() {
+    if (i >= arqs.length) {
+      enviandoAnexo = ''; carregarAnexos(); if (dados) render(dados);
+      mostrarToast(erros.length ? ok + ' enviado(s) · ' + erros.length + ' não deu (' + erros[0] + ')' : ok === 1 ? 'Arquivo anexado ao chamado' : ok + ' arquivos anexados ao chamado');
+      if (msg) { tx.value = msg; ajustar(); atualizarBotao(); be.onclick(); }   // a mensagem vai logo depois dos arquivos
+      return;
+    }
+    var f = arqs[i++]; enviandoAnexo = (arqs.length > 1 ? i + ' de ' + arqs.length + ' · ' : '') + f.name; if (dados) render(dados);
+    enviarUm(f).then(function (r) { if (r.ok) ok++; else erros.push(r.msg || f.name); prox(); });
+  }
+  prox();
+}
+F.aoColarImagem(function (arqs) { previaAnexos(arqs); }, true);   // print ou qualquer arquivo copiado (Ctrl+C no Explorer → Ctrl+V aqui)
+/** Arrastar arquivos do computador para a conversa (igual WhatsApp Web). */
+(function () {
+  var cont = 0, ov = null;
+  function temArq(ev) { var t = ev.dataTransfer && ev.dataTransfer.types; return !!t && [].indexOf.call(t, 'Files') >= 0; }
+  function mostra(sim) {
+    if (sim && !ov) { ov = document.createElement('div'); ov.className = 'soltar'; ov.innerHTML = '<div>' + F.ic('clipe') + '<b>Solte para anexar ao chamado</b><span>Fotos, PDF, planilhas… até 10 MB cada · também dá para colar com Ctrl+V</span></div>'; document.body.appendChild(ov); }
+    if (!sim && ov) { ov.remove(); ov = null; }
+  }
+  document.addEventListener('dragenter', function (ev) { if (!temArq(ev)) return; ev.preventDefault(); cont++; if (!previaAberta && !fechadoAtual() && ID) mostra(true); });
+  document.addEventListener('dragover', function (ev) { if (!temArq(ev)) return; ev.preventDefault(); ev.dataTransfer.dropEffect = fechadoAtual() ? 'none' : 'copy'; });
+  document.addEventListener('dragleave', function (ev) { if (!temArq(ev)) return; cont = Math.max(0, cont - 1); if (!cont) mostra(false); });
+  document.addEventListener('drop', function (ev) {
+    if (!temArq(ev)) return; ev.preventDefault(); cont = 0; mostra(false);   // sem isso o app abriria o arquivo no lugar da tela
+    var fs = ev.dataTransfer.files; if (fs && fs.length) previaAnexos(fs);
+  });
+})();
 /** Chamado sem acesso some da lista "Chamados em aberto" da tela inicial. */
 function semAcesso(sim) {
   try { var l = JSON.parse(localStorage.getItem('hd_semacesso') || '[]'), k = String(ID), i = l.indexOf(k);

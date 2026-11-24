@@ -328,17 +328,24 @@ var Base = {
 })();
 
 // ---- Ctrl+V de print: a imagem copiada vira um arquivo PNG (Print_AAAAMMDD_HHMMSS.png) ----
-F.aoColarImagem = function (fn) {
+/** Ctrl+V com arquivo: print (imagem da área de transferência) vira "Print_data.png".
+   todos = true: também aceita arquivos copiados no Explorer/Finder (PDF, XML, planilha…), com o nome original. */
+F.aoColarImagem = function (fn, todos) {
   document.addEventListener('paste', function (ev) {
-    var itens = (ev.clipboardData && ev.clipboardData.items) || [], arqs = [];
-    for (var i = 0; i < itens.length; i++) {
-      if (itens[i].kind !== 'file' || !/^image\//.test(itens[i].type)) continue;
-      var f = itens[i].getAsFile(); if (!f) continue;
-      var d = new Date(), p = function (n) { return ('0' + n).slice(-2); };
-      var nome = 'Print_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + (arqs.length ? '_' + (arqs.length + 1) : '') + '.png';
-      try { f = new File([f], nome, { type: f.type || 'image/png' }); } catch (e) { f.name2 = nome; }
+    var cd = ev.clipboardData, itens = (cd && cd.items) || [], arqs = [], vistos = {};
+    var d = new Date(), p = function (n) { return ('0' + n).slice(-2); }, nPrint = 0;
+    function por(f) {
+      if (!f) return; var img = /^image\//.test(f.type);
+      if (!img && !todos) return;
+      var k = (f.name || '') + '|' + f.size; if (vistos[k]) return; vistos[k] = 1;
+      if (img && (!todos || !f.name || /^image\.(png|jpe?g|gif|bmp)$/i.test(f.name))) {   // print da tela (sem nome de verdade)
+        var nome = 'Print_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + (nPrint ? '_' + (nPrint + 1) : '') + '.png'; nPrint++;
+        try { f = new File([f], nome, { type: f.type || 'image/png' }); } catch (e) { f.name2 = nome; }
+      }
       arqs.push(f);
     }
+    for (var i = 0; i < itens.length; i++) if (itens[i].kind === 'file') por(itens[i].getAsFile());
+    if (todos && cd && cd.files) for (var j = 0; j < cd.files.length; j++) por(cd.files[j]);
     if (!arqs.length) return;   // texto: cola normal
     ev.preventDefault();
     fn(arqs);
