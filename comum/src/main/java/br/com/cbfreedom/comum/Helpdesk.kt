@@ -207,6 +207,9 @@ object Helpdesk {
                 o = Engine.run(fetcher(api), p.getString("estado", null), minhasAcoes(c), System.currentTimeMillis() + 40_000L, forca)
             }
             if (logou) ed.putString("cookie", api.cookie)
+            // módulos liberados no site (Financeiro, Inadimplência…): confere a cada 30 min, sem precisar sair e entrar
+            if (logou) ed.putLong("acesso_em", agora)
+            else if (o.ok && agora - p.getLong("acesso_em", 0L) > 30 * 60_000L) { try { Acesso.atualizar(c, api) } catch (_: Exception) { }; ed.putLong("acesso_em", agora) }
             val avisar = ativo(c)
             when {
                 o.sessionExpired -> { ed.putString("status", "Este login não tem acesso ao Helpdesk"); diag(c, "Sem acesso ao Helpdesk (sessão recusada)") }

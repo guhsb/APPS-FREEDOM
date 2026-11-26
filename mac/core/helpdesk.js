@@ -77,6 +77,9 @@ const H = {
         o = await Engine.run(c => api.bruto(c), p.getStr('estado'), this.minhasAcoes(), agora() + 40000, forca);
       }
       if (logou) ed.put('cookie', api.cookie);
+      // módulos liberados no site (Financeiro, Inadimplência…): confere a cada 30 min, sem precisar sair e entrar
+      if (logou) ed.put('acesso_em', t0);
+      else if (o.ok && t0 - (Number(p.get('acesso_em')) || 0) > 30 * 60000) { try { await Acesso.atualizar(api); } catch (e) { } ed.put('acesso_em', t0); }
       const avisar = this.ativo();
       if (o.sessionExpired) { ed.put('status', 'Este login não tem acesso ao Helpdesk'); this.diag('Sem acesso ao Helpdesk (sessão recusada)'); }
       else if (!o.ok) { ed.put('status', 'Não verificou: ' + (o.error || 'erro')); this.diag('Erro: ' + (o.error || 'erro')); }

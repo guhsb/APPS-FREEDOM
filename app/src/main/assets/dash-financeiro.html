@@ -20,6 +20,21 @@
 .sem b{font-size:13.5px}.sem .sv{text-align:right;font-weight:800;font-size:14px;white-space:nowrap}
 .sem .bb{grid-column:1/-1;display:flex;gap:3px;height:8px}.sem .bb i{border-radius:99px;display:block}
 .sem small{grid-column:1/-1;font-size:12px;color:var(--tx3)}
+@media (min-width:700px){.pers{flex-wrap:wrap;overflow:visible}.filt label{max-width:220px}}
+.filt{display:flex;gap:8px;margin:-4px 0 12px;flex-wrap:wrap}.filt label{flex:1 1 130px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;color:var(--tx3)}
+.filt input,.filt select{border:1px solid var(--ln);background:var(--sf);color:var(--tx);border-radius:12px;padding:9px 10px;font:inherit;font-size:14px;font-weight:500}
+.cxT{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:4px 10px;margin-bottom:12px}.cxT small{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--tx3)}.cxT h2{margin:2px 0 0;font-size:20px;font-weight:800;color:var(--tx)}.cxT span{font-size:11.5px;color:var(--tx3);white-space:nowrap}
+.cxD{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media (max-width:560px){.cxD{grid-template-columns:1fr}}
+.cxB{background:var(--sf2);border:1px solid var(--ln);border-radius:12px;padding:12px}.cxB p{margin:0 0 8px;font-weight:700;font-size:13.5px}
+.cxL{display:flex;align-items:center;gap:12px}.cxL small{display:block;font-size:12px;color:var(--tx3)}.cxL>div>b{font-size:21px;font-weight:800;letter-spacing:-.3px;white-space:nowrap}
+.anel{position:relative;width:78px;height:78px;flex:0 0 auto}.anel svg{width:100%;height:100%}.anel circle{fill:none;stroke-width:6;stroke-linecap:round}.cxL .anel b{color:var(--tx);position:absolute;white-space:nowrap;inset:0;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;letter-spacing:-.3px}
+.cxS{margin-top:12px;font-size:13px;color:var(--tx2)}.cxS b{font-size:18px;font-weight:800;margin-left:6px}
+.cxC{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.cxC span{font-size:12px;font-weight:700;border-radius:99px;padding:5px 10px;background:var(--sf3);color:var(--tx2)}
+.cxC span.ok{background:var(--verde-s);color:var(--tx-verde)}.cxC span.la{background:var(--laranja-s);color:var(--tx-laranja)}
+.pvr .cxT h2{color:var(--tx)}.pvr .cxT small,.pvr .cxT span{color:var(--tx3);opacity:1}
+.pvB{border:1px solid var(--ln);border-radius:12px;padding:12px;background:var(--sf2)}.pvB p{margin:0 0 6px;font-weight:700;font-size:13.5px}.pvB small{font-size:12px;color:var(--tx3)}.pvB>b{display:block;font-size:20px;font-weight:800;margin:2px 0 8px}
+.pvL{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--tx3);margin-top:6px}
+.pvr .dois{gap:10px}
 .dia2{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin:14px 0 2px;display:flex;justify-content:space-between}
 </style>
 </head><body class="dash">
@@ -36,13 +51,20 @@
 <script src="logo-dados.js"></script>
 <script src="imagem.js"></script>
 <script>
-var versao = null, X = Dash, aba = X.lembrar('fin_aba') || 'resumo', per = X.lembrar('fin_per') || 'mes', S = { resumo: null, rec: null, pag: null }, carregando = {};
+var versao = null, X = Dash, emp = X.lembrar('fin_emp') || '', pers = (function () { try { return JSON.parse(X.lembrar('fin_pers') || 'null'); } catch (e) { return null; } })() || null, aba = X.lembrar('fin_aba') || 'resumo', per = X.lembrar('fin_per') || 'mes', S = { resumo: null, rec: null, pag: null }, carregando = {};
 var ABAS = [['resumo', 'Resumo'], ['rec', 'A receber'], ['pag', 'A pagar']];
-var PERS = [['hoje', 'Hoje'], ['semana', 'Esta semana'], ['mes', 'Mês atual'], ['prox7', 'Próximos 7 dias'], ['proxmes', 'Próximo mês'], ['mesant', 'Mês passado']];
+var PERS = [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['semana', 'Semana atual'], ['ult7', 'Últimos 7 dias'], ['mes', 'Mês atual'], ['ult30', 'Últimos 30 dias'], ['mesant', 'Mês passado'], ['proxsem', 'Próxima semana'], ['prox7', 'Próximos 7 dias'], ['proxmes', 'Próximo mês'], ['pers', 'Personalizado']];
+var EMPRESAS = ['1', '2', '4', '5', '6', '7', '8', '9', '10'];
 /** Período escolhido → [de, até] (datas ISO). */
 function periodo(p) {
   var h = X.hoje(), d = X.de(h), dia = 864e5;
+  var mais = function (k) { return X.iso(new Date(d.getTime() + k * dia)); };
   if (p === 'hoje') return [h, h];
+  if (p === 'ontem') return [mais(-1), mais(-1)];
+  if (p === 'ult7') return [mais(-6), h];
+  if (p === 'ult30') return [mais(-29), h];
+  if (p === 'proxsem') { var w2 = (d.getUTCDay() + 6) % 7; return [mais(7 - w2), mais(13 - w2)]; }
+  if (p === 'pers') return pers && pers[0] && pers[1] ? (pers[0] <= pers[1] ? [pers[0], pers[1]] : [pers[1], pers[0]]) : X.mes(h, 0);
   if (p === 'semana') { var w = (d.getUTCDay() + 6) % 7; return [X.iso(new Date(d.getTime() - w * dia)), X.iso(new Date(d.getTime() + (6 - w) * dia))]; }
   if (p === 'prox7') return [h, X.iso(new Date(d.getTime() + 6 * dia))];
   if (p === 'proxmes') return X.mes(h, 1);
@@ -54,7 +76,12 @@ var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out
 /** Mesmo período antes, até o mesmo ponto (mês atual até hoje × mês passado até o mesmo dia). Futuro: sem comparação. */
 function anterior(p) {
   var h = X.hoje(), dia = 864e5, r = periodo(p);
-  if (p === 'prox7' || p === 'proxmes') return null;
+  if (p === 'prox7' || p === 'proxmes' || p === 'proxsem' || r[0] > h) return null;
+  var antes = function (dias, nome) { return [X.iso(new Date(X.de(r[0]).getTime() - dias * dia)), X.iso(new Date(X.de(r[1] > h ? h : r[1]).getTime() - dias * dia)), nome]; };
+  if (p === 'ontem') return antes(1, 'anteontem');
+  if (p === 'ult7') return antes(7, '7 dias antes');
+  if (p === 'ult30') return antes(30, '30 dias antes');
+  if (p === 'pers') { var len = Math.round((X.de(r[1]) - X.de(r[0])) / dia) + 1; return antes(len, 'período anterior'); }
   if (p === 'hoje') { var o = X.iso(new Date(X.de(h).getTime() - dia)); return [o, o, 'ontem']; }
   if (p === 'semana') { var ate = r[1] > h ? h : r[1]; return [X.iso(new Date(X.de(r[0]).getTime() - 7 * dia)), X.iso(new Date(X.de(ate).getTime() - 7 * dia)), 'semana passada']; }
   var m = X.mes(r[0], -1), fim = r[1] > h ? h : r[1], d = Math.min(Number(fim.slice(8, 10)), Number(m[1].slice(8, 10)));
@@ -63,10 +90,11 @@ function anterior(p) {
 /** As 4 semanas a partir de amanhã (previsto pelo vencimento). */
 function semanas() { var d = X.de(X.hoje()).getTime(), dia = 864e5, l = []; for (var i = 0; i < 4; i++) l.push([X.iso(new Date(d + (1 + i * 7) * dia)), X.iso(new Date(d + (7 + i * 7) * dia))]); return l; }
 function variacaoTxt(at, an) { at = n(at); an = n(an); if (!an) return ''; var v = (at - an) / an * 100; return (v >= 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(v)) + '%'; }
+function pct2(v) { return n(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'; }
 function pct(v) { return Math.round(n(v)) + '%'; }
 
 // ---------- dados ----------
-function chave(t) { var p = periodo(per); return t + '|' + p[0] + '|' + p[1]; }
+function chave(t) { var p = periodo(per); return t + '|' + p[0] + '|' + p[1] + '|' + emp; }
 function carregar(forcar) {
   var k = chave(aba), alvo = aba;
   if (carregando[k]) return;
@@ -88,13 +116,13 @@ function buscarDados(alvo, k, ver) {
   var p = periodo(per), pr, v = ver ? ver.v : '';
   if (alvo === 'resumo') {
     // primeiro o principal (aparece na hora); comparação e próximos 30 dias chegam depois, sem segurar a tela
-    var an = anterior(per), dash = function (a, b) { return '/finance/dashboard' + X.q({ date_from: a, date_to: b }); }, velho = S.resumo && S.resumo.k === k ? S.resumo : null;
+    var an = anterior(per), dash = function (a, b) { return '/finance/dashboard' + X.q({ date_from: a, date_to: b, company: emp }); }, velho = S.resumo && S.resumo.k === k ? S.resumo : null;
     pr = X.get(dash(p[0], p[1])).then(function (j) {
       var r = { k: k, v: v, j: j, ant: velho ? velho.ant : null, proj: velho ? velho.proj : null };
       if (chave('resumo') === k) { S.resumo = r; if (aba === 'resumo') X.manter(desenhar); }
       var extras = [];
       if (an) extras.push(X.opc(dash(an[0], an[1])).then(function (x) { r.ant = x && x.entries != null ? { j: x, nome: an[2] } : null; }));
-      var pk = 'fin|proj|' + X.hoje() + '|' + v, pc = X.cache(pk);
+      var pk = 'fin|proj|' + X.hoje() + '|' + emp + '|' + v, pc = X.cache(pk);
       if (pc && pc.d && (v || Date.now() - (pc.t || 0) < 30 * 60e3)) r.proj = pc.d;
       else extras.push(semanas().reduce(function (prom, w) { return prom.then(function (l) { return X.opc(dash(w[0], w[1])).then(function (x) { l.push({ w: w, j: x }); return l; }); }); }, Promise.resolve([]))
         .then(function (l) { r.proj = l; X.cache(pk, l); }));
@@ -108,7 +136,7 @@ function buscarDados(alvo, k, ver) {
 function titulos(rota, p, parcial) {
   var todos = [], tot = 0;
   function pag(i) {
-    return X.get('/finance/' + rota + X.q({ due_date_from: p[0], due_date_to: p[1], situation: 'A', order_by: 'due_date', page: i, page_size: i === 1 ? 100 : 200 })).then(function (j) {
+    return X.get('/finance/' + rota + X.q({ due_date_from: p[0], due_date_to: p[1], company: emp, situation: 'A', order_by: 'due_date', page: i, page_size: i === 1 ? 100 : 200 })).then(function (j) {
       tot = n(j.total); (j.records || []).forEach(function (r) { todos.push(r); });
       if (todos.length < tot && i < 5) { if (parcial) parcial(montarTit(todos, tot)); return pag(i + 1); }   // mostra a 1ª página enquanto busca o resto
     });
@@ -126,13 +154,16 @@ function montarTit(todos, tot) {
 // ---------- telas ----------
 function desenharSub() {
   var p = periodo(per);
-  document.getElementById('sub').textContent = F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · ' + (versao && versao.quando ? 'site atualizado ' + X.finQuando(versao.quando) : 'dados em homologação');
+  document.getElementById('sub').textContent = F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + (emp ? ' · empresa ' + emp : '') + ' · ' + (versao && versao.quando ? 'site atualizado ' + X.finQuando(versao.quando) : 'dados em homologação');
 }
 function desenhar() {
   if (!ABAS.some(function (a) { return a[0] === aba; })) aba = 'resumo';
   var p = periodo(per);
   desenharSub();
   var h = X.abas(ABAS, aba) + '<div class="pers">' + PERS.map(function (x) { return '<b data-per="' + x[0] + '"' + (x[0] === per ? ' class="on"' : '') + '>' + x[1] + '</b>'; }).join('') + '</div>';
+  var pp = periodo(per);
+  h += '<div class="filt">' + (per === 'pers' ? '<label>De<input type="date" id="pDe" value="' + pp[0] + '"></label><label>Até<input type="date" id="pAte" value="' + pp[1] + '"></label>' : '') +
+    '<label>Empresa<select id="fEmp">' + X.opcoes(EMPRESAS.map(function (e) { return [e, 'Empresa ' + e]; }), emp, 'Todas') + '</select></label></div>';
   var s = S[aba];
   if (!s || s.k !== chave(aba)) h += X.carregando(aba === 'resumo' ? 'Carregando o caixa…' : 'Carregando os títulos…');
   else h += aba === 'resumo' ? resumo(s.j, s.ant, s.proj) : lista(s.l, aba === 'rec');
@@ -140,20 +171,23 @@ function desenhar() {
 }
 function resumo(j, ant, proj) {
   var ent = n(j.entries), sai = n(j.exits), liq = n(j.net), h = '';
-  h += '<div class="card hero"><div class="lb">Saldo do período</div><div class="v" style="color:var(--' + (liq >= 0 ? 'tx-verde' : 'tx-rosa') + ')">' + (liq < 0 ? '−' : '') + X.brl0(Math.abs(liq)) + '</div>' +
-    '<div class="s">Entrou <b>' + X.k(ent) + '</b> · saiu <b>' + X.k(sai) + '</b></div>' +
-    X.faixa([['Entradas', ent, 'var(--verde)'], ['Saídas', sai, 'var(--azul)']], 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') +
-    '<div class="leg"><span><b style="color:var(--verde)">■</b> Recebimentos ' + pct(j.entries_share_percent) + '</span><span><b style="color:var(--azul)">■</b> Pagamentos ' + pct(j.exits_share_percent) + '</span></div>' +
-    '<div class="chips"><span class="chip ' + (n(j.net_difference) >= 0 ? 'ok' : 'la') + '">Previsto: ' + X.k(j.net_forecast) + ' de saldo</span>' +
-    '<span class="chip az">' + X.int(j.entries_count) + ' recebimentos · ' + X.int(j.exits_count) + ' pagamentos</span></div>';
+  // igual ao site: "Resumo do Caixa" e "Previsto x Realizado"
+  var pr0 = periodo(per), faixaDt = F.dataBR(pr0[0]) + ' — ' + F.dataBR(pr0[1] > X.hoje() ? X.hoje() : pr0[1]);
+  var anel = function (p, cor) { var v = Math.max(0, Math.min(100, n(p))), r = 27, c = 2 * Math.PI * r;
+    return '<div class="anel"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="' + r + '" stroke="var(--sf3)"/><circle cx="32" cy="32" r="' + r + '" stroke="' + cor + '" stroke-dasharray="' + (c * v / 100).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 32 32)"/></svg><b>' + pct2(p) + '</b></div>'; };
+  h += '<div class="card caixa inteiro"><div class="cxT"><div><small>GRUPO FREEDOM / VISÃO FINANCEIRA</small><h2>Resumo do Caixa</h2></div><span>' + faixaDt + '</span></div>' +
+    '<div class="cxD">' + [['Recebimentos', j.entries_execution_percent, 'var(--verde)', 'Valor recebido', ent], ['Pagamentos', j.exits_execution_percent, 'var(--azul)', 'Valor pago', sai]].map(function (x) {
+      return '<div class="cxB"><p>' + x[0] + '</p><div class="cxL">' + anel(x[1], x[2]) + '<div><small>' + x[3] + '</small><b>' + F.brl(x[4]) + '</b></div></div></div>'; }).join('') + '</div>' +
+    '<div class="cxS">Saldo do período <b style="color:var(--' + (liq >= 0 ? 'tx-verde' : 'tx-rosa') + ')">' + (liq < 0 ? '−' : '') + F.brl(Math.abs(liq)) + '</b></div>';
   if (ant && ant.j && (n(ant.j.entries) || n(ant.j.exits))) {
     var ve = variacaoTxt(ent, ant.j.entries), vs = variacaoTxt(sai, ant.j.exits);
-    h += '<div class="chips" style="margin-top:6px">' + (ve ? '<span class="chip ' + (ent >= n(ant.j.entries) ? 'ok' : 'la') + '">Recebido ' + ve + ' vs ' + F.esc(ant.nome) + '</span>' : '') +
-      (vs ? '<span class="chip ' + (sai <= n(ant.j.exits) ? 'ok' : 'la') + '">Pago ' + vs + ' vs ' + F.esc(ant.nome) + '</span>' : '') + '</div>';
+    h += '<div class="cxC">' + (ve ? '<span class="' + (ent >= n(ant.j.entries) ? 'ok' : 'la') + '">Recebido ' + ve + ' vs ' + F.esc(ant.nome) + '</span>' : '') + (vs ? '<span class="' + (sai <= n(ant.j.exits) ? 'ok' : 'la') + '">Pago ' + vs + ' vs ' + F.esc(ant.nome) + '</span>' : '') + '</div>';
   }
   h += '</div>';
-  h += '<div class="dois">' + previsto('Recebimentos', ent, j.entries_forecast, j.entries_execution_percent, j.entries_missing, 'verde', 'falta receber') +
-    previsto('Pagamentos', sai, j.exits_forecast, j.exits_execution_percent, j.exits_missing, 'azul', 'falta pagar') + '</div>';
+  h += '<div class="card pvr inteiro"><div class="cxT"><div><small>GRUPO FREEDOM / CONTROLE OPERACIONAL</small><h2>Previsto x Realizado</h2></div><span>' + faixaDt + '</span></div><div class="dois">' +
+    [['Recebimentos', j.entries_forecast, j.entries_execution_percent, j.entries_missing, 'var(--verde)'], ['Pagamentos', j.exits_forecast, j.exits_execution_percent, j.exits_missing, 'var(--azul)']].map(function (x) {
+      return '<div class="pvB"><p>' + x[0] + '</p><small>Previsão do período</small><b>' + F.brl(x[1]) + '</b><div class="barra"><i style="width:' + Math.min(100, n(x[2])) + '%;background:' + x[4] + '"></i></div>' +
+        '<div class="pvL"><span>' + pct2(x[2]) + ' realizado</span><span>Diferença entre previsto e realizado: ' + F.brl(x[3]) + '</span></div></div>'; }).join('') + '</div></div>';
   h += projecao(proj);
   var dias = (j.daily || []).filter(function (x) { return x.date <= X.hoje() || n(x.entries) || n(x.exits); });
   if (dias.length >= 2) {
@@ -215,7 +249,7 @@ function quando() { return new Date().toLocaleString('pt-BR', { day: '2-digit', 
 function imagem() {
   var s = S[aba], p = periodo(per), nomeP = (PERS.filter(function (x) { return x[0] === per; })[0] || [0, ''])[1];
   if (!s || s.k !== chave(aba)) { F.toast('Espere os números carregarem'); return; }
-  var sub = nomeP + ' · ' + F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · ' + quando(), bl = [];
+  var sub = nomeP + (emp ? ' · Empresa ' + emp : '') + ' · ' + F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · ' + quando(), bl = [];
   if (aba === 'resumo') {
     var j = s.j;
     bl.push({ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Saldo do período', valor: n(j.net), pill: 'Entrou ' + X.k(j.entries), sub: 'saiu ' + X.k(j.exits) }] });
@@ -238,7 +272,17 @@ function imagem() {
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest ? ev.target.closest('[data-aba],[data-per]') : null; if (!t) return;
   if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('fin_aba', aba); desenhar(); carregar(); window.scrollTo(0, 0); return; }
-  per = t.getAttribute('data-per'); X.lembrar('fin_per', per); desenhar(); carregar();
+  per = t.getAttribute('data-per'); X.lembrar('fin_per', per);
+  if (per === 'pers' && !pers) { var m = X.mes(X.hoje(), 0); pers = [m[0], X.hoje()]; }
+  desenhar(); carregar();
+});
+document.addEventListener('change', function (ev) {
+  var id = ev.target.id;
+  if (id === 'fEmp') { emp = ev.target.value; X.lembrar('fin_emp', emp); desenhar(); carregar(); }
+  if (id === 'pDe' || id === 'pAte') {
+    var de = X.val('pDe'), ate = X.val('pAte'); if (!de || !ate) return;
+    pers = [de, ate]; X.lembrar('fin_pers', JSON.stringify(pers)); desenhar(); carregar();
+  }
 });
 document.getElementById('btVoltar').innerHTML = F.ic('seta');
 document.getElementById('btAt').innerHTML = F.ic('atualizar');

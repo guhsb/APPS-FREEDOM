@@ -98,6 +98,9 @@ namespace Freedom
                     o = Engine.Run(Fetcher(api), p.GetString("estado"), MinhasAcoes(), Relogio.Agora() + 40000, forca);
                 }
                 if (logou) ed.Put("cookie", api.Cookie);
+                // módulos liberados no site (Financeiro, Inadimplência…): confere a cada 30 min, sem precisar sair e entrar
+                if (logou) ed.Put("acesso_em", agora);
+                else if (o.Ok && agora - p.GetLong("acesso_em") > 30 * 60000L) { Acesso.Atualizar(api); ed.Put("acesso_em", agora); }
                 bool avisar = Ativo();
                 if (o.SessionExpired) { ed.Put("status", "Este login não tem acesso ao Helpdesk"); Diag("Sem acesso ao Helpdesk (sessão recusada)"); }
                 else if (!o.Ok) { ed.Put("status", "Não verificou: " + (o.Error ?? "erro")); Diag("Erro: " + (o.Error ?? "erro")); }
