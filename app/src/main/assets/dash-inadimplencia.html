@@ -38,18 +38,25 @@
 <script src="logo-dados.js"></script>
 <script src="imagem.js"></script>
 <script>
-var X = Dash, f = { nome: '', min: X.lembrar('inad_min') || '', faixa: '' }, d = null, pags = 1, ab = {}, tits = {}, carregandoAgora = false, seq = 0;
+var versao = null, X = Dash, f = { nome: '', min: X.lembrar('inad_min') || '', faixa: '' }, d = null, pags = 1, ab = {}, tits = {}, carregandoAgora = false, seq = 0;
 var CORES = { '1-30': 'var(--azul)', '31-60': 'var(--violeta)', '61-90': 'var(--laranja)', '91+': 'var(--rosa)' };
 function n(v) { return F.n(v); }
 function url(pag) { return '/finance/delinquency' + X.q({ reference_date: X.hoje(), page: pag, page_size: 20, aging_bucket: f.faixa, customer_name: f.nome.trim(), minimum_balance: f.min }); }
+/** Chave do que foi buscado, sem a data (a mesma carga do site vale até chegar outra). */
+function chave() { return url(1).replace(/reference_date=[^&]*&?/, ''); }
 function carregar(forcar) {
   if (carregandoAgora && !forcar) return;
-  var meu = ++seq, k = url(1);
-  if (!d || d.k !== k) { var c = X.cache('inad|' + k); d = c && c.d ? c.d : null; pags = 1; X.manter(desenhar); }
+  var meu = ++seq, k = url(1), ck = chave();
+  if (!d || d.ck !== ck) { var c = X.cache('inad|' + ck); d = c && c.d ? c.d : null; pags = 1; X.manter(desenhar); }
   carregandoAgora = true; document.getElementById('btAt').classList.add('gira');
   var lento = setTimeout(function () { var s = document.getElementById('sub'); if (s && meu === seq) s.textContent = 'O site leva uns segundos para calcular…'; }, 2500);
-  X.get(k).then(function (j) { if (meu !== seq) return; d = { k: k, j: j, cl: j.clients || [] }; guardarDia(j); pags = 1; X.cache('inad|' + k, d); document.getElementById('aviso').innerHTML = ''; })
-    .catch(function (e) { if (meu === seq) document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); })
+  // só calcula de novo quando o site recebeu dados novos; senão continua com o último resultado
+  X.finVersao().catch(function () { return null; }).then(function (ver) {
+    if (meu !== seq) return;
+    if (ver) versao = ver;
+    if (ver && d && d.ck === ck && d.v === ver.v) { if (forcar) F.toast('Já está com a última atualização do site (' + X.finQuando(ver.quando) + ')'); return; }
+    return X.get(k).then(function (j) { if (meu !== seq) return; d = { k: k, ck: ck, v: ver ? ver.v : '', j: j, cl: j.clients || [] }; guardarDia(j); pags = 1; X.cache('inad|' + ck, d); document.getElementById('aviso').innerHTML = ''; });
+  }).catch(function (e) { if (meu === seq) document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); })
     .then(function () { clearTimeout(lento); if (meu !== seq) return; carregandoAgora = false; document.getElementById('btAt').classList.remove('gira'); X.manter(desenhar); });
 }
 function maisClientes(b) {
@@ -107,7 +114,7 @@ function desenhar() {
   if (f.faixa) h += '<div class="fxs"><b data-faixa="">Atraso ' + F.esc(f.faixa === '91+' ? '91 dias ou mais' : f.faixa + ' dias') + ' ×</b></div>';
   if (!d) { document.getElementById('sub').textContent = 'Calculando…'; document.getElementById('c').innerHTML = h + X.carregando('Calculando o saldo vencido…'); return; }
   var j = d.j, b = j.buckets || [], tot = n(j.overdue_balance) || 1;
-  document.getElementById('sub').textContent = 'Posição em ' + F.dataBR(j.reference_date || X.hoje()) + ' · estimativa em homologação';
+  document.getElementById('sub').textContent = 'Posição em ' + F.dataBR(j.reference_date || X.hoje()) + ' · ' + (versao && versao.quando ? 'site atualizado ' + X.finQuando(versao.quando) : 'estimativa em homologação');
   h += '<div class="card hero"><div class="lb">Saldo vencido</div><div class="v">' + X.brl0(j.overdue_balance) + '</div><div class="s"><b>' + X.int(j.customer_count) + '</b> clientes · <b>' + X.int(j.title_count) + '</b> títulos vencidos</div>' +
     X.faixa(b.map(function (x) { return [x.label, n(x.balance), CORES[x.key] || 'var(--azul)']; }), 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') +
     '<div class="leg">' + b.map(function (x) { return '<span><b style="color:' + (CORES[x.key] || 'var(--azul)') + '">■</b> ' + F.esc(x.label.replace(' dias ou mais', '+').replace(' dias', 'd')) + '</span>'; }).join('') + '</div>';

@@ -153,6 +153,19 @@ var Dash = (function () {
   X.carregando = function (t) { return '<div class="carregando"><i></i>' + (t || 'Carregando…') + '</div>'; };
   X.erro = function (msg) { var st = document.getElementById('sub'); if (st && /Carregando/.test(st.textContent)) st.textContent = 'Não atualizou · toque em Tentar'; return '<div class="aviso" role="alert">' + F.ic('alerta') + '<span>' + F.esc(msg) + '</span><button onclick="carregar(true)">Tentar</button></div>'; };
   /** Última resposta guardada no aparelho: a tela abre na hora com ela e se atualiza sozinha. */
+  /** Versão dos dados financeiros do site: muda só quando o site recebe uma carga nova (lê 1 título de cada lado, rápido).
+     Enquanto for a mesma, as telas usam o que já buscaram, sem pedir de novo. */
+  X.finQuando = function (iso) { try { var d = new Date(iso), o = { timeZone: 'America/Sao_Paulo' }; return d.toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, o)) + ' às ' + d.toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit' }, o)); } catch (e) { return ''; } };
+  X.finVersao = function () {
+    if (X._fv && Date.now() - X._fv.t < 60e3) return X._fv.p;
+    var p = Promise.all([X.get('/finance/accounts-receivable?page=1&page_size=1'), X.opc('/finance/accounts-payable?page=1&page_size=1')]).then(function (r) {
+      var a = ((r[0] || {}).records || [])[0] || {}, b = ((r[1] || {}).records || [])[0] || {};
+      if (!a.batch_id && !a.observed_at_utc) throw new Error('sem versão');
+      return { v: [a.batch_id, a.observed_at_utc, b.batch_id, b.observed_at_utc].join('|'), quando: [a.observed_at_utc, b.observed_at_utc].filter(Boolean).sort().pop() || '' };
+    });
+    X._fv = { t: Date.now(), p: p }; p.catch(function () { X._fv = null; });
+    return p;
+  };
   X.cache = function (k, v) {
     try {
       if (v === undefined) { var s = localStorage.getItem('dc_' + k); return s ? JSON.parse(s) : null; }

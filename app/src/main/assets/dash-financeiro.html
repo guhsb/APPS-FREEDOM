@@ -36,7 +36,7 @@
 <script src="logo-dados.js"></script>
 <script src="imagem.js"></script>
 <script>
-var X = Dash, aba = X.lembrar('fin_aba') || 'resumo', per = X.lembrar('fin_per') || 'mes', S = { resumo: null, rec: null, pag: null }, carregando = {};
+var versao = null, X = Dash, aba = X.lembrar('fin_aba') || 'resumo', per = X.lembrar('fin_per') || 'mes', S = { resumo: null, rec: null, pag: null }, carregando = {};
 var ABAS = [['resumo', 'Resumo'], ['rec', 'A receber'], ['pag', 'A pagar']];
 var PERS = [['hoje', 'Hoje'], ['semana', 'Esta semana'], ['mes', 'Mês atual'], ['prox7', 'Próximos 7 dias'], ['proxmes', 'Próximo mês'], ['mesant', 'Mês passado']];
 /** Período escolhido → [de, até] (datas ISO). */
@@ -69,43 +69,69 @@ function pct(v) { return Math.round(n(v)) + '%'; }
 function chave(t) { var p = periodo(per); return t + '|' + p[0] + '|' + p[1]; }
 function carregar(forcar) {
   var k = chave(aba), alvo = aba;
-  if (carregando[k] && !forcar) return;
+  if (carregando[k]) return;
   if (!S[alvo] || S[alvo].k !== k) { var c = X.cache('fin|' + k); S[alvo] = c && c.d ? c.d : null; desenhar(); }
   carregando[k] = true; document.getElementById('btAt').classList.add('gira');
-  var p = periodo(per), pr;
-  if (alvo === 'resumo') {
-    var an = anterior(per), dash = function (a, b) { return '/finance/dashboard' + X.q({ date_from: a, date_to: b }); };
-    pr = Promise.all([X.get(dash(p[0], p[1])), an ? X.opc(dash(an[0], an[1])) : null].concat(semanas().map(function (w) { return X.opc(dash(w[0], w[1])); })))
-      .then(function (r) { return { k: k, j: r[0], ant: r[1] ? { j: r[1], nome: an[2] } : null, proj: r.slice(2).map(function (x, i) { return { w: semanas()[i], j: x }; }) }; });
-  }
-  else pr = titulos(alvo === 'rec' ? 'accounts-receivable' : 'accounts-payable', p).then(function (l) { return { k: k, l: l }; });
-  pr.then(function (r) { S[alvo] = r; X.cache('fin|' + k, r); document.getElementById('aviso').innerHTML = ''; })
-    .catch(function (e) { document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); })
+  // só busca de novo quando o site recebeu dados novos; senão continua com o que já tem
+  X.finVersao().catch(function () { return null; }).then(function (ver) {
+    if (ver) { versao = ver; desenharSub(); }
+    var c = S[alvo] && S[alvo].k === k ? S[alvo] : null;
+    if (ver && c && c.v === ver.v && (alvo !== 'resumo' || c.proj)) {
+      if (forcar) F.toast('Já está com a última atualização do site (' + X.finQuando(ver.quando) + ')');
+      return;
+    }
+    return buscarDados(alvo, k, ver);
+  }).catch(function (e) { document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); })
     .then(function () { delete carregando[k]; document.getElementById('btAt').classList.remove('gira'); if (aba === alvo) X.manter(desenhar); });
 }
-/** Títulos em aberto que vencem no período (até 1.000, mais perto primeiro). */
-function titulos(rota, p) {
-  var todos = [], tot = 0;
-  function pag(i) {
-    return X.get('/finance/' + rota + X.q({ due_date_from: p[0], due_date_to: p[1], situation: 'A', order_by: 'due_date', page: i, page_size: 200 })).then(function (j) {
-      tot = n(j.total); (j.records || []).forEach(function (r) { todos.push(r); });
-      if (todos.length < tot && i < 5) return pag(i + 1);
+function buscarDados(alvo, k, ver) {
+  var p = periodo(per), pr, v = ver ? ver.v : '';
+  if (alvo === 'resumo') {
+    // primeiro o principal (aparece na hora); comparação e próximos 30 dias chegam depois, sem segurar a tela
+    var an = anterior(per), dash = function (a, b) { return '/finance/dashboard' + X.q({ date_from: a, date_to: b }); }, velho = S.resumo && S.resumo.k === k ? S.resumo : null;
+    pr = X.get(dash(p[0], p[1])).then(function (j) {
+      var r = { k: k, v: v, j: j, ant: velho ? velho.ant : null, proj: velho ? velho.proj : null };
+      if (chave('resumo') === k) { S.resumo = r; if (aba === 'resumo') X.manter(desenhar); }
+      var extras = [];
+      if (an) extras.push(X.opc(dash(an[0], an[1])).then(function (x) { r.ant = x && x.entries != null ? { j: x, nome: an[2] } : null; }));
+      var pk = 'fin|proj|' + X.hoje() + '|' + v, pc = X.cache(pk);
+      if (pc && pc.d && (v || Date.now() - (pc.t || 0) < 30 * 60e3)) r.proj = pc.d;
+      else extras.push(semanas().reduce(function (prom, w) { return prom.then(function (l) { return X.opc(dash(w[0], w[1])).then(function (x) { l.push({ w: w, j: x }); return l; }); }); }, Promise.resolve([]))
+        .then(function (l) { r.proj = l; X.cache(pk, l); }));
+      return Promise.all(extras).then(function () { return r; });
     });
   }
-  return pag(1).then(function () {
+  else pr = titulos(alvo === 'rec' ? 'accounts-receivable' : 'accounts-payable', p, function (parcial) { if (chave(alvo) === k) { S[alvo] = { k: k, l: parcial }; if (aba === alvo) X.manter(desenhar); } }).then(function (l) { return { k: k, v: v, l: l }; });
+  return pr.then(function (r) { if (chave(alvo) === k) S[alvo] = r; X.cache('fin|' + k, r); document.getElementById('aviso').innerHTML = ''; });
+}
+/** Títulos em aberto que vencem no período (até 1.000, mais perto primeiro). */
+function titulos(rota, p, parcial) {
+  var todos = [], tot = 0;
+  function pag(i) {
+    return X.get('/finance/' + rota + X.q({ due_date_from: p[0], due_date_to: p[1], situation: 'A', order_by: 'due_date', page: i, page_size: i === 1 ? 100 : 200 })).then(function (j) {
+      tot = n(j.total); (j.records || []).forEach(function (r) { todos.push(r); });
+      if (todos.length < tot && i < 5) { if (parcial) parcial(montarTit(todos, tot)); return pag(i + 1); }   // mostra a 1ª página enquanto busca o resto
+    });
+  }
+  return pag(1).then(function () { return montarTit(todos, tot); });
+}
+function montarTit(todos, tot) {
     return { tot: tot, itens: todos.map(function (r) {
       var m = r.monetary_values || {}, d = r.original_dates || {}, c = r.original_codes || {};
       return { doc: c.nro_documento || r.nrolancto, nome: c.cliente_nome || (c.cod_fornecedor ? 'Fornecedor ' + c.cod_fornecedor : '—'), cod: c.cod_cliente || c.cod_fornecedor || '', fone: c.cliente_fone1 || c.cliente_celular || '',
         emp: c.cod_empresa || '', venc: String(d.data_vencimento || '').slice(0, 10), v: n(m.valor != null ? m.valor : m.valor_original) };
     }) };
-  });
 }
 
 // ---------- telas ----------
+function desenharSub() {
+  var p = periodo(per);
+  document.getElementById('sub').textContent = F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · ' + (versao && versao.quando ? 'site atualizado ' + X.finQuando(versao.quando) : 'dados em homologação');
+}
 function desenhar() {
   if (!ABAS.some(function (a) { return a[0] === aba; })) aba = 'resumo';
   var p = periodo(per);
-  document.getElementById('sub').textContent = F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · dados em homologação';
+  desenharSub();
   var h = X.abas(ABAS, aba) + '<div class="pers">' + PERS.map(function (x) { return '<b data-per="' + x[0] + '"' + (x[0] === per ? ' class="on"' : '') + '>' + x[1] + '</b>'; }).join('') + '</div>';
   var s = S[aba];
   if (!s || s.k !== chave(aba)) h += X.carregando(aba === 'resumo' ? 'Carregando o caixa…' : 'Carregando os títulos…');
