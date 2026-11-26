@@ -26,7 +26,7 @@ if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 let janela = null, vApp = null, vSite = null, vPainel = null, tray = null;
 let vDash = null, dashAtual = null, vSino = null, sinoAberto = false, sinoX = -1, helpSub = 'inicio';
 const subs = {};   // página -> partes (abas) que ela tem
-const DASH = { comercial: 'dash-comercial.html', logistica: 'dash-logistica.html', admin: 'admin.html' };
+const DASH = { comercial: 'dash-comercial.html', logistica: 'dash-logistica.html', financeiro: 'dash-financeiro.html', inadimplencia: 'dash-inadimplencia.html', admin: 'admin.html' };
 let aba = 'helpdesk', painelAtual = null, paginaApp = '', saindo = false, siteCarregado = false, ultimoLoginSite = 0;
 let monitor = null, timerPaineis = null;
 
@@ -83,7 +83,8 @@ function montarMenu() {
     { label: 'Ver', submenu: [{ label: 'Helpdesk', accelerator: 'Cmd+1', click: () => selecionar('helpdesk') }, { label: 'Site', accelerator: 'Cmd+2', click: () => selecionar('site') },
       { label: 'Painel', accelerator: 'Cmd+3', click: () => selecionar('painel') },
       { label: 'Comercial', accelerator: 'Cmd+4', click: () => selecionar('comercial') }, { label: 'Logística', accelerator: 'Cmd+5', click: () => selecionar('logistica') },
-      { label: 'Administração', accelerator: 'Cmd+6', click: () => selecionar('admin') }, { type: 'separator' },
+      { label: 'Administração', accelerator: 'Cmd+6', click: () => selecionar('admin') },
+      { label: 'Financeiro', accelerator: 'Cmd+7', click: () => selecionar('financeiro') }, { label: 'Inadimplência', accelerator: 'Cmd+8', click: () => selecionar('inadimplencia') }, { type: 'separator' },
       { label: 'Recarregar', accelerator: 'Cmd+R', click: () => { const v = vistaAtual(); if (v) v.webContents.reload(); } },
       { role: 'zoomIn', label: 'Aumentar' }, { role: 'zoomOut', label: 'Diminuir' }, { role: 'resetZoom', label: 'Tamanho normal' }] },
     { label: 'Janela', submenu: [{ role: 'minimize', label: 'Minimizar' }, { role: 'zoom', label: 'Zoom' }, { label: 'Fechar janela', accelerator: 'Cmd+W', click: () => janela && janela.hide() }] }
@@ -143,6 +144,8 @@ function abasDisponiveis() {
   if (Acesso.helpdesk()) r.push('helpdesk');
   if (Acesso.comercial()) r.push('comercial');
   if (Acesso.logistica()) r.push('logistica');
+  if (Acesso.financeiro()) r.push('financeiro');
+  if (Acesso.inadimplencia()) r.push('inadimplencia');
   if (Acesso.admin()) r.push('admin');
   if (Paineis.paraAba().length > 0) r.push('painel');
   r.push('site');
@@ -193,7 +196,7 @@ function selecionar(nova) {
 // ---------------- barras novas (topo, atalhos, sino) ----------------
 const acoesTela = {};
 function shellJson() {
-  const nomes = { helpdesk: 'Helpdesk', comercial: 'Comercial', logistica: 'Logística', admin: 'Admin', painel: 'Painel', site: 'Site' };
+  const nomes = { helpdesk: 'Helpdesk', comercial: 'Comercial', logistica: 'Logística', financeiro: 'Financeiro', inadimplencia: 'Inadimplência', admin: 'Admin', painel: 'Painel', site: 'Site' };
   const o = { logado: logado(), aba, abas: logado() ? abasDisponiveis().map(a => [a, nomes[a]]) : [], tema: temaClaro() ? 'claro' : 'escuro',
     naoLidos: aba === 'helpdesk' ? 0 : Helpdesk.naoVistos(), sino: sinoAberto, helpSub, helpdesk: Acesso.helpdesk(), email: Store.email() || '', nome: Acesso.nome() || '',
     paineis: Paineis.paraAba().map(p => ({ id: p.id, nome: p.nomeModulo })), painel: painelAtual };

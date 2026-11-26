@@ -28,7 +28,7 @@ function permitido(m, caminho) {
   const p = caminho.split('?')[0];
   if (p.startsWith('/helpdesk/admin/')) return ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'].indexOf(m) >= 0;   // Administração do Helpdesk (o site confere quem pode)
   if (p.startsWith('/helpdesk/')) return ['GET', 'POST', 'PATCH'].indexOf(m) >= 0;
-  if (m === 'GET') return p === '/auth/me' || p.startsWith('/dashboard/') || p.startsWith('/logistics/') || p.startsWith('/admin/users') || p.startsWith('/admin/audit') || p.startsWith('/admin/firebird-mappings');
+  if (m === 'GET') return p === '/auth/me' || p.startsWith('/dashboard/') || p.startsWith('/logistics/') || p.startsWith('/finance/') || p.startsWith('/admin/users') || p.startsWith('/admin/audit') || p.startsWith('/admin/firebird-mappings');
   return ESCRITAS.some(e => e[0] === m && e[1].test(p));
 }
 

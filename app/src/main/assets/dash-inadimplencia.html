@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="dash.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
+<style>
+.perfil{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;background:var(--laranja-s);color:var(--tx-laranja);margin-left:6px;vertical-align:2px}
+@media (max-width:440px){.perfil{display:none}}
+.fx{display:grid;grid-template-columns:1fr 150px;gap:8px;margin:0 0 12px}
+.fx input,.fx select{width:100%;box-sizing:border-box;border:1px solid var(--ln);background:var(--sf);color:var(--tx);border-radius:12px;padding:11px 12px;font:inherit;font-size:14px}
+.fxs{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px}
+.fxs b{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;border-radius:999px;padding:6px 10px;background:var(--rosa-s);color:var(--tx-rosa);cursor:pointer}
+.fai{display:flex;align-items:center;gap:10px;padding:10px 8px;margin:0 -8px;border-radius:10px;cursor:pointer}.fai:hover{background:var(--sf2)}.fai.on{background:var(--rosa-s)}
+.fai .q{width:12px;height:12px;border-radius:4px;flex:0 0 auto}
+.fai .c{flex:1;min-width:0}.fai .c b{font-size:14px}.fai .c span{display:block;font-size:12px;color:var(--tx3)}
+.fai .t{height:6px;border-radius:99px;background:var(--sf3);margin-top:6px;overflow:hidden}.fai .t i{display:block;height:100%;border-radius:99px}
+.fai .v{text-align:right;font-weight:700;font-size:14px;white-space:nowrap}.fai .v small{display:block;font-size:12px;color:var(--tx3);font-weight:600}
+.cli{border-top:1px solid var(--ln)}.cli:first-child{border-top:0}
+.cli .l{display:flex;gap:10px;align-items:center;padding:11px 0;cursor:pointer}
+.cli .c{flex:1;min-width:0}.cli .c b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cli .c span{font-size:12px;color:var(--tx3)}
+.cli .v{text-align:right;white-space:nowrap}.cli .v b{font-size:14.5px;display:block}
+.dd{display:inline-block;font-size:11.5px;font-weight:700;border-radius:99px;padding:2px 8px;margin-top:3px}
+.tts{background:var(--sf2);border:1px solid var(--ln);border-radius:12px;padding:4px 12px;margin:0 0 12px}
+.tts .r{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--ln);font-size:13px}.tts .r:first-child{border-top:0}
+.tts .r span{color:var(--tx3);font-size:12px}.tts .r b{white-space:nowrap}
+.tts .acs{display:flex;gap:8px;padding:8px 0 6px}.tts .acs a{flex:1;text-align:center;font-size:13px;font-weight:700;border-radius:10px;padding:9px;background:var(--sf);border:1px solid var(--ln);color:var(--tx);text-decoration:none}
+</style>
+</head><body class="dash">
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1>Inadimplência<span class="perfil">homologação</span></h1><div class="st" id="sub">Carregando…</div></div>
+  <button class="bt" id="btImg" aria-label="Gerar imagem" title="Gerar imagem (PNG)"></button>
+  <button class="bt" id="btAt" aria-label="Atualizar"></button>
+</div>
+<div id="aviso"></div>
+<div id="c"><div class="carregando"><i></i>Calculando o saldo vencido…</div></div>
+<script src="base.js"></script>
+<script src="dash.js"></script>
+<script src="logo-dados.js"></script>
+<script src="imagem.js"></script>
+<script>
+var X = Dash, f = { nome: '', min: X.lembrar('inad_min') || '', faixa: '' }, d = null, pags = 1, ab = {}, tits = {}, carregandoAgora = false, seq = 0;
+var CORES = { '1-30': 'var(--azul)', '31-60': 'var(--violeta)', '61-90': 'var(--laranja)', '91+': 'var(--rosa)' };
+function n(v) { return F.n(v); }
+function url(pag) { return '/finance/delinquency' + X.q({ reference_date: X.hoje(), page: pag, page_size: 20, aging_bucket: f.faixa, customer_name: f.nome.trim(), minimum_balance: f.min }); }
+function carregar(forcar) {
+  if (carregandoAgora && !forcar) return;
+  var meu = ++seq, k = url(1);
+  if (!d || d.k !== k) { var c = X.cache('inad|' + k); d = c && c.d ? c.d : null; pags = 1; X.manter(desenhar); }
+  carregandoAgora = true; document.getElementById('btAt').classList.add('gira');
+  var lento = setTimeout(function () { var s = document.getElementById('sub'); if (s && meu === seq) s.textContent = 'O site leva uns segundos para calcular…'; }, 2500);
+  X.get(k).then(function (j) { if (meu !== seq) return; d = { k: k, j: j, cl: j.clients || [] }; guardarDia(j); pags = 1; X.cache('inad|' + k, d); document.getElementById('aviso').innerHTML = ''; })
+    .catch(function (e) { if (meu === seq) document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); })
+    .then(function () { clearTimeout(lento); if (meu !== seq) return; carregandoAgora = false; document.getElementById('btAt').classList.remove('gira'); X.manter(desenhar); });
+}
+function maisClientes(b) {
+  if (!d) return; b.disabled = true; b.textContent = 'Carregando…';
+  X.get(url(pags + 1)).then(function (j) { pags++; d.cl = d.cl.concat(j.clients || []); }).catch(function (e) { F.toast(e.message); }).then(function () { X.manter(desenhar); });
+}
+function abrirCli(k) {
+  ab[k] = !ab[k]; desenhar();
+  if (ab[k] && !tits[k]) {
+    tits[k] = 'c';
+    X.get('/finance/delinquency/clients/' + encodeURIComponent(k) + '/titles' + X.q({ reference_date: X.hoje(), page: 1, page_size: 50 }))
+      .then(function (j) { tits[k] = j.records || []; }).catch(function () { tits[k] = 'e'; }).then(function () { X.manter(desenhar); });
+  }
+}
+// ---------- evolução: o app guarda o saldo vencido de cada dia (sem filtro) ----------
+function historico() { try { return JSON.parse(localStorage.getItem('inad_hist') || '{}'); } catch (e) { return {}; } }
+function guardarDia(j) {
+  if (f.nome || f.min || f.faixa) return;   // só o total geral
+  var h = historico(), dia = String(j.reference_date || X.hoje()).slice(0, 10), fx = {};
+  (j.buckets || []).forEach(function (b) { fx[b.key] = n(b.balance); });
+  h[dia] = { s: n(j.overdue_balance), c: n(j.customer_count), t: n(j.title_count), fx: fx };
+  var ks = Object.keys(h).sort(); ks.slice(0, Math.max(0, ks.length - 180)).forEach(function (k) { delete h[k]; });
+  try { localStorage.setItem('inad_hist', JSON.stringify(h)); } catch (e) { }
+}
+function difTxt(v) { return (v > 0 ? '▲ +' : v < 0 ? '▼ −' : '') + X.k(Math.abs(v)); }
+function evolucao() {
+  var h = historico(), ks = Object.keys(h).sort().slice(-60);
+  if (ks.length < 2) return X.card('Evolução do saldo vencido', 'O app guarda o saldo de cada dia em que a tela é aberta', '<div class="vazio2">O gráfico começa a aparecer a partir do próximo dia em que você abrir esta tela.</div>');
+  var ult = h[ks[ks.length - 1]], ante = h[ks[ks.length - 2]], alvo = X.iso(new Date(X.de(ks[ks.length - 1]).getTime() - 7 * 864e5)), sem = null;
+  for (var i = ks.length - 2; i >= 0; i--) if (ks[i] <= alvo) { sem = h[ks[i]]; break; }
+  var chip = function (rot, de) { if (!de) return ''; var v = ult.s - de.s; return '<span class="chip ' + (v > 0 ? 'la' : 'ok') + '">' + rot + ': ' + difTxt(v) + '</span>'; };
+  // o eixo começa perto do menor valor (senão a linha fica reta: a variação é pequena perto do total)
+  var nn = ks.length, meio = Math.floor(nn / 2), vs = ks.map(function (k) { return h[k].s; }), mn = Math.min.apply(null, vs), mx0 = Math.max.apply(null, vs), base = Math.max(0, mn - Math.max(1, mx0 - mn) * 0.6), mx = mx0 - base;
+  return X.card('Evolução do saldo vencido', 'Subindo é ruim · toque no ponto para ver o dia',
+    '<div class="chips" style="margin:0 0 8px">' + chip('Desde ' + X.dm(ks[ks.length - 2]), ante) + chip('Em 7 dias', sem) + '</div>' +
+    X.linhas('inad', [{ pts: ks.map(function (k, i) { return [i, h[k].s - base]; }), cor: 'var(--rosa)', pontos: true }], nn, [[0, X.dm(ks[0])], [meio, X.dm(ks[meio])], [nn - 1, X.dm(ks[nn - 1])]], mx * 1.1, [],
+      ks.map(function (k) { return '<b>' + X.dm(k) + '</b><br>vencido ' + X.k(h[k].s) + '<br>' + X.int(h[k].c) + ' clientes'; })));
+}
+function quando() { return new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function imagem() {
+  if (!d) { F.toast('Espere os números carregarem'); return; }
+  var j = d.j, bl = [], filtro = [f.nome && 'cliente "' + f.nome + '"', f.min && 'saldo acima de ' + X.k(f.min), f.faixa && 'atraso ' + f.faixa + ' dias'].filter(Boolean).join(' · ');
+  bl.push({ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Saldo vencido', valor: n(j.overdue_balance), pill: X.int(j.customer_count) + ' clientes', sub: X.int(j.title_count) + ' títulos vencidos' }] });
+  bl.push({ tipo: 'tiles', cols: 2, itens: (j.buckets || []).map(function (b) { return { r: b.label + ' · ' + Math.round(n(b.share_percent)) + '%', v: X.k(b.balance), c: b.key === '91+' ? 'rosa' : '' }; }) });
+  bl.push({ tipo: 'tabela', titulo: 'Maiores saldos vencidos', cols: [['Cliente', 'l', 0.52], ['Atraso', 'r', 0.2], ['Saldo', 'r', 0.28, 1]],
+    linhas: d.cl.slice(0, 15).map(function (c) { return [c.customer_name || '—', X.int(c.maximum_days_overdue) + ' dias', F.brl(c.overdue_balance)]; }) });
+  bl.push({ tipo: 'nota', t: (filtro ? 'Filtro: ' + filtro + '. ' : '') + 'Estimativa em homologação no site.' });
+  F.gerarImagem({ titulo: 'Inadimplência', sub: 'Posição em ' + F.dataBR(j.reference_date || X.hoje()) + ' · ' + quando(), arquivo: 'Inadimplencia_' + X.hoje().replace(/-/g, ''), blocos: bl });
+}
+function corAtraso(dd) { return dd > 90 ? 'rosa' : dd > 60 ? 'laranja' : dd > 30 ? 'violeta' : 'azul'; }
+
+function desenhar() {
+  var h = '<div class="fx"><input id="fNome" placeholder="Buscar cliente" value="' + F.esc(f.nome) + '"><select id="fMin">' +
+    X.opcoes([['', 'Qualquer saldo'], ['1000', 'Acima de R$ 1 mil'], ['10000', 'Acima de R$ 10 mil'], ['50000', 'Acima de R$ 50 mil']], f.min) + '</select></div>';
+  if (f.faixa) h += '<div class="fxs"><b data-faixa="">Atraso ' + F.esc(f.faixa === '91+' ? '91 dias ou mais' : f.faixa + ' dias') + ' ×</b></div>';
+  if (!d) { document.getElementById('sub').textContent = 'Calculando…'; document.getElementById('c').innerHTML = h + X.carregando('Calculando o saldo vencido…'); return; }
+  var j = d.j, b = j.buckets || [], tot = n(j.overdue_balance) || 1;
+  document.getElementById('sub').textContent = 'Posição em ' + F.dataBR(j.reference_date || X.hoje()) + ' · estimativa em homologação';
+  h += '<div class="card hero"><div class="lb">Saldo vencido</div><div class="v">' + X.brl0(j.overdue_balance) + '</div><div class="s"><b>' + X.int(j.customer_count) + '</b> clientes · <b>' + X.int(j.title_count) + '</b> títulos vencidos</div>' +
+    X.faixa(b.map(function (x) { return [x.label, n(x.balance), CORES[x.key] || 'var(--azul)']; }), 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') +
+    '<div class="leg">' + b.map(function (x) { return '<span><b style="color:' + (CORES[x.key] || 'var(--azul)') + '">■</b> ' + F.esc(x.label.replace(' dias ou mais', '+').replace(' dias', 'd')) + '</span>'; }).join('') + '</div>';
+  var velho = b.filter(function (x) { return x.key === '91+'; })[0];
+  if (velho && n(velho.share_percent) >= 50) h += '<div class="chips"><span class="chip la">' + Math.round(n(velho.share_percent)) + '% está vencido há mais de 90 dias</span></div>';
+  h += '</div>';
+  if (!f.nome && !f.min && !f.faixa) h += evolucao();
+  h += X.card('Por faixa de atraso', 'Toque numa faixa para ver só esses clientes', b.map(function (x) {
+    var c = CORES[x.key] || 'var(--azul)';
+    return '<div class="fai' + (f.faixa === x.key ? ' on' : '') + '" data-faixa="' + F.esc(x.key) + '"><span class="q" style="background:' + c + '"></span><div class="c"><b>' + F.esc(x.label) + '</b><span>' + X.int(x.title_count) + ' títulos · ' + X.int(x.customer_count) + ' clientes</span>' +
+      '<div class="t"><i style="width:' + Math.max(1, n(x.balance) / tot * 100) + '%;background:' + c + '"></i></div></div><div class="v">' + X.k(x.balance) + '<small>' + Math.round(n(x.share_percent)) + '%</small></div></div>';
+  }).join(''));
+  var cl = d.cl;
+  h += X.card('Clientes com saldo vencido', 'Maior saldo primeiro · toque para ver os títulos', !cl.length ? '<div class="vazio2">Nenhum cliente com esses filtros.</div>' : cl.map(function (c) {
+    var k = c.client_key, dd = n(c.maximum_days_overdue), cor = corAtraso(dd), t = tits[k];
+    var det = !ab[k] ? '' : '<div class="tts">' + (t === 'c' ? '<div class="r"><span>Carregando títulos…</span></div>' : t === 'e' ? '<div class="r"><span>Não consegui carregar os títulos.</span></div>' :
+      (t || []).map(function (x) { return '<div class="r"><div>Doc <b>' + F.esc(x.document_number) + '</b> · venceu ' + F.dataBR(x.due_date) + '<br><span>' + X.int(x.days_overdue) + ' dias · empresa ' + F.esc(x.company) + '</span></div><b>' + F.brl(x.outstanding_balance) + '</b></div>'; }).join('')) +
+      (c.phone ? '<div class="acs"><a href="tel:' + F.esc(String(c.phone).replace(/\D/g, '')) + '">Ligar</a><a href="https://wa.me/55' + F.esc(String(c.phone).replace(/\D/g, '')) + '" target="_blank">WhatsApp</a></div>' : '') + '</div>';
+    return '<div class="cli"><div class="l" data-cli="' + F.esc(k) + '"><div class="c"><b>' + F.esc(c.customer_name || '—') + '</b><span>cód. ' + F.esc(c.customer_code) + (c.phone ? ' · ' + F.esc(c.phone) : '') + ' · ' + X.int(c.title_count) + (n(c.title_count) === 1 ? ' título' : ' títulos') + '</span></div>' +
+      '<div class="v"><b>' + X.k(c.overdue_balance) + '</b><span class="dd" style="background:var(--' + cor + '-s);color:var(--tx-' + cor + ')">' + X.int(dd) + ' dias</span></div></div>' + det + '</div>';
+  }).join('') + (cl.length < n(j.total_clients) ? '<button class="mais" id="btMais">Ver mais (' + X.int(n(j.total_clients) - cl.length) + ')</button>' : ''));
+  h += '<div class="cs" style="margin:4px 2px 14px">Estimativa em homologação: cancelamentos, renegociações e saldo exigível ainda não validados.</div>';
+  var c = document.getElementById('c'); c.innerHTML = h; X.ligarGraficos(c);
+}
+
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-faixa],[data-cli],#btMais') : null; if (!t) return;
+  if (t.id === 'btMais') { maisClientes(t); return; }
+  if (t.hasAttribute('data-cli')) { abrirCli(t.getAttribute('data-cli')); return; }
+  var k = t.getAttribute('data-faixa'); f.faixa = f.faixa === k ? '' : k; ab = {}; carregar(true);
+});
+var buscar = X.espera(function () { ab = {}; carregar(true); }, 500);
+document.addEventListener('input', function (ev) { if (ev.target.id === 'fNome') { f.nome = ev.target.value; buscar(); } });
+document.addEventListener('change', function (ev) { if (ev.target.id === 'fMin') { f.min = ev.target.value; X.lembrar('inad_min', f.min); ab = {}; carregar(true); } });
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btAt').innerHTML = F.ic('atualizar');
+document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
+document.getElementById('btAt').onclick = function () { tits = {}; carregar(true); };
+document.getElementById('btImg').innerHTML = F.ic('imagem'); document.getElementById('btImg').onclick = imagem;
+window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t); };
+F.topoSombra();
+desenhar(); carregar();
+</script>
+</body></html>

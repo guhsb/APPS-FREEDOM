@@ -388,6 +388,9 @@ namespace Freedom
         public static bool Helpdesk() { return Tem(HELPDESK); }
         public static bool Comercial() { return Tem("commercial"); }
         public static bool Logistica() { return Tem("logistics"); }
+        /// <summary>Financeiro e Inadimplência: só aparecem quando o site confirma o módulo (dados sensíveis).</summary>
+        public static bool Financeiro() { var m = Modulos(); return m != null && m.Contains("finance"); }
+        public static bool Inadimplencia() { var m = Modulos(); return m != null && m.Contains("delinquency"); }
         /// <summary>Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra).</summary>
         public static bool Admin()
         {

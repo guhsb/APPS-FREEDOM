@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="dash.css"><script>try{document.documentElement.setAttribute('data-tema',((window.App&&App.tema&&App.tema())||localStorage.getItem('tema'))==='escuro'?'escuro':'claro')}catch(e){document.documentElement.setAttribute('data-tema','claro')}</script>
+<style>
+.perfil{display:inline-flex;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;background:var(--laranja-s);color:var(--tx-laranja);margin-left:6px;vertical-align:2px}
+@media (max-width:440px){.perfil{display:none}}
+.pers{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}.pers::-webkit-scrollbar{display:none}
+.pers b{flex:0 0 auto;padding:7px 12px;border-radius:999px;border:1px solid var(--ln);background:var(--sf);font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer}
+.pers b.on{background:var(--tx);color:var(--sf);border-color:var(--tx)}
+.dois{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:620px){.dois{grid-template-columns:1fr}}
+.pr .lb{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
+.pr .v{font-size:24px;font-weight:800;letter-spacing:-.4px;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.pr .s{font-size:12.5px;color:var(--tx3)}.pr .s b{color:var(--tx)}
+.pr .barra{margin:12px 0 6px}
+.tit{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--ln)}.tit:first-child{border-top:0}
+.tit .c{flex:1;min-width:0}.tit .c b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tit .c span{font-size:12px;color:var(--tx3)}
+.tit .v{text-align:right;font-weight:700;font-size:14px;white-space:nowrap}.tit .v small{display:block;font-weight:600;font-size:11.5px;color:var(--tx3)}
+.sem{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-top:1px solid var(--ln)}.sem:first-child{border-top:0}
+.sem b{font-size:13.5px}.sem .sv{text-align:right;font-weight:800;font-size:14px;white-space:nowrap}
+.sem .bb{grid-column:1/-1;display:flex;gap:3px;height:8px}.sem .bb i{border-radius:99px;display:block}
+.sem small{grid-column:1/-1;font-size:12px;color:var(--tx3)}
+.dia2{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);margin:14px 0 2px;display:flex;justify-content:space-between}
+</style>
+</head><body class="dash">
+<div class="topo">
+  <button class="bt voltar" id="btVoltar" aria-label="Voltar"></button>
+  <div class="tt"><h1>Financeiro<span class="perfil">homologação</span></h1><div class="st" id="sub">Carregando…</div></div>
+  <button class="bt" id="btImg" aria-label="Gerar imagem" title="Gerar imagem (PNG)"></button>
+  <button class="bt" id="btAt" aria-label="Atualizar"></button>
+</div>
+<div id="aviso"></div>
+<div id="c"><div class="carregando"><i></i>Carregando o financeiro…</div></div>
+<script src="base.js"></script>
+<script src="dash.js"></script>
+<script src="logo-dados.js"></script>
+<script src="imagem.js"></script>
+<script>
+var X = Dash, aba = X.lembrar('fin_aba') || 'resumo', per = X.lembrar('fin_per') || 'mes', S = { resumo: null, rec: null, pag: null }, carregando = {};
+var ABAS = [['resumo', 'Resumo'], ['rec', 'A receber'], ['pag', 'A pagar']];
+var PERS = [['hoje', 'Hoje'], ['semana', 'Esta semana'], ['mes', 'Mês atual'], ['prox7', 'Próximos 7 dias'], ['proxmes', 'Próximo mês'], ['mesant', 'Mês passado']];
+/** Período escolhido → [de, até] (datas ISO). */
+function periodo(p) {
+  var h = X.hoje(), d = X.de(h), dia = 864e5;
+  if (p === 'hoje') return [h, h];
+  if (p === 'semana') { var w = (d.getUTCDay() + 6) % 7; return [X.iso(new Date(d.getTime() - w * dia)), X.iso(new Date(d.getTime() + (6 - w) * dia))]; }
+  if (p === 'prox7') return [h, X.iso(new Date(d.getTime() + 6 * dia))];
+  if (p === 'proxmes') return X.mes(h, 1);
+  if (p === 'mesant') return X.mes(h, -1);
+  return X.mes(h, 0);
+}
+function n(v) { return F.n(v); }
+var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** Mesmo período antes, até o mesmo ponto (mês atual até hoje × mês passado até o mesmo dia). Futuro: sem comparação. */
+function anterior(p) {
+  var h = X.hoje(), dia = 864e5, r = periodo(p);
+  if (p === 'prox7' || p === 'proxmes') return null;
+  if (p === 'hoje') { var o = X.iso(new Date(X.de(h).getTime() - dia)); return [o, o, 'ontem']; }
+  if (p === 'semana') { var ate = r[1] > h ? h : r[1]; return [X.iso(new Date(X.de(r[0]).getTime() - 7 * dia)), X.iso(new Date(X.de(ate).getTime() - 7 * dia)), 'semana passada']; }
+  var m = X.mes(r[0], -1), fim = r[1] > h ? h : r[1], d = Math.min(Number(fim.slice(8, 10)), Number(m[1].slice(8, 10)));
+  return [m[0], m[0].slice(0, 8) + ('0' + d).slice(-2), MESES[Number(m[0].slice(5, 7)) - 1] + (r[1] > h ? ' (até dia ' + d + ')' : '')];
+}
+/** As 4 semanas a partir de amanhã (previsto pelo vencimento). */
+function semanas() { var d = X.de(X.hoje()).getTime(), dia = 864e5, l = []; for (var i = 0; i < 4; i++) l.push([X.iso(new Date(d + (1 + i * 7) * dia)), X.iso(new Date(d + (7 + i * 7) * dia))]); return l; }
+function variacaoTxt(at, an) { at = n(at); an = n(an); if (!an) return ''; var v = (at - an) / an * 100; return (v >= 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(v)) + '%'; }
+function pct(v) { return Math.round(n(v)) + '%'; }
+
+// ---------- dados ----------
+function chave(t) { var p = periodo(per); return t + '|' + p[0] + '|' + p[1]; }
+function carregar(forcar) {
+  var k = chave(aba), alvo = aba;
+  if (carregando[k] && !forcar) return;
+  if (!S[alvo] || S[alvo].k !== k) { var c = X.cache('fin|' + k); S[alvo] = c && c.d ? c.d : null; desenhar(); }
+  carregando[k] = true; document.getElementById('btAt').classList.add('gira');
+  var p = periodo(per), pr;
+  if (alvo === 'resumo') {
+    var an = anterior(per), dash = function (a, b) { return '/finance/dashboard' + X.q({ date_from: a, date_to: b }); };
+    pr = Promise.all([X.get(dash(p[0], p[1])), an ? X.opc(dash(an[0], an[1])) : null].concat(semanas().map(function (w) { return X.opc(dash(w[0], w[1])); })))
+      .then(function (r) { return { k: k, j: r[0], ant: r[1] ? { j: r[1], nome: an[2] } : null, proj: r.slice(2).map(function (x, i) { return { w: semanas()[i], j: x }; }) }; });
+  }
+  else pr = titulos(alvo === 'rec' ? 'accounts-receivable' : 'accounts-payable', p).then(function (l) { return { k: k, l: l }; });
+  pr.then(function (r) { S[alvo] = r; X.cache('fin|' + k, r); document.getElementById('aviso').innerHTML = ''; })
+    .catch(function (e) { document.getElementById('aviso').innerHTML = X.erro(e.message || 'Não consegui carregar'); })
+    .then(function () { delete carregando[k]; document.getElementById('btAt').classList.remove('gira'); if (aba === alvo) X.manter(desenhar); });
+}
+/** Títulos em aberto que vencem no período (até 1.000, mais perto primeiro). */
+function titulos(rota, p) {
+  var todos = [], tot = 0;
+  function pag(i) {
+    return X.get('/finance/' + rota + X.q({ due_date_from: p[0], due_date_to: p[1], situation: 'A', order_by: 'due_date', page: i, page_size: 200 })).then(function (j) {
+      tot = n(j.total); (j.records || []).forEach(function (r) { todos.push(r); });
+      if (todos.length < tot && i < 5) return pag(i + 1);
+    });
+  }
+  return pag(1).then(function () {
+    return { tot: tot, itens: todos.map(function (r) {
+      var m = r.monetary_values || {}, d = r.original_dates || {}, c = r.original_codes || {};
+      return { doc: c.nro_documento || r.nrolancto, nome: c.cliente_nome || (c.cod_fornecedor ? 'Fornecedor ' + c.cod_fornecedor : '—'), cod: c.cod_cliente || c.cod_fornecedor || '', fone: c.cliente_fone1 || c.cliente_celular || '',
+        emp: c.cod_empresa || '', venc: String(d.data_vencimento || '').slice(0, 10), v: n(m.valor != null ? m.valor : m.valor_original) };
+    }) };
+  });
+}
+
+// ---------- telas ----------
+function desenhar() {
+  if (!ABAS.some(function (a) { return a[0] === aba; })) aba = 'resumo';
+  var p = periodo(per);
+  document.getElementById('sub').textContent = F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · dados em homologação';
+  var h = X.abas(ABAS, aba) + '<div class="pers">' + PERS.map(function (x) { return '<b data-per="' + x[0] + '"' + (x[0] === per ? ' class="on"' : '') + '>' + x[1] + '</b>'; }).join('') + '</div>';
+  var s = S[aba];
+  if (!s || s.k !== chave(aba)) h += X.carregando(aba === 'resumo' ? 'Carregando o caixa…' : 'Carregando os títulos…');
+  else h += aba === 'resumo' ? resumo(s.j, s.ant, s.proj) : lista(s.l, aba === 'rec');
+  var c = document.getElementById('c'); c.innerHTML = h; X.ligarGraficos(c);
+}
+function resumo(j, ant, proj) {
+  var ent = n(j.entries), sai = n(j.exits), liq = n(j.net), h = '';
+  h += '<div class="card hero"><div class="lb">Saldo do período</div><div class="v" style="color:var(--' + (liq >= 0 ? 'tx-verde' : 'tx-rosa') + ')">' + (liq < 0 ? '−' : '') + X.brl0(Math.abs(liq)) + '</div>' +
+    '<div class="s">Entrou <b>' + X.k(ent) + '</b> · saiu <b>' + X.k(sai) + '</b></div>' +
+    X.faixa([['Entradas', ent, 'var(--verde)'], ['Saídas', sai, 'var(--azul)']], 14).replace('class="abc"', 'class="abc" style="margin:14px 0 6px"') +
+    '<div class="leg"><span><b style="color:var(--verde)">■</b> Recebimentos ' + pct(j.entries_share_percent) + '</span><span><b style="color:var(--azul)">■</b> Pagamentos ' + pct(j.exits_share_percent) + '</span></div>' +
+    '<div class="chips"><span class="chip ' + (n(j.net_difference) >= 0 ? 'ok' : 'la') + '">Previsto: ' + X.k(j.net_forecast) + ' de saldo</span>' +
+    '<span class="chip az">' + X.int(j.entries_count) + ' recebimentos · ' + X.int(j.exits_count) + ' pagamentos</span></div>';
+  if (ant && ant.j && (n(ant.j.entries) || n(ant.j.exits))) {
+    var ve = variacaoTxt(ent, ant.j.entries), vs = variacaoTxt(sai, ant.j.exits);
+    h += '<div class="chips" style="margin-top:6px">' + (ve ? '<span class="chip ' + (ent >= n(ant.j.entries) ? 'ok' : 'la') + '">Recebido ' + ve + ' vs ' + F.esc(ant.nome) + '</span>' : '') +
+      (vs ? '<span class="chip ' + (sai <= n(ant.j.exits) ? 'ok' : 'la') + '">Pago ' + vs + ' vs ' + F.esc(ant.nome) + '</span>' : '') + '</div>';
+  }
+  h += '</div>';
+  h += '<div class="dois">' + previsto('Recebimentos', ent, j.entries_forecast, j.entries_execution_percent, j.entries_missing, 'verde', 'falta receber') +
+    previsto('Pagamentos', sai, j.exits_forecast, j.exits_execution_percent, j.exits_missing, 'azul', 'falta pagar') + '</div>';
+  h += projecao(proj);
+  var dias = (j.daily || []).filter(function (x) { return x.date <= X.hoje() || n(x.entries) || n(x.exits); });
+  if (dias.length >= 2) {
+    var nn = dias.length, meio = Math.floor(nn / 2), mx = Math.max.apply(null, dias.map(function (x) { return Math.max(n(x.entries), n(x.exits)); }));
+    var dicas = dias.map(function (x) { return '<b>' + X.dm(x.date) + '</b><br>recebido ' + X.k(x.entries) + '<br>pago ' + X.k(x.exits) + '<br>saldo ' + X.k(x.net); });
+    h += X.card('Dia a dia', 'Recebido × pago · toque para ver o dia', X.linhas('fin', [{ pts: dias.map(function (x, i) { return [i, n(x.entries)]; }), cor: 'var(--verde)' }, { pts: dias.map(function (x, i) { return [i, n(x.exits)]; }), cor: 'var(--azul)' }],
+      nn, [[0, X.dm(dias[0].date)], [meio, X.dm(dias[meio].date)], [nn - 1, X.dm(dias[nn - 1].date)]], mx, [], dicas) +
+      '<div class="lg"><span><i style="border-color:var(--verde)"></i>Recebido</span><span><i style="border-color:var(--azul)"></i>Pago</span></div>');
+  }
+  var ins = [], uteis = dias.filter(function (x) { return n(x.entries) || n(x.exits); });
+  if (uteis.length) {
+    var melhor = uteis.slice().sort(function (a, b) { return n(b.entries) - n(a.entries); })[0], neg = uteis.filter(function (x) { return n(x.net) < 0; });
+    ins.push(X.ins('verde', '▲', 'Maior recebimento: ' + X.dm(melhor.date), X.k(melhor.entries) + ' recebidos nesse dia'));
+    if (neg.length) ins.push(X.ins('laranja', '▼', neg.length + (neg.length > 1 ? ' dias pagaram mais do que receberam' : ' dia pagou mais do que recebeu'), 'Pior: ' + X.dm(neg.sort(function (a, b) { return n(a.net) - n(b.net); })[0].date) + ' · ' + X.k(neg[0].net)));
+  }
+  if (n(j.entries_missing) > 0) ins.push(X.ins('azul', '◎', 'Ainda faltam ' + X.k(j.entries_missing) + ' para receber', 'Do previsto de ' + X.k(j.entries_forecast) + ' no período'));
+  h += X.atencao(ins.slice(0, 4));
+  h += '<div class="cs" style="margin:4px 2px 14px">Estimativa em homologação: o previsto usa o vencimento e o realizado a data de pagamento.</div>';
+  return h;
+}
+function projecao(proj) {
+  proj = (proj || []).filter(function (x) { return x.j && x.j.entries_forecast != null; }); if (!proj.length) return '';
+  var mx = Math.max.apply(null, proj.map(function (x) { return Math.max(n(x.j.entries_forecast), n(x.j.exits_forecast)); }).concat([1])), te = 0, ts = 0;
+  var corpo = proj.map(function (x) {
+    var e = n(x.j.entries_forecast), sa = n(x.j.exits_forecast), sl = e - sa; te += e; ts += sa;
+    return '<div class="sem"><b>' + X.dm(x.w[0]) + ' a ' + X.dm(x.w[1]) + '</b><span class="sv" style="color:var(--tx-' + (sl >= 0 ? 'verde' : 'rosa') + ')">' + (sl < 0 ? '−' : '+') + X.k(Math.abs(sl)) + '</span>' +
+      '<div class="bb"><i style="width:' + (e / mx * 50) + '%;background:var(--verde)"></i><i style="width:' + (sa / mx * 50) + '%;background:var(--azul)"></i></div>' +
+      '<small>entra ' + X.k(e) + ' · sai ' + X.k(sa) + '</small></div>';
+  }).join('');
+  var st = te - ts;
+  return X.card('Próximos 30 dias', 'Previsto pelo vencimento dos títulos · ' + (st >= 0 ? 'sobra ' : 'falta ') + X.k(Math.abs(st)), corpo +
+    '<div class="lg"><span><i style="border-color:var(--verde)"></i>Entra</span><span><i style="border-color:var(--azul)"></i>Sai</span></div>');
+}
+function previsto(t, real, prev, p, falta, cor, txtFalta) {
+  return '<div class="card pr"><div class="lb">' + t + '</div><div class="v">' + X.k(real) + '</div><div class="s">de <b>' + X.k(prev) + '</b> previstos</div>' +
+    '<div class="barra"><i style="width:' + Math.min(100, n(p)) + '%;background:var(--' + cor + ')"></i></div>' +
+    '<div class="leg"><span><b style="color:var(--tx)">' + pct(p) + '</b> realizado</span><span>' + txtFalta + ' ' + X.k(falta) + '</span></div></div>';
+}
+function lista(l, rec) {
+  if (!l.itens.length) return '<div class="vazio">Nenhum título em aberto vencendo nesse período.</div>';
+  var tot = l.itens.reduce(function (a, x) { return a + x.v; }, 0), hoje = X.hoje(), h = '';
+  var venc = l.itens.filter(function (x) { return x.venc < hoje; }), vv = venc.reduce(function (a, x) { return a + x.v; }, 0);
+  var ncli = Object.keys(l.itens.reduce(function (m, x) { m[x.cod] = 1; return m; }, {})).length;
+  h += X.k4([[rec ? 'A receber' : 'A pagar', X.k(tot), X.int(l.tot) + ' títulos · ' + ncli + (rec ? ' clientes' : ' fornecedores')], ['Já vencidos', venc.length ? X.k(vv) : '—', venc.length ? venc.length + ' títulos' : 'nenhum', venc.length ? 'neg' : '']]);
+  var dias = {}, ord = [];
+  l.itens.forEach(function (x) { if (!dias[x.venc]) { dias[x.venc] = []; ord.push(x.venc); } dias[x.venc].push(x); });
+  var corpo = ord.map(function (d) {
+    var it = dias[d].sort(function (a, b) { return b.v - a.v; }), s = it.reduce(function (a, x) { return a + x.v; }, 0);
+    return '<div class="dia2"><span>' + (d === hoje ? 'Hoje' : X.dm(d)) + (d < hoje ? ' · vencido' : '') + '</span><span>' + X.k(s) + '</span></div>' + it.slice(0, 15).map(function (x) {
+      return '<div class="tit"><div class="c"><b>' + F.esc(x.nome) + '</b><span>Doc ' + F.esc(x.doc) + (x.cod ? ' · cód. ' + F.esc(x.cod) : '') + (x.fone ? ' · ' + F.esc(x.fone) : '') + '</span></div><div class="v">' + F.brl(x.v) + '<small>empresa ' + F.esc(x.emp) + '</small></div></div>';
+    }).join('') + (it.length > 15 ? '<div class="cs" style="margin:6px 0 0">+ ' + (it.length - 15) + ' títulos nesse dia</div>' : '');
+  }).join('');
+  h += X.card(rec ? 'Títulos a receber por vencimento' : 'Títulos a pagar por vencimento', l.tot > l.itens.length ? 'Mostrando os ' + l.itens.length + ' primeiros de ' + X.int(l.tot) : 'Maiores valores primeiro em cada dia', corpo);
+  return h;
+}
+
+// ---------- imagem (PNG) ----------
+function quando() { return new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function imagem() {
+  var s = S[aba], p = periodo(per), nomeP = (PERS.filter(function (x) { return x[0] === per; })[0] || [0, ''])[1];
+  if (!s || s.k !== chave(aba)) { F.toast('Espere os números carregarem'); return; }
+  var sub = nomeP + ' · ' + F.dataBR(p[0]) + (p[0] !== p[1] ? ' a ' + F.dataBR(p[1]) : '') + ' · ' + quando(), bl = [];
+  if (aba === 'resumo') {
+    var j = s.j;
+    bl.push({ tipo: 'card', blocos: [{ tipo: 'hero', rot: 'Saldo do período', valor: n(j.net), pill: 'Entrou ' + X.k(j.entries), sub: 'saiu ' + X.k(j.exits) }] });
+    bl.push({ tipo: 'tiles', cols: 2, itens: [{ r: 'Recebido · ' + pct(j.entries_execution_percent) + ' do previsto', v: X.k(j.entries), c: 'verde' }, { r: 'Pago · ' + pct(j.exits_execution_percent) + ' do previsto', v: X.k(j.exits), c: 'azul' },
+      { r: 'Falta receber', v: X.k(j.entries_missing) }, { r: 'Falta pagar', v: X.k(j.exits_missing) }] });
+    var pj = (s.proj || []).filter(function (x) { return x.j && x.j.entries_forecast != null; });
+    if (pj.length) bl.push({ tipo: 'tabela', titulo: 'Próximos 30 dias (previsto)', cols: [['Semana', 'l', 0.3], ['Entra', 'r', 0.24], ['Sai', 'r', 0.22], ['Saldo', 'r', 0.24, 1]],
+      linhas: pj.map(function (x) { var e = n(x.j.entries_forecast), sa = n(x.j.exits_forecast); return [X.dm(x.w[0]) + ' a ' + X.dm(x.w[1]), X.k(e), X.k(sa), (e - sa < 0 ? '−' : '') + X.k(Math.abs(e - sa))]; }) });
+  } else {
+    var l = s.l, tot = l.itens.reduce(function (a, x) { return a + x.v; }, 0);
+    bl.push({ tipo: 'card', blocos: [{ tipo: 'hero', rot: aba === 'rec' ? 'A receber no período' : 'A pagar no período', valor: tot, pill: X.int(l.tot) + ' títulos em aberto' }] });
+    bl.push({ tipo: 'tabela', titulo: 'Maiores títulos', cols: [['Vence', 'l', 0.14], [aba === 'rec' ? 'Cliente' : 'Fornecedor', 'l', 0.6], ['Valor', 'r', 0.26, 1]],
+      linhas: l.itens.slice().sort(function (a, b) { return b.v - a.v; }).slice(0, 20).map(function (x) { return [X.dm(x.venc), x.nome, F.brl(x.v)]; }) });
+  }
+  bl.push({ tipo: 'nota', t: 'Dados em homologação no site.' });
+  F.gerarImagem({ titulo: aba === 'resumo' ? 'Financeiro' : aba === 'rec' ? 'Contas a receber' : 'Contas a pagar', sub: sub, arquivo: 'Financeiro_' + X.hoje().replace(/-/g, ''), blocos: bl });
+}
+
+// ---------- toques ----------
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest ? ev.target.closest('[data-aba],[data-per]') : null; if (!t) return;
+  if (t.hasAttribute('data-aba')) { aba = t.getAttribute('data-aba'); X.lembrar('fin_aba', aba); desenhar(); carregar(); window.scrollTo(0, 0); return; }
+  per = t.getAttribute('data-per'); X.lembrar('fin_per', per); desenhar(); carregar();
+});
+document.getElementById('btVoltar').innerHTML = F.ic('seta');
+document.getElementById('btAt').innerHTML = F.ic('atualizar');
+document.getElementById('btVoltar').onclick = function () { try { App.voltar(); } catch (e) { history.back(); } };
+document.getElementById('btAt').onclick = function () { carregar(true); };
+document.getElementById('btImg').innerHTML = F.ic('imagem'); document.getElementById('btImg').onclick = imagem;
+window.temaMudou = function (t) { document.documentElement.setAttribute('data-tema', t); };
+F.topoSombra();
+desenhar(); carregar();
+</script>
+</body></html>

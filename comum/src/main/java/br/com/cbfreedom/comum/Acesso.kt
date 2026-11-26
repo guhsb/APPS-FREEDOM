@@ -50,6 +50,9 @@ object Acesso {
     fun helpdesk(c: Context): Boolean = tem(c, HELPDESK)
     fun comercial(c: Context): Boolean = tem(c, "commercial")
     fun logistica(c: Context): Boolean = tem(c, "logistics")
+    /** Financeiro e Inadimplência: só quando o site confirma o módulo (dados sensíveis). */
+    fun financeiro(c: Context): Boolean = modulos(c)?.contains("finance") == true
+    fun inadimplencia(c: Context): Boolean = modulos(c)?.contains("delinquency") == true
 
     /** Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra). */
     fun admin(c: Context): Boolean {

@@ -211,6 +211,9 @@ const Acesso = {
   helpdesk() { return this.tem(this.HELPDESK); },
   comercial() { return this.tem('commercial'); },
   logistica() { return this.tem('logistics'); },
+  /** Financeiro e Inadimplência: só quando o site confirma o módulo (dados sensíveis). */
+  financeiro() { const m = this.modulos(); return !!m && m.indexOf('finance') >= 0; },
+  inadimplencia() { const m = this.modulos(); return !!m && m.indexOf('delinquency') >= 0; },
   /** Administração do site: só quem tem permissão de usuários, auditoria ou De/Para (enquanto não souber, não mostra). */
   admin() { if (this.P.getBool('hd_admin', false)) return true; const p = this.P.get('permissoes'); return Array.isArray(p) && p.some(x => x === 'users:manage' || x === 'audit:view' || x === 'firebird_mappings:view'); },
   perfil() { return this.P.getStr('perfil', ''); },

@@ -96,7 +96,7 @@ object Chamado {
         val p = caminho.substringBefore('?')
         if (p.startsWith("/helpdesk/admin/")) return m in setOf("GET", "POST", "PATCH", "PUT", "DELETE")   // Administração do Helpdesk (o site confere quem pode)
         if (p.startsWith("/helpdesk/")) return m in setOf("GET", "POST", "PATCH")
-        if (m == "GET") return p == "/auth/me" || p.startsWith("/dashboard/") || p.startsWith("/logistics/") ||
+        if (m == "GET") return p == "/auth/me" || p.startsWith("/dashboard/") || p.startsWith("/logistics/") || p.startsWith("/finance/") ||
             p.startsWith("/admin/users") || p.startsWith("/admin/audit") || p.startsWith("/admin/firebird-mappings")
         return ESCRITAS.any { it.first == m && it.second.matches(p) }
     }

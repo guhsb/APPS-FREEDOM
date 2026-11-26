@@ -63,7 +63,7 @@ namespace Freedom
             var p = caminho.Split('?')[0];
             if (p.StartsWith("/helpdesk/admin/")) return m == "GET" || m == "POST" || m == "PATCH" || m == "PUT" || m == "DELETE";   // Administração do Helpdesk (o site confere quem pode)
             if (p.StartsWith("/helpdesk/")) return m == "GET" || m == "POST" || m == "PATCH";
-            if (m == "GET") return p == "/auth/me" || p.StartsWith("/dashboard/") || p.StartsWith("/logistics/") ||
+            if (m == "GET") return p == "/auth/me" || p.StartsWith("/dashboard/") || p.StartsWith("/logistics/") || p.StartsWith("/finance/") ||
                 p.StartsWith("/admin/users") || p.StartsWith("/admin/audit") || p.StartsWith("/admin/firebird-mappings");
             foreach (var e in ESCRITAS) if (e.Key == m && e.Value.IsMatch(p)) return true;
             return false;

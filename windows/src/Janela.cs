@@ -56,7 +56,7 @@ namespace Freedom
         string helpSub = "inicio";
         readonly Dictionary<string, string> subs = new Dictionary<string, string>();   // página -> partes (abas) que ela tem
         string dashAtual;   // aba (comercial/logistica/admin) que está aberta no webDash
-        static readonly Dictionary<string, string> DASH = new Dictionary<string, string> { { "comercial", "dash-comercial.html" }, { "logistica", "dash-logistica.html" }, { "admin", "admin.html" } };
+        static readonly Dictionary<string, string> DASH = new Dictionary<string, string> { { "comercial", "dash-comercial.html" }, { "logistica", "dash-logistica.html" }, { "financeiro", "dash-financeiro.html" }, { "inadimplencia", "dash-inadimplencia.html" }, { "admin", "admin.html" } };
         Panel caixaPainel;
         FlowLayoutPanel chips;
         CoreWebView2Environment env;
@@ -356,7 +356,7 @@ namespace Freedom
             nav.Width = 84;
             nav.BackColor = BARRA;
             nav.Paint += (s, e) => { using (var p = new Pen(LINHA)) e.Graphics.DrawLine(p, nav.Width - 1, 0, nav.Width - 1, nav.Height); };
-            var itens = new[] { new[] { "helpdesk", "helpdesk", "Helpdesk" }, new[] { "comercial", "comercial", "Comercial" }, new[] { "logistica", "logistica", "Logística" }, new[] { "admin", "admin", "Admin" }, new[] { "painel", "painel", "Painel" }, new[] { "site", "site", "Site" } };
+            var itens = new[] { new[] { "helpdesk", "helpdesk", "Helpdesk" }, new[] { "comercial", "comercial", "Comercial" }, new[] { "logistica", "logistica", "Logística" }, new[] { "financeiro", "financeiro", "Financeiro" }, new[] { "inadimplencia", "inadimplencia", "Inadimplência" }, new[] { "admin", "admin", "Admin" }, new[] { "painel", "painel", "Painel" }, new[] { "site", "site", "Site" } };
             int y = 12;
             foreach (var it in itens)
             {
@@ -380,6 +380,8 @@ namespace Freedom
             if (id == "painel") return Acesso.Painel();
             if (id == "comercial") return Acesso.Comercial();
             if (id == "logistica") return Acesso.Logistica();
+            if (id == "financeiro") return Acesso.Financeiro();
+            if (id == "inadimplencia") return Acesso.Inadimplencia();
             if (id == "admin") return Acesso.Admin();
             return true;
         }
@@ -486,7 +488,7 @@ namespace Freedom
             var o = new JSONObject();
             bool logado = Store.Logado();
             var lista = new JSONArray();
-            foreach (var it in new[] { new[] { "helpdesk", "Helpdesk" }, new[] { "comercial", "Comercial" }, new[] { "logistica", "Logística" }, new[] { "admin", "Admin" }, new[] { "painel", "Painel" }, new[] { "site", "Site" } })
+            foreach (var it in new[] { new[] { "helpdesk", "Helpdesk" }, new[] { "comercial", "Comercial" }, new[] { "logistica", "Logística" }, new[] { "financeiro", "Financeiro" }, new[] { "inadimplencia", "Inadimplência" }, new[] { "admin", "Admin" }, new[] { "painel", "Painel" }, new[] { "site", "Site" } })
                 if (logado && AbaDisponivel(it[0])) lista.Put(new JSONArray().Put(it[0]).Put(it[1]));
             o.Put("logado", logado).Put("aba", aba).Put("abas", lista).Put("tema", Claro ? "claro" : "escuro")
              .Put("naoLidos", aba == "helpdesk" ? 0 : Helpdesk.NaoVistos()).Put("sino", sinoAberto).Put("helpSub", helpSub)

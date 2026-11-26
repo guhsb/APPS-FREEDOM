@@ -73,8 +73,10 @@ class Tela : Activity() {
         const val ABA_COMERCIAL = "comercial"
         const val ABA_LOGISTICA = "logistica"
         const val ABA_ADMIN = "admin"
+        const val ABA_FINANCEIRO = "financeiro"
+        const val ABA_INADIMPLENCIA = "inadimplencia"
         /** Telas completas (iguais ao site) de cada aba nova. */
-        private val DASH = mapOf(ABA_COMERCIAL to "dash-comercial.html", ABA_LOGISTICA to "dash-logistica.html", ABA_ADMIN to "admin.html")
+        private val DASH = mapOf(ABA_COMERCIAL to "dash-comercial.html", ABA_LOGISTICA to "dash-logistica.html", ABA_FINANCEIRO to "dash-financeiro.html", ABA_INADIMPLENCIA to "dash-inadimplencia.html", ABA_ADMIN to "admin.html")
         private const val ASSET = "file:///android_asset/"
         private const val REQ_ARQUIVO = 31
         private const val REQ_ANEXO = 33
@@ -415,7 +417,7 @@ class Tela : Activity() {
         val o = JSONObject()
         val logado = Store.logado(this)
         val lista = org.json.JSONArray()
-        for (it in listOf(ABA_HELPDESK to "Helpdesk", ABA_COMERCIAL to "Comercial", ABA_LOGISTICA to "Logística", ABA_ADMIN to "Admin", ABA_PAINEL to "Painel", ABA_SITE to "Site"))
+        for (it in listOf(ABA_HELPDESK to "Helpdesk", ABA_COMERCIAL to "Comercial", ABA_LOGISTICA to "Logística", ABA_FINANCEIRO to "Financeiro", ABA_INADIMPLENCIA to "Inadimplência", ABA_ADMIN to "Admin", ABA_PAINEL to "Painel", ABA_SITE to "Site"))
             if (logado && abaDisponivel(it.first)) lista.put(org.json.JSONArray().put(it.first).put(it.second))
         o.put("logado", logado).put("aba", aba).put("abas", lista).put("tema", if (claro) "claro" else "escuro")
             .put("naoLidos", if (aba == ABA_HELPDESK) 0 else Helpdesk.naoVistos(this)).put("helpSub", helpSubAtual())
@@ -463,6 +465,8 @@ class Tela : Activity() {
         ABA_PAINEL -> Acesso.painel(this)
         ABA_COMERCIAL -> Acesso.comercial(this)
         ABA_LOGISTICA -> Acesso.logistica(this)
+        ABA_FINANCEIRO -> Acesso.financeiro(this)
+        ABA_INADIMPLENCIA -> Acesso.inadimplencia(this)
         ABA_ADMIN -> Acesso.admin(this)
         else -> true
     }
